@@ -3,9 +3,10 @@
    MAIN STYLESHEET
    ========================================================= */
 
-/* ---------------------------------------------------------
+
+/* =========================================================
    RESET
-   --------------------------------------------------------- */
+   ========================================================= */
 
 * {
     box-sizing: border-box;
@@ -19,18 +20,16 @@ html {
 
 body {
     min-height: 100vh;
-    font-family:
-        Arial,
-        Helvetica,
-        sans-serif;
-    background: #0d0f14;
-    color: #f4f4f4;
+    font-family: Arial, Helvetica, sans-serif;
+    background: #101116;
+    color: #f4f4f6;
     line-height: 1.5;
 }
 
 button,
 input,
-textarea {
+textarea,
+select {
     font: inherit;
 }
 
@@ -43,61 +42,83 @@ img {
     display: block;
 }
 
+.hidden {
+    display: none !important;
+}
 
-/* ---------------------------------------------------------
-   APPLICATION HEADER
-   --------------------------------------------------------- */
+
+/* =========================================================
+   PAGE SYSTEM
+   ========================================================= */
+
+.page {
+    display: none;
+    min-height: calc(100vh - 76px);
+}
+
+.page.active-page {
+    display: block;
+}
+
+
+/* =========================================================
+   HEADER
+   ========================================================= */
 
 .site-header {
     position: sticky;
     top: 0;
     z-index: 1000;
 
-    min-height: 70px;
+    height: 76px;
 
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-
-    padding: 0 32px;
-
-    background: #11141b;
-    border-bottom: 1px solid #292d37;
+    background: #15171d;
+    border-bottom: 1px solid #292c35;
 
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
 }
 
+.header-inner {
+    width: min(1400px, calc(100% - 40px));
+    height: 100%;
+    margin: 0 auto;
 
-/* Logo */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 30px;
+}
 
-.logo-button {
-    border: none;
+
+/* LOGO */
+
+.site-logo {
+    border: 0;
     background: transparent;
 
     color: #ffffff;
 
     font-size: 19px;
     font-weight: 900;
-    letter-spacing: 1.5px;
+    letter-spacing: 1px;
 
+    line-height: 1;
     text-align: left;
-
-    line-height: 1.05;
 }
 
-.logo-button span {
+.site-logo span {
     display: block;
+
+    margin-top: 5px;
 
     font-size: 10px;
     letter-spacing: 4px;
 
-    color: #aeb4c0;
-
-    margin-top: 4px;
+    color: #8e93a1;
 }
 
 
-/* Navigation */
+/* NAVIGATION */
 
 .main-nav {
     display: flex;
@@ -106,17 +127,16 @@ img {
 }
 
 .main-nav button {
-    border: none;
-    background: transparent;
-
-    color: #aeb4c0;
+    border: 0;
+    border-radius: 7px;
 
     padding: 10px 15px;
 
-    font-size: 13px;
-    font-weight: 700;
+    background: transparent;
+    color: #aeb2bd;
 
-    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 700;
 
     transition:
         background 0.2s ease,
@@ -124,527 +144,378 @@ img {
 }
 
 .main-nav button:hover {
-    background: #1c2029;
+    background: #22252d;
     color: #ffffff;
 }
 
 
-/* ---------------------------------------------------------
-   PAGE SYSTEM
-   --------------------------------------------------------- */
-
-.page {
-    display: none;
-
-    min-height: calc(100vh - 70px);
-}
-
-.page.active {
-    display: block;
-}
-
-
-/* ---------------------------------------------------------
-   HERO
-   --------------------------------------------------------- */
-
-.hero-section {
-    position: relative;
-
-    min-height: 560px;
-
-    display: flex;
-    align-items: center;
-
-    padding: 80px 7%;
-
-    overflow: hidden;
-
-    background:
-        radial-gradient(
-            circle at 80% 30%,
-            rgba(76, 94, 140, 0.18),
-            transparent 35%
-        ),
-        linear-gradient(
-            135deg,
-            #10131a 0%,
-            #0c0e13 100%
-        );
-}
-
-.hero-section::before {
-    content: "";
-
-    position: absolute;
-
-    width: 500px;
-    height: 500px;
-
-    right: -180px;
-    top: -150px;
-
-    border-radius: 50%;
-
-    border: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.hero-section::after {
-    content: "";
-
-    position: absolute;
-
-    width: 700px;
-    height: 700px;
-
-    right: -280px;
-    top: -250px;
-
-    border-radius: 50%;
-
-    border: 1px solid rgba(255, 255, 255, 0.025);
-}
-
-.hero-content {
-    position: relative;
-    z-index: 2;
-
-    max-width: 760px;
-}
-
-.eyebrow {
-    margin-bottom: 8px;
-
-    color: #8f98a8;
-
-    font-size: 11px;
-    font-weight: 800;
-
-    letter-spacing: 2.5px;
-    text-transform: uppercase;
-}
-
-.hero-content h1 {
-    font-size: clamp(46px, 7vw, 86px);
-
-    line-height: 0.95;
-
-    letter-spacing: -3px;
-
-    font-weight: 900;
-
-    margin-bottom: 28px;
-}
-
-.hero-description {
-    max-width: 600px;
-
-    color: #aeb4c0;
-
-    font-size: 17px;
-
-    line-height: 1.7;
-
-    margin-bottom: 34px;
-}
-
-
-/* ---------------------------------------------------------
+/* =========================================================
    BUTTONS
-   --------------------------------------------------------- */
-
-.hero-buttons,
-.creator-actions,
-.results-actions,
-.simulation-controls {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
+   ========================================================= */
 
 .primary-button,
-.secondary-button,
-.small-button {
-    border-radius: 6px;
+.secondary-button {
+    border: 0;
+    border-radius: 8px;
+
+    padding: 13px 20px;
 
     font-weight: 800;
+    font-size: 14px;
 
     transition:
         transform 0.15s ease,
         background 0.2s ease,
-        border-color 0.2s ease;
+        box-shadow 0.2s ease;
 }
 
 .primary-button {
-    border: 1px solid #ffffff;
-
     background: #ffffff;
-
-    color: #0d0f14;
-
-    padding: 13px 20px;
-
-    font-size: 12px;
-    letter-spacing: 0.5px;
+    color: #111318;
 }
 
 .primary-button:hover {
     transform: translateY(-1px);
-
-    background: #e6e6e6;
+    background: #eeeeef;
+    box-shadow: 0 7px 20px rgba(0, 0, 0, 0.25);
 }
 
-
 .secondary-button {
-    border: 1px solid #383e4a;
+    background: #22252d;
+    color: #f4f4f6;
 
-    background: #171a21;
-
-    color: #e2e5eb;
-
-    padding: 12px 19px;
-
-    font-size: 12px;
-    letter-spacing: 0.4px;
+    border: 1px solid #363a45;
 }
 
 .secondary-button:hover {
-    background: #20242d;
-
-    border-color: #555c69;
+    background: #2b2e37;
+    border-color: #484c58;
 }
-
 
 .small-button {
-    border: 1px solid #383e4a;
-
-    background: #171a21;
-
-    color: #e2e5eb;
-
-    padding: 9px 13px;
-
-    font-size: 11px;
-}
-
-.small-button:hover {
-    background: #222630;
+    padding: 9px 14px;
+    font-size: 13px;
 }
 
 
-/* ---------------------------------------------------------
-   SAVED SEASONS
-   --------------------------------------------------------- */
+/* =========================================================
+   HERO
+   ========================================================= */
 
-.saved-seasons-section {
-    max-width: 1300px;
+.hero-section {
+    min-height: 600px;
 
+    display: flex;
+    align-items: center;
+
+    background:
+        radial-gradient(
+            circle at 50% 25%,
+            #272b35 0%,
+            #181a20 38%,
+            #101116 75%
+        );
+
+    border-bottom: 1px solid #292c35;
+}
+
+.hero-content {
+    width: min(1000px, calc(100% - 40px));
     margin: 0 auto;
 
-    padding: 65px 32px 90px;
+    padding: 90px 0;
+}
+
+.hero-kicker,
+.section-kicker {
+    color: #8f95a3;
+
+    font-size: 11px;
+    font-weight: 900;
+
+    letter-spacing: 3px;
+}
+
+.hero-content h1 {
+    margin-top: 16px;
+
+    font-size: clamp(48px, 8vw, 92px);
+    font-weight: 900;
+
+    line-height: 0.95;
+    letter-spacing: -4px;
+}
+
+.hero-content h1 span {
+    display: block;
+    color: #8f95a3;
+}
+
+.hero-description {
+    max-width: 650px;
+
+    margin-top: 28px;
+
+    color: #aeb2bd;
+
+    font-size: 18px;
+    line-height: 1.7;
+}
+
+.hero-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+
+    margin-top: 35px;
+}
+
+
+/* =========================================================
+   GENERAL CONTENT
+   ========================================================= */
+
+.content-section,
+.page-container {
+    width: min(1400px, calc(100% - 40px));
+    margin: 0 auto;
+}
+
+.content-section {
+    padding: 70px 0;
+}
+
+.page-container {
+    padding: 55px 0 90px;
+}
+
+.section-heading,
+.page-header,
+.section-title,
+.simulator-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+
+    gap: 25px;
+}
+
+.section-heading h2,
+.section-title h2 {
+    margin-top: 5px;
+
+    font-size: 28px;
+    line-height: 1.2;
 }
 
 .section-heading {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-
     margin-bottom: 28px;
 }
 
-.section-heading h2 {
-    font-size: 30px;
-
-    letter-spacing: -1px;
+.page-header {
+    margin-bottom: 45px;
 }
+
+.page-header h1,
+.simulator-header h1 {
+    margin-top: 7px;
+
+    font-size: clamp(32px, 5vw, 48px);
+    line-height: 1.1;
+}
+
+.page-header p:not(.section-kicker),
+.simulator-header p:not(.section-kicker),
+.section-title p:not(.section-kicker) {
+    margin-top: 10px;
+
+    color: #8f95a3;
+}
+
+
+/* =========================================================
+   SAVED SEASONS
+   ========================================================= */
 
 .saved-seasons-grid {
     display: grid;
 
     grid-template-columns:
-        repeat(
-            auto-fit,
-            minmax(280px, 1fr)
-        );
+        repeat(auto-fill, minmax(280px, 1fr));
 
     gap: 18px;
 }
 
-
-/* Saved season card */
-
-.saved-season-card {
+.season-card {
     overflow: hidden;
 
-    background: #15181f;
+    background: #181a20;
 
-    border: 1px solid #292e38;
-
-    border-radius: 8px;
+    border: 1px solid #292c35;
+    border-radius: 12px;
 
     transition:
         transform 0.2s ease,
         border-color 0.2s ease;
 }
 
-.saved-season-card:hover {
+.season-card:hover {
     transform: translateY(-3px);
-
-    border-color: #505866;
+    border-color: #474b57;
 }
 
-.saved-season-logo {
-    width: 100%;
-    height: 170px;
+.season-card-image {
+    height: 165px;
 
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    background: #0f1116;
+    background: #22252d;
 
     overflow: hidden;
 }
 
-.saved-season-logo img {
+.season-card-image img {
     width: 100%;
     height: 100%;
 
     object-fit: cover;
 }
 
-.saved-season-logo-placeholder {
-    color: #555d6b;
-
-    font-size: 42px;
+.season-card-body {
+    padding: 20px;
 }
 
-.saved-season-info {
-    padding: 18px;
-}
-
-.saved-season-info h3 {
-    margin-bottom: 4px;
-
-    font-size: 18px;
-}
-
-.saved-season-theme {
-    color: #858d9b;
-
-    font-size: 12px;
-}
-
-.saved-season-actions {
-    display: flex;
-
-    gap: 8px;
-
-    margin-top: 17px;
-}
-
-.saved-season-actions button {
-    flex: 1;
-
-    border: 1px solid #343944;
-
-    background: #1c2028;
-
-    color: #dce0e7;
-
-    border-radius: 5px;
-
-    padding: 9px;
-
-    font-size: 10px;
-    font-weight: 800;
-
-    text-transform: uppercase;
-}
-
-.saved-season-actions button:hover {
-    background: #272c36;
-}
-
-
-/* ---------------------------------------------------------
-   EMPTY STATE
-   --------------------------------------------------------- */
-
-.empty-state {
-    grid-column: 1 / -1;
-
-    text-align: center;
-
-    padding: 70px 25px;
-
-    background: #12151b;
-
-    border: 1px dashed #343944;
-
-    border-radius: 8px;
-}
-
-.empty-icon {
-    font-size: 42px;
-
-    margin-bottom: 14px;
-}
-
-.empty-state h3 {
-    margin-bottom: 6px;
-
+.season-card-body h3 {
     font-size: 20px;
 }
 
-.empty-state p {
-    max-width: 430px;
+.season-card-body p {
+    margin-top: 7px;
 
-    margin: 0 auto 22px;
-
-    color: #858d9b;
-
-    font-size: 13px;
-}
-
-
-/* ---------------------------------------------------------
-   GENERAL PAGE CONTAINER
-   --------------------------------------------------------- */
-
-.page-container {
-    width: min(1250px, calc(100% - 48px));
-
-    margin: 0 auto;
-
-    padding: 55px 0 80px;
-}
-
-.page-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-
-    gap: 25px;
-
-    margin-bottom: 35px;
-}
-
-.page-header h1 {
-    margin-bottom: 6px;
-
-    font-size: clamp(30px, 5vw, 48px);
-
-    line-height: 1;
-
-    letter-spacing: -1.5px;
-}
-
-.page-header p:not(.eyebrow) {
-    color: #858d9b;
+    color: #8f95a3;
 
     font-size: 14px;
 }
 
-
-/* ---------------------------------------------------------
-   EDITOR CARDS
-   --------------------------------------------------------- */
-
-.editor-card,
-.results-card {
-    margin-bottom: 22px;
-
-    padding: 27px;
-
-    background: #15181f;
-
-    border: 1px solid #292e38;
-
-    border-radius: 8px;
-}
-
-.card-header {
+.season-card-actions {
     display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
+    gap: 8px;
 
-    gap: 20px;
-
-    margin-bottom: 25px;
+    margin-top: 18px;
 }
 
-.card-header h2 {
-    font-size: 22px;
+.season-card-actions button {
+    flex: 1;
 
-    letter-spacing: -0.5px;
-}
+    border: 0;
+    border-radius: 7px;
 
-.card-header p:not(.eyebrow) {
-    margin-top: 4px;
+    padding: 9px;
 
-    color: #7f8795;
+    background: #252831;
+    color: #ffffff;
 
     font-size: 12px;
+    font-weight: 800;
+}
+
+.season-card-actions button:hover {
+    background: #30343e;
 }
 
 
-/* ---------------------------------------------------------
+/* EMPTY STATE */
+
+.empty-state {
+    padding: 70px 25px;
+
+    text-align: center;
+
+    background: #181a20;
+
+    border: 1px dashed #353943;
+    border-radius: 12px;
+}
+
+.empty-state h3 {
+    font-size: 20px;
+}
+
+.empty-state p {
+    max-width: 500px;
+
+    margin: 8px auto 20px;
+
+    color: #8f95a3;
+}
+
+
+/* =========================================================
+   CREATOR SECTIONS
+   ========================================================= */
+
+.creator-section {
+    margin-bottom: 55px;
+}
+
+.editor-card {
+    margin-top: 25px;
+
+    padding: 28px;
+
+    background: #181a20;
+
+    border: 1px solid #292c35;
+    border-radius: 12px;
+}
+
+
+/* =========================================================
    FORMS
-   --------------------------------------------------------- */
+   ========================================================= */
 
 .form-grid {
     display: grid;
 
     grid-template-columns:
-        repeat(
-            2,
-            minmax(0, 1fr)
-        );
+        repeat(2, minmax(0, 1fr));
 
-    gap: 20px;
+    gap: 22px;
 }
 
 .form-group {
     display: flex;
-
     flex-direction: column;
-
-    gap: 7px;
 }
 
-.form-group.full-width {
+.form-group-full {
     grid-column: 1 / -1;
 }
 
 .form-group label {
-    color: #cbd0d9;
+    margin-bottom: 8px;
 
-    font-size: 11px;
+    color: #cdd0d8;
+
+    font-size: 12px;
     font-weight: 800;
 
-    letter-spacing: 0.7px;
-
     text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .form-group input,
-.form-group textarea {
+.form-group textarea,
+.form-group select {
     width: 100%;
 
-    border: 1px solid #343944;
-
-    border-radius: 5px;
-
-    outline: none;
-
-    background: #0f1217;
-
-    color: #ffffff;
+    border: 1px solid #343842;
+    border-radius: 7px;
 
     padding: 12px 13px;
 
-    font-size: 13px;
+    background: #101116;
+    color: #ffffff;
+
+    outline: none;
 
     transition:
         border-color 0.2s ease,
@@ -652,8 +523,9 @@ img {
 }
 
 .form-group input:focus,
-.form-group textarea:focus {
-    border-color: #687181;
+.form-group textarea:focus,
+.form-group select:focus {
+    border-color: #6d7280;
 
     box-shadow:
         0 0 0 3px rgba(255, 255, 255, 0.04);
@@ -661,376 +533,479 @@ img {
 
 .form-group textarea {
     resize: vertical;
-
-    min-height: 100px;
+    min-height: 110px;
 }
 
-.form-group small {
-    color: #69717f;
-
-    font-size: 10px;
+.form-group input::placeholder,
+.form-group textarea::placeholder {
+    color: #5f6470;
 }
 
 
-/* ---------------------------------------------------------
-   LOGO PREVIEW
-   --------------------------------------------------------- */
+/* =========================================================
+   IMAGE PREVIEW
+   ========================================================= */
 
-.image-preview {
-    margin-top: 25px;
-
-    padding-top: 25px;
-
-    border-top: 1px solid #292e38;
+.image-preview-container {
+    margin-top: 28px;
 }
 
-.preview-label {
+.image-preview-container > p {
     margin-bottom: 10px;
 
-    color: #747d8c;
+    color: #8f95a3;
+
+    font-size: 12px;
+    font-weight: 800;
+
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.image-preview-box {
+    min-height: 150px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    position: relative;
+
+    overflow: hidden;
+
+    border: 1px dashed #3a3e49;
+    border-radius: 9px;
+
+    background: #111319;
+}
+
+.image-preview-box img {
+    max-width: 100%;
+    max-height: 250px;
+
+    object-fit: contain;
+}
+
+.image-preview-box span {
+    position: absolute;
+
+    color: #555a67;
+
+    font-size: 13px;
+}
+
+
+/* =========================================================
+   HOUSEGUEST EDITOR
+   ========================================================= */
+
+.houseguest-count-display {
+    flex-shrink: 0;
+
+    min-width: 100px;
+
+    padding: 12px 15px;
+
+    text-align: center;
+
+    background: #181a20;
+
+    border: 1px solid #30343e;
+    border-radius: 9px;
+}
+
+.houseguest-count-display strong {
+    display: block;
+
+    font-size: 25px;
+    line-height: 1;
+}
+
+.houseguest-count-display span {
+    display: block;
+
+    margin-top: 4px;
+
+    color: #777d8b;
 
     font-size: 10px;
     font-weight: 800;
 
-    letter-spacing: 1.5px;
-}
-
-.image-preview img {
-    max-width: 320px;
-    max-height: 180px;
-
-    object-fit: contain;
-
-    border-radius: 5px;
-
-    border: 1px solid #343944;
-
-    background: #0d0f14;
-}
-
-.hidden {
-    display: none !important;
-}
-
-
-/* ---------------------------------------------------------
-   CAST COUNT
-   --------------------------------------------------------- */
-
-.cast-count {
-    text-align: right;
-}
-
-.cast-count strong {
-    display: block;
-
-    font-size: 28px;
-
-    line-height: 1;
-}
-
-.cast-count span {
-    color: #717987;
-
-    font-size: 10px;
-
     text-transform: uppercase;
-
     letter-spacing: 1px;
 }
 
 
-/* ---------------------------------------------------------
-   HOUSEGUEST EDITOR
-   --------------------------------------------------------- */
+/* HOUSEGUEST GRID */
 
 .houseguest-editor {
     display: grid;
 
     grid-template-columns:
-        repeat(
-            auto-fill,
-            minmax(300px, 1fr)
-        );
+        repeat(auto-fill, minmax(440px, 1fr));
 
-    gap: 15px;
+    gap: 20px;
 
-    margin-bottom: 18px;
+    margin-top: 25px;
 }
 
 
-/* Houseguest card */
+/* HOUSEGUEST CARD */
 
 .houseguest-card {
     position: relative;
 
-    padding: 18px;
+    padding: 22px;
 
-    background: #101319;
+    background: #181a20;
 
-    border: 1px solid #292e38;
+    border: 1px solid #292c35;
+    border-radius: 12px;
 
-    border-radius: 7px;
+    transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease;
 }
+
+.houseguest-card:hover {
+    border-color: #444854;
+
+    box-shadow:
+        0 10px 30px rgba(0, 0, 0, 0.18);
+}
+
+
+/* CARD HEADER */
 
 .houseguest-card-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
 
-    margin-bottom: 15px;
+    margin-bottom: 20px;
+}
+
+.houseguest-card-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
 .houseguest-number {
-    color: #666f7d;
-
-    font-size: 10px;
-    font-weight: 800;
-
-    letter-spacing: 1px;
-}
-
-.remove-houseguest {
-    border: none;
-
-    background: transparent;
-
-    color: #777f8c;
-
-    font-size: 18px;
-
-    line-height: 1;
-}
-
-.remove-houseguest:hover {
-    color: #ffffff;
-}
-
-
-/* Houseguest image */
-
-.houseguest-image-preview {
-    width: 100%;
-    height: 150px;
+    width: 30px;
+    height: 30px;
 
     display: flex;
     align-items: center;
     justify-content: center;
 
-    margin-bottom: 15px;
+    border-radius: 50%;
+
+    background: #282b34;
+    color: #aeb2bd;
+
+    font-size: 12px;
+    font-weight: 900;
+}
+
+.houseguest-card-title h3 {
+    font-size: 16px;
+}
+
+.remove-houseguest-button {
+    border: 0;
+    border-radius: 6px;
+
+    padding: 7px 10px;
+
+    background: #252831;
+    color: #777d89;
+
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.remove-houseguest-button:hover {
+    background: #32272a;
+    color: #ffffff;
+}
+
+
+/* PHOTO */
+
+.houseguest-photo-section {
+    display: grid;
+
+    grid-template-columns: 115px minmax(0, 1fr);
+
+    gap: 18px;
+
+    margin-bottom: 22px;
+}
+
+.houseguest-photo-preview {
+    width: 115px;
+    height: 145px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
 
     overflow: hidden;
 
-    border-radius: 5px;
+    border: 1px solid #343842;
+    border-radius: 8px;
 
-    background: #0b0d11;
-
-    border: 1px solid #292e38;
+    background: #101116;
 }
 
-.houseguest-image-preview img {
+.houseguest-photo-preview img {
     width: 100%;
     height: 100%;
 
     object-fit: cover;
 }
 
-.houseguest-placeholder {
-    color: #4c5360;
+.houseguest-photo-placeholder {
+    padding: 10px;
 
-    font-size: 38px;
+    text-align: center;
+
+    color: #555a67;
+
+    font-size: 11px;
+    font-weight: 700;
 }
 
 
-/* Houseguest fields */
+/* HOUSEGUEST FORM */
 
-.houseguest-fields {
+.houseguest-basic-info {
     display: grid;
 
-    gap: 12px;
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+
+    gap: 14px;
 }
 
-.houseguest-field {
-    display: flex;
-
-    flex-direction: column;
-
-    gap: 5px;
+.houseguest-basic-info .form-group-full {
+    grid-column: 1 / -1;
 }
 
-.houseguest-field label {
-    color: #747d8c;
 
-    font-size: 9px;
-    font-weight: 800;
+/* =========================================================
+   RATINGS
+   ========================================================= */
 
-    letter-spacing: 0.8px;
+.houseguest-ratings {
+    margin-top: 22px;
+
+    padding-top: 20px;
+
+    border-top: 1px solid #292c35;
+}
+
+.houseguest-ratings-title {
+    margin-bottom: 15px;
+
+    color: #8f95a3;
+
+    font-size: 11px;
+    font-weight: 900;
 
     text-transform: uppercase;
+    letter-spacing: 1.5px;
 }
 
-.houseguest-field input {
-    width: 100%;
-
-    border: 1px solid #303540;
-
-    border-radius: 4px;
-
-    background: #151920;
-
-    color: #ffffff;
-
-    padding: 9px 10px;
-
-    outline: none;
-
-    font-size: 12px;
-}
-
-.houseguest-field input:focus {
-    border-color: #626b79;
-}
-
-
-/* Ratings */
-
-.rating-grid {
+.ratings-grid {
     display: grid;
 
     grid-template-columns:
-        repeat(4, 1fr);
-
-    gap: 7px;
-}
-
-.rating-field input {
-    text-align: center;
-}
-
-
-/* ---------------------------------------------------------
-   ADD HOUSEGUEST BUTTON
-   --------------------------------------------------------- */
-
-.add-houseguest-button {
-    width: 100%;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
+        repeat(5, minmax(0, 1fr));
 
     gap: 8px;
+}
 
-    padding: 14px;
+.rating-group {
+    display: flex;
+    flex-direction: column;
+}
 
-    border: 1px dashed #3b414d;
+.rating-group label {
+    margin-bottom: 6px;
 
+    color: #777d8b;
+
+    font-size: 9px;
+    font-weight: 900;
+
+    text-transform: uppercase;
+    text-align: center;
+
+    letter-spacing: 0.5px;
+}
+
+.rating-group input {
+    width: 100%;
+
+    border: 1px solid #343842;
     border-radius: 6px;
 
-    background: #11141a;
+    padding: 9px 4px;
 
-    color: #9aa2af;
+    background: #101116;
+    color: #ffffff;
 
-    font-size: 12px;
+    text-align: center;
+
     font-weight: 800;
 
-    transition:
-        background 0.2s ease,
-        border-color 0.2s ease,
-        color 0.2s ease;
+    outline: none;
 }
 
-.add-houseguest-button span {
-    font-size: 18px;
-}
-
-.add-houseguest-button:hover {
-    background: #191d24;
-
-    border-color: #646c7a;
-
-    color: #ffffff;
+.rating-group input:focus {
+    border-color: #6d7280;
 }
 
 
-/* ---------------------------------------------------------
-   COMING SOON
-   --------------------------------------------------------- */
+/* =========================================================
+   ADD HOUSEGUEST
+   ========================================================= */
 
-.coming-soon-card {
-    opacity: 0.9;
+.add-houseguest-container {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+
+    margin-top: 25px;
+
+    padding: 22px;
+
+    background: #15171d;
+
+    border: 1px dashed #363a45;
+    border-radius: 10px;
 }
 
-.future-features {
-    display: grid;
-
-    grid-template-columns:
-        repeat(
-            4,
-            minmax(0, 1fr)
-        );
-
-    gap: 12px;
-}
-
-.future-feature {
-    padding: 18px;
-
-    background: #101319;
-
-    border: 1px solid #272c35;
-
-    border-radius: 6px;
-}
-
-.future-feature span {
-    display: block;
-
-    margin-bottom: 10px;
-
-    font-size: 24px;
-}
-
-.future-feature strong {
-    display: block;
-
-    margin-bottom: 5px;
+.add-houseguest-container p {
+    color: #777d8b;
 
     font-size: 13px;
 }
 
-.future-feature p {
-    color: #717987;
 
-    font-size: 11px;
+/* =========================================================
+   FUTURE FEATURES
+   ========================================================= */
 
-    line-height: 1.5;
-}
-
-
-/* ---------------------------------------------------------
-   CREATOR ACTIONS
-   --------------------------------------------------------- */
-
-.creator-actions {
-    justify-content: flex-end;
-
-    padding-top: 8px;
-}
-
-
-/* ---------------------------------------------------------
-   GAME STATUS
-   --------------------------------------------------------- */
-
-.game-status {
+.future-feature-grid {
     display: grid;
 
     grid-template-columns:
-        repeat(
-            4,
-            minmax(0, 1fr)
-        );
+        repeat(3, minmax(0, 1fr));
+
+    gap: 16px;
+
+    margin-top: 25px;
+}
+
+.future-feature-card {
+    position: relative;
+
+    min-height: 220px;
+
+    padding: 24px;
+
+    background: #181a20;
+
+    border: 1px solid #292c35;
+    border-radius: 11px;
+
+    overflow: hidden;
+}
+
+.feature-number {
+    position: absolute;
+
+    top: 15px;
+    right: 18px;
+
+    color: #292d36;
+
+    font-size: 42px;
+    font-weight: 900;
+}
+
+.future-feature-card h3 {
+    position: relative;
+
+    margin-bottom: 10px;
+
+    font-size: 18px;
+}
+
+.future-feature-card p {
+    position: relative;
+
+    color: #777d8b;
+
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.feature-status {
+    display: inline-block;
+
+    margin-top: 20px;
+
+    color: #8f95a3;
+
+    font-size: 9px;
+    font-weight: 900;
+
+    letter-spacing: 1.5px;
+}
+
+
+/* =========================================================
+   CREATOR ACTIONS
+   ========================================================= */
+
+.creator-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+
+    gap: 10px;
+
+    padding-top: 30px;
+
+    border-top: 1px solid #292c35;
+}
+
+
+/* =========================================================
+   SIMULATOR
+   ========================================================= */
+
+.simulator-header {
+    margin-bottom: 30px;
+}
+
+.simulator-header-actions {
+    display: flex;
+    gap: 10px;
+}
+
+
+/* STATUS */
+
+.simulator-status-grid {
+    display: grid;
+
+    grid-template-columns:
+        repeat(4, minmax(0, 1fr));
 
     gap: 12px;
 
@@ -1038,13 +1013,12 @@ img {
 }
 
 .status-box {
-    padding: 18px;
+    padding: 17px;
 
-    background: #15181f;
+    background: #181a20;
 
-    border: 1px solid #292e38;
-
-    border-radius: 7px;
+    border: 1px solid #292c35;
+    border-radius: 9px;
 }
 
 .status-box strong {
@@ -1052,13 +1026,13 @@ img {
 
     margin-bottom: 5px;
 
-    color: #666f7d;
+    color: #666c79;
 
-    font-size: 9px;
-
-    letter-spacing: 1.5px;
+    font-size: 10px;
+    font-weight: 900;
 
     text-transform: uppercase;
+    letter-spacing: 1px;
 }
 
 .status-box span {
@@ -1067,500 +1041,563 @@ img {
     color: #ffffff;
 
     font-size: 15px;
-
     font-weight: 800;
 }
 
 
-/* ---------------------------------------------------------
+/* =========================================================
    GAME CHAIN
-   --------------------------------------------------------- */
+   ========================================================= */
 
 .game-chain {
-    display: flex;
-    align-items: center;
+    display: grid;
 
-    width: 100%;
+    grid-template-columns:
+        repeat(6, minmax(0, 1fr));
 
-    margin-bottom: 25px;
+    gap: 5px;
+
+    padding: 6px;
+
+    background: #181a20;
+
+    border: 1px solid #292c35;
+    border-radius: 10px;
 
     overflow-x: auto;
-
-    padding-bottom: 5px;
 }
 
 .chain-step {
-    flex-shrink: 0;
-
-    min-width: 100px;
-
-    text-align: center;
-}
-
-.chain-step span {
-    width: 28px;
-    height: 28px;
+    min-width: 120px;
 
     display: flex;
     align-items: center;
     justify-content: center;
 
-    margin: 0 auto 7px;
+    gap: 8px;
+
+    padding: 12px 8px;
+
+    border-radius: 7px;
+
+    color: #676d7a;
+
+    font-size: 11px;
+    font-weight: 900;
+
+    text-transform: uppercase;
+
+    transition:
+        background 0.2s ease,
+        color 0.2s ease;
+}
+
+.chain-step.active {
+    background: #ffffff;
+    color: #111318;
+}
+
+.chain-step.completed {
+    background: #292d36;
+    color: #d7d9de;
+}
+
+.chain-number {
+    width: 20px;
+    height: 20px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
 
     border-radius: 50%;
 
-    background: #20242c;
+    background: rgba(255, 255, 255, 0.08);
 
-    color: #858d9b;
-
-    font-size: 10px;
-    font-weight: 800;
+    font-size: 9px;
 }
 
-.chain-step strong {
-    color: #666f7d;
-
-    font-size: 8px;
-
-    letter-spacing: 0.6px;
-}
-
-.chain-step.active span {
-    background: #ffffff;
-
-    color: #11141a;
-}
-
-.chain-step.active strong {
+.chain-step.active .chain-number {
+    background: #111318;
     color: #ffffff;
 }
 
-.chain-line {
-    flex: 1;
 
-    min-width: 25px;
-
-    height: 1px;
-
-    background: #303540;
-}
-
-
-/* ---------------------------------------------------------
+/* =========================================================
    EVENT DISPLAY
-   --------------------------------------------------------- */
+   ========================================================= */
 
 .event-display {
-    min-height: 360px;
+    min-height: 330px;
 
     display: flex;
     flex-direction: column;
-    align-items: center;
     justify-content: center;
 
-    padding: 50px 25px;
+    margin-top: 25px;
+    padding: 45px;
+
+    background:
+        radial-gradient(
+            circle at center,
+            #22262f 0%,
+            #181a20 55%,
+            #15171c 100%
+        );
+
+    border: 1px solid #292c35;
+    border-radius: 12px;
 
     text-align: center;
+}
 
-    background: #15181f;
+.event-label {
+    margin-bottom: 10px;
+}
 
-    border: 1px solid #292e38;
+.event-label span {
+    color: #777d8b;
 
-    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 900;
+
+    text-transform: uppercase;
+    letter-spacing: 2px;
 }
 
 .event-display h2 {
-    max-width: 700px;
+    font-size: clamp(26px, 5vw, 44px);
 
-    margin-bottom: 15px;
-
-    font-size: clamp(24px, 4vw, 38px);
-
-    line-height: 1.15;
-
-    letter-spacing: -1px;
+    line-height: 1.1;
 }
 
-#event-content {
-    max-width: 650px;
+.event-content {
+    max-width: 700px;
 
-    color: #858d9b;
+    margin: 18px auto 0;
 
-    font-size: 14px;
+    color: #969ba7;
+
+    font-size: 15px;
 }
 
 .simulation-controls {
+    display: flex;
     justify-content: center;
 
     margin-top: 20px;
 }
 
 
-/* ---------------------------------------------------------
+/* =========================================================
    RESULTS
-   --------------------------------------------------------- */
+   ========================================================= */
 
-.results-header {
-    padding: 45px 20px;
+.winner-card {
+    padding: 55px 30px;
 
-    margin-bottom: 25px;
+    background:
+        radial-gradient(
+            circle at center,
+            #292d36 0%,
+            #181a20 70%
+        );
+
+    border: 1px solid #383c47;
+    border-radius: 12px;
 
     text-align: center;
-
-    background: #15181f;
-
-    border: 1px solid #292e38;
-
-    border-radius: 8px;
 }
 
-.results-header h1 {
-    margin-bottom: 35px;
+.winner-card h2 {
+    margin-top: 8px;
 
-    font-size: clamp(30px, 6vw, 55px);
-
-    letter-spacing: -2px;
+    font-size: clamp(36px, 6vw, 64px);
 }
 
-.winner-display p {
-    margin-bottom: 5px;
-
-    color: #737c8a;
-
-    font-size: 10px;
-    font-weight: 800;
-
-    letter-spacing: 2px;
+.results-section {
+    margin-top: 50px;
 }
 
-#winner-name {
-    font-size: 32px;
+.placements-list {
+    margin-top: 20px;
 
-    font-weight: 900;
+    overflow: hidden;
+
+    border: 1px solid #292c35;
+    border-radius: 10px;
 }
-
-
-/* Final placements */
 
 .placement-row {
     display: grid;
 
-    grid-template-columns: 70px 1fr auto;
+    grid-template-columns: 70px minmax(0, 1fr) 120px;
 
     align-items: center;
 
-    gap: 15px;
+    padding: 15px 18px;
 
-    padding: 15px 5px;
+    background: #181a20;
 
-    border-bottom: 1px solid #252a33;
+    border-bottom: 1px solid #292c35;
 }
 
 .placement-row:last-child {
-    border-bottom: none;
+    border-bottom: 0;
 }
 
 .placement-number {
-    font-size: 18px;
+    color: #777d8b;
 
+    font-size: 13px;
     font-weight: 900;
 }
 
 .placement-name {
-    font-weight: 700;
+    font-weight: 800;
 }
 
-.placement-result {
-    color: #747d8c;
+.placement-status {
+    color: #777d8b;
 
     font-size: 11px;
+    font-weight: 800;
+
+    text-align: right;
 }
-
-
-/* Statistics */
 
 .statistics-grid {
     display: grid;
 
     grid-template-columns:
-        repeat(
-            auto-fit,
-            minmax(180px, 1fr)
-        );
+        repeat(4, minmax(0, 1fr));
 
-    gap: 12px;
+    gap: 15px;
+
+    margin-top: 20px;
 }
 
 .stat-card {
-    padding: 18px;
+    padding: 20px;
 
-    background: #101319;
+    background: #181a20;
 
-    border: 1px solid #292e38;
-
-    border-radius: 6px;
+    border: 1px solid #292c35;
+    border-radius: 10px;
 }
 
 .stat-card strong {
     display: block;
 
-    margin-bottom: 7px;
+    color: #777d8b;
 
-    color: #666f7d;
-
-    font-size: 9px;
-
-    letter-spacing: 1px;
+    font-size: 10px;
 
     text-transform: uppercase;
+    letter-spacing: 1px;
 }
 
 .stat-card span {
     display: block;
 
-    font-size: 17px;
+    margin-top: 8px;
 
-    font-weight: 800;
+    font-size: 25px;
+    font-weight: 900;
 }
 
 
-/* ---------------------------------------------------------
+/* =========================================================
    MODAL
-   --------------------------------------------------------- */
+   ========================================================= */
 
 .modal {
     position: fixed;
-
     inset: 0;
 
     z-index: 2000;
 
+    display: none;
+}
+
+.modal.active {
     display: flex;
     align-items: center;
     justify-content: center;
+}
 
-    padding: 20px;
+.modal-overlay {
+    position: absolute;
+    inset: 0;
 
     background: rgba(0, 0, 0, 0.75);
 
-    backdrop-filter: blur(5px);
+    backdrop-filter: blur(4px);
 }
 
 .modal-content {
     position: relative;
+    z-index: 1;
 
-    width: min(600px, 100%);
-
+    width: min(650px, calc(100% - 30px));
     max-height: 90vh;
 
     overflow-y: auto;
 
     padding: 30px;
 
-    background: #171a21;
+    background: #181a20;
 
-    border: 1px solid #353b47;
+    border: 1px solid #353944;
+    border-radius: 12px;
 
-    border-radius: 8px;
-
-    box-shadow:
-        0 25px 80px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 25px 80px rgba(0, 0, 0, 0.5);
 }
 
 .modal-close {
     position: absolute;
 
     top: 12px;
-    right: 15px;
+    right: 14px;
 
-    border: none;
+    width: 32px;
+    height: 32px;
 
-    background: transparent;
+    border: 0;
+    border-radius: 50%;
 
-    color: #747d8c;
+    background: #282b34;
+    color: #aeb2bd;
 
-    font-size: 24px;
+    font-size: 20px;
+    line-height: 1;
 }
 
 .modal-close:hover {
+    background: #343842;
     color: #ffffff;
 }
 
 
-/* ---------------------------------------------------------
-   RESPONSIVE DESIGN
-   --------------------------------------------------------- */
+/* =========================================================
+   RESPONSIVE — TABLET
+   ========================================================= */
 
-@media (max-width: 900px) {
+@media (max-width: 1000px) {
 
-    .future-features {
+    .future-feature-grid {
         grid-template-columns:
-            repeat(2, 1fr);
+            repeat(2, minmax(0, 1fr));
     }
 
-    .game-status {
+    .houseguest-editor {
         grid-template-columns:
-            repeat(2, 1fr);
+            1fr;
+    }
+
+    .statistics-grid {
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr));
     }
 
 }
 
 
-@media (max-width: 700px) {
+/* =========================================================
+   RESPONSIVE — SMALL TABLET
+   ========================================================= */
+
+@media (max-width: 800px) {
 
     .site-header {
-        padding: 0 18px;
+        height: auto;
     }
 
-    .main-nav button {
-        padding: 8px;
+    .header-inner {
+        padding: 14px 0;
 
-        font-size: 10px;
-    }
-
-    .hero-section {
-        min-height: 500px;
-
-        padding:
-            65px
-            24px;
-    }
-
-    .hero-content h1 {
-        letter-spacing: -2px;
-    }
-
-    .hero-description {
-        font-size: 14px;
-    }
-
-    .hero-buttons {
-        flex-direction: column;
-
-        align-items: stretch;
-    }
-
-    .hero-buttons button {
-        width: 100%;
-    }
-
-    .saved-seasons-section {
-        padding-left: 20px;
-        padding-right: 20px;
-    }
-
-    .section-heading {
         align-items: flex-start;
-
-        gap: 15px;
     }
 
-    .page-container {
-        width: calc(100% - 30px);
-
-        padding-top: 35px;
-    }
-
-    .page-header {
-        flex-direction: column;
+    .main-nav {
+        flex-wrap: wrap;
+        justify-content: flex-end;
     }
 
     .form-grid {
         grid-template-columns: 1fr;
     }
 
-    .form-group.full-width {
+    .form-group-full {
         grid-column: auto;
     }
 
-    .editor-card,
-    .results-card {
-        padding: 20px;
-    }
-
-    .future-features {
-        grid-template-columns: 1fr;
-    }
-
-    .creator-actions,
-    .results-actions {
-        flex-direction: column-reverse;
-
-        align-items: stretch;
-    }
-
-    .creator-actions button,
-    .results-actions button {
-        width: 100%;
-    }
-
-}
-
-
-@media (max-width: 480px) {
-
-    .site-header {
-        min-height: 60px;
-    }
-
-    .logo-button {
-        font-size: 14px;
-    }
-
-    .logo-button span {
-        font-size: 8px;
-
-        letter-spacing: 2px;
-    }
-
-    .main-nav {
-        gap: 0;
-    }
-
-    .main-nav button {
-        font-size: 9px;
-
-        padding: 7px 5px;
-    }
-
-    .hero-section {
-        min-height: 470px;
-    }
-
-    .hero-content h1 {
-        font-size: 44px;
-    }
-
-    .section-heading {
-        flex-direction: column;
-    }
-
-    .section-heading .small-button {
-        width: 100%;
-    }
-
-    .game-status {
-        grid-template-columns: 1fr;
+    .simulator-status-grid {
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr));
     }
 
     .game-chain {
         justify-content: flex-start;
     }
 
-    .event-display {
-        min-height: 300px;
+}
 
-        padding: 35px 18px;
+
+/* =========================================================
+   RESPONSIVE — MOBILE
+   ========================================================= */
+
+@media (max-width: 600px) {
+
+    .header-inner {
+        width: min(100% - 24px, 1400px);
+
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+
+    .main-nav {
+        justify-content: flex-start;
+    }
+
+    .main-nav button {
+        padding: 8px 10px;
+
+        font-size: 12px;
+    }
+
+    .content-section,
+    .page-container,
+    .hero-content {
+        width: min(100% - 24px, 1400px);
+    }
+
+    .hero-section {
+        min-height: 520px;
+    }
+
+    .hero-content {
+        padding: 65px 0;
+    }
+
+    .hero-content h1 {
+        font-size: 52px;
+        letter-spacing: -2px;
+    }
+
+    .hero-description {
+        font-size: 15px;
+    }
+
+    .section-heading,
+    .page-header,
+    .section-title,
+    .simulator-header {
+        flex-direction: column;
+    }
+
+    .page-header {
+        align-items: stretch;
+    }
+
+    .houseguest-count-display {
+        align-self: flex-start;
+    }
+
+    .editor-card {
+        padding: 18px;
+    }
+
+    .houseguest-card {
+        padding: 16px;
+    }
+
+    .houseguest-photo-section {
+        grid-template-columns: 90px minmax(0, 1fr);
+    }
+
+    .houseguest-photo-preview {
+        width: 90px;
+        height: 120px;
+    }
+
+    .houseguest-basic-info {
+        grid-template-columns: 1fr;
+    }
+
+    .houseguest-basic-info .form-group-full {
+        grid-column: auto;
+    }
+
+    .ratings-grid {
+        grid-template-columns:
+            repeat(3, minmax(0, 1fr));
+    }
+
+    .add-houseguest-container {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .future-feature-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .simulator-status-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .event-display {
+        padding: 30px 18px;
+    }
+
+    .statistics-grid {
+        grid-template-columns: 1fr;
     }
 
     .placement-row {
-        grid-template-columns:
-            45px
-            1fr;
+        grid-template-columns: 50px minmax(0, 1fr);
+
+        gap: 5px;
     }
 
-    .placement-result {
+    .placement-status {
         grid-column: 2;
+
+        text-align: left;
+    }
+
+    .creator-actions {
+        flex-direction: column-reverse;
+        align-items: stretch;
+    }
+
+    .creator-actions button {
+        width: 100%;
+    }
+
+}
+
+
+/* =========================================================
+   VERY SMALL MOBILE
+   ========================================================= */
+
+@media (max-width: 400px) {
+
+    .ratings-grid {
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+    }
+
+    .hero-content h1 {
+        font-size: 43px;
+    }
+
+    .simulator-status-grid {
+        grid-template-columns: 1fr;
     }
 
 }
