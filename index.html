@@ -12,22 +12,48 @@
 <body>
 
     <!-- =========================================================
-         APPLICATION HEADER
+         HEADER
          ========================================================= -->
 
     <header class="site-header">
 
-        <div class="header-left">
-            <button class="logo-button" onclick="showPage('home-page')">
+        <div class="header-inner">
+
+            <button
+                class="site-logo"
+                type="button"
+                onclick="showPage('home-page')"
+            >
                 BIG BROTHER
                 <span>SIMULATOR</span>
             </button>
-        </div>
 
-        <nav class="main-nav">
-            <button onclick="showPage('home-page')">Home</button>
-            <button onclick="showPage('creator-page')">Create Season</button>
-        </nav>
+            <nav class="main-nav">
+
+                <button
+                    type="button"
+                    onclick="showPage('home-page')"
+                >
+                    Home
+                </button>
+
+                <button
+                    type="button"
+                    onclick="createNewSeason()"
+                >
+                    Create Season
+                </button>
+
+                <button
+                    type="button"
+                    onclick="scrollToSavedSeasons()"
+                >
+                    Saved Seasons
+                </button>
+
+            </nav>
+
+        </div>
 
     </header>
 
@@ -36,41 +62,53 @@
          MAIN APPLICATION
          ========================================================= -->
 
-    <main id="app">
+    <main>
 
 
         <!-- =====================================================
              HOME PAGE
              ===================================================== -->
 
-        <section id="home-page" class="page active">
+        <section
+            id="home-page"
+            class="page active-page"
+        >
 
             <div class="hero-section">
 
                 <div class="hero-content">
 
-                    <p class="eyebrow">WELCOME TO</p>
+                    <p class="hero-kicker">
+                        CREATE • SIMULATE • PLAY
+                    </p>
 
-                    <h1>BIG BROTHER<br>SIMULATOR</h1>
+                    <h1>
+                        BIG BROTHER
+                        <span>SIMULATOR</span>
+                    </h1>
 
                     <p class="hero-description">
-                        Create your own Big Brother seasons, customize
-                        your houseguests, competitions, twists, themes,
-                        and watch your season play out.
+                        Create completely custom Big Brother seasons,
+                        build your cast, customize the rules, and
+                        simulate the entire game.
                     </p>
 
                     <div class="hero-buttons">
 
                         <button
                             class="primary-button"
-                            onclick="showPage('creator-page')">
-                            + CREATE NEW SEASON
+                            type="button"
+                            onclick="createNewSeason()"
+                        >
+                            Create New Season
                         </button>
 
                         <button
                             class="secondary-button"
-                            onclick="scrollToSavedSeasons()">
-                            VIEW SAVED SEASONS
+                            type="button"
+                            onclick="scrollToSavedSeasons()"
+                        >
+                            View Saved Seasons
                         </button>
 
                     </div>
@@ -82,194 +120,228 @@
 
             <!-- SAVED SEASONS -->
 
-            <section class="saved-seasons-section" id="saved-seasons">
+            <div
+                id="saved-seasons"
+                class="content-section"
+            >
 
                 <div class="section-heading">
 
                     <div>
-                        <p class="eyebrow">YOUR SEASONS</p>
-                        <h2>Saved Seasons</h2>
+                        <p class="section-kicker">
+                            YOUR SEASONS
+                        </p>
+
+                        <h2>
+                            Saved Seasons
+                        </h2>
                     </div>
 
                     <button
-                        class="small-button"
-                        onclick="showPage('creator-page')">
+                        class="primary-button small-button"
+                        type="button"
+                        onclick="createNewSeason()"
+                    >
                         + New Season
                     </button>
 
                 </div>
 
-
-                <div id="saved-seasons-container" class="saved-seasons-grid">
-
-                    <!-- Saved seasons will be inserted here by JavaScript -->
-
-                    <div class="empty-state">
-
-                        <div class="empty-icon">🏠</div>
-
-                        <h3>No Seasons Yet</h3>
-
-                        <p>
-                            Create your first custom Big Brother season
-                            to get started.
-                        </p>
-
-                        <button
-                            class="primary-button"
-                            onclick="showPage('creator-page')">
-                            CREATE YOUR FIRST SEASON
-                        </button>
-
-                    </div>
-
+                <div
+                    id="saved-seasons-container"
+                    class="saved-seasons-grid"
+                >
+                    <!-- Saved seasons are generated by JavaScript -->
                 </div>
 
-            </section>
+            </div>
 
         </section>
 
 
 
         <!-- =====================================================
-             SEASON CREATOR
+             SEASON CREATOR PAGE
              ===================================================== -->
 
-        <section id="creator-page" class="page">
+        <section
+            id="creator-page"
+            class="page"
+        >
 
             <div class="page-container">
+
+                <!-- PAGE HEADER -->
 
                 <div class="page-header">
 
                     <div>
 
-                        <p class="eyebrow">SEASON CREATOR</p>
+                        <p class="section-kicker">
+                            SEASON CREATOR
+                        </p>
 
-                        <h1>Create Your Season</h1>
+                        <h1>
+                            Create Your Season
+                        </h1>
 
                         <p>
-                            Build your own custom Big Brother season.
+                            Build your cast and customize your
+                            Big Brother season.
                         </p>
 
                     </div>
 
                     <button
                         class="secondary-button"
-                        onclick="showPage('home-page')">
-                        ← BACK
+                        type="button"
+                        onclick="showPage('home-page')"
+                    >
+                        ← Back
                     </button>
 
                 </div>
 
 
-                <!-- =============================================
+
+                <!-- =================================================
                      SEASON INFORMATION
-                     ============================================= -->
+                     ================================================= -->
 
-                <div class="editor-card">
+                <div class="creator-section">
 
-                    <div class="card-header">
+                    <div class="section-title">
 
                         <div>
-                            <p class="eyebrow">STEP 1</p>
-                            <h2>Season Information</h2>
+                            <p class="section-kicker">
+                                STEP 1
+                            </p>
+
+                            <h2>
+                                Season Information
+                            </h2>
                         </div>
 
                     </div>
 
 
-                    <div class="form-grid">
+                    <div class="editor-card">
 
-                        <div class="form-group">
+                        <div class="form-grid">
 
-                            <label for="season-name">
-                                Season Name
-                            </label>
+                            <!-- Season Name -->
 
-                            <input
-                                type="text"
-                                id="season-name"
-                                placeholder="Big Brother 1"
-                                maxlength="100">
+                            <div class="form-group">
+
+                                <label for="season-name">
+                                    Season Name
+                                </label>
+
+                                <input
+                                    type="text"
+                                    id="season-name"
+                                    placeholder="Example: Big Brother 30"
+                                >
+
+                            </div>
+
+
+                            <!-- Theme -->
+
+                            <div class="form-group">
+
+                                <label for="season-theme">
+                                    Season Theme
+                                </label>
+
+                                <input
+                                    type="text"
+                                    id="season-theme"
+                                    placeholder="Example: Big Brother Hotel"
+                                >
+
+                            </div>
+
+
+                            <!-- Description -->
+
+                            <div class="form-group form-group-full">
+
+                                <label for="season-description">
+                                    Season Description
+                                </label>
+
+                                <textarea
+                                    id="season-description"
+                                    rows="4"
+                                    placeholder="Describe the theme or concept of your season..."
+                                ></textarea>
+
+                            </div>
+
+
+                            <!-- Logo -->
+
+                            <div class="form-group">
+
+                                <label for="season-logo">
+                                    Season Logo URL
+                                </label>
+
+                                <input
+                                    type="url"
+                                    id="season-logo"
+                                    placeholder="https://i.imgur.com/example.png"
+                                >
+
+                            </div>
+
+
+                            <!-- Background -->
+
+                            <div class="form-group">
+
+                                <label for="season-background">
+                                    Background Image URL
+                                </label>
+
+                                <input
+                                    type="url"
+                                    id="season-background"
+                                    placeholder="https://i.imgur.com/example.jpg"
+                                >
+
+                            </div>
 
                         </div>
 
 
-                        <div class="form-group">
+                        <!-- Logo Preview -->
 
-                            <label for="season-theme">
-                                Season Theme
-                            </label>
+                        <div
+                            id="season-logo-preview"
+                            class="image-preview-container"
+                        >
 
-                            <input
-                                type="text"
-                                id="season-theme"
-                                placeholder="Big Brother Hotel"
-                                maxlength="100">
+                            <p>
+                                Season Logo Preview
+                            </p>
 
-                        </div>
+                            <div class="image-preview-box">
 
+                                <img
+                                    id="season-logo-preview-image"
+                                    src=""
+                                    alt="Season logo preview"
+                                >
 
-                        <div class="form-group full-width">
+                                <span>
+                                    Enter a logo URL above
+                                </span>
 
-                            <label for="season-description">
-                                Season Description
-                            </label>
-
-                            <textarea
-                                id="season-description"
-                                rows="4"
-                                placeholder="Describe your season..."></textarea>
-
-                        </div>
-
-
-                        <div class="form-group">
-
-                            <label for="season-logo">
-                                Season Logo URL
-                            </label>
-
-                            <input
-                                type="url"
-                                id="season-logo"
-                                placeholder="https://i.imgur.com/example.png">
-
-                            <small>
-                                You can use an Imgur image URL.
-                            </small>
+                            </div>
 
                         </div>
-
-
-                        <div class="form-group">
-
-                            <label for="season-background">
-                                Background Image URL
-                            </label>
-
-                            <input
-                                type="url"
-                                id="season-background"
-                                placeholder="https://i.imgur.com/example.jpg">
-
-                        </div>
-
-                    </div>
-
-
-                    <!-- LOGO PREVIEW -->
-
-                    <div
-                        id="season-logo-preview"
-                        class="image-preview hidden">
-
-                        <p class="preview-label">LOGO PREVIEW</p>
-
-                        <img
-                            id="season-logo-preview-image"
-                            src=""
-                            alt="Season logo preview">
 
                     </div>
 
@@ -277,99 +349,261 @@
 
 
 
-                <!-- =============================================
-                     HOUSEGUESTS
-                     ============================================= -->
+                <!-- =================================================
+                     HOUSEGUEST EDITOR
+                     ================================================= -->
 
-                <div class="editor-card">
+                <div class="creator-section">
 
-                    <div class="card-header">
+                    <div class="section-title">
 
                         <div>
-                            <p class="eyebrow">STEP 2</p>
-                            <h2>Houseguests</h2>
-                            <p>
-                                Add the cast for your season.
+
+                            <p class="section-kicker">
+                                STEP 2
                             </p>
+
+                            <h2>
+                                Houseguests
+                            </h2>
+
+                            <p>
+                                Build your cast and give every
+                                houseguest their own strengths,
+                                weaknesses, and personality.
+                            </p>
+
                         </div>
 
-                        <div class="cast-count">
 
-                            <strong id="houseguest-count">0</strong>
+                        <div class="houseguest-count-display">
 
-                            <span>Houseguests</span>
+                            <strong id="houseguest-count">
+                                0
+                            </strong>
+
+                            <span>
+                                Houseguests
+                            </span>
 
                         </div>
 
                     </div>
 
+
+                    <!-- HOUSEGUEST EDITOR -->
 
                     <div
                         id="houseguest-editor"
-                        class="houseguest-editor">
-
-                        <!-- Houseguest cards will be inserted here -->
-
+                        class="houseguest-editor"
+                    >
+                        <!-- Houseguest cards are generated by JavaScript -->
                     </div>
 
 
-                    <button
-                        class="add-houseguest-button"
-                        onclick="addHouseguest()">
+                    <!-- ADD HOUSEGUEST -->
 
-                        <span>+</span>
+                    <div class="add-houseguest-container">
 
-                        Add Houseguest
+                        <button
+                            class="primary-button"
+                            type="button"
+                            onclick="addHouseguest()"
+                        >
+                            + Add Houseguest
+                        </button>
 
-                    </button>
+                        <p>
+                            Add as many houseguests as you need.
+                            Season rules will determine the valid
+                            cast size when the simulation system is completed.
+                        </p>
+
+                    </div>
 
                 </div>
 
 
 
-                <!-- =============================================
-                     FUTURE FEATURES
-                     ============================================= -->
+                <!-- =================================================
+                     FUTURE SEASON CUSTOMIZATION
+                     ================================================= -->
 
-                <div class="editor-card coming-soon-card">
+                <div class="creator-section">
 
-                    <div class="card-header">
+                    <div class="section-title">
 
                         <div>
 
-                            <p class="eyebrow">COMING NEXT</p>
+                            <p class="section-kicker">
+                                STEP 3+
+                            </p>
 
-                            <h2>Season Rules & Customization</h2>
+                            <h2>
+                                Season Customization
+                            </h2>
+
+                            <p>
+                                These systems will be fully editable
+                                as we continue building the simulator.
+                            </p>
 
                         </div>
 
                     </div>
 
 
-                    <div class="future-features">
+                    <div class="future-feature-grid">
 
-                        <div class="future-feature">
-                            <span>🏆</span>
-                            <strong>Competitions</strong>
-                            <p>Create your own HOH, POV and safety competitions.</p>
+
+                        <!-- Rules -->
+
+                        <div class="future-feature-card">
+
+                            <div class="feature-number">
+                                03
+                            </div>
+
+                            <h3>
+                                Game Rules
+                            </h3>
+
+                            <p>
+                                Customize final two or final three,
+                                jury size, veto rules, battle backs,
+                                double evictions, safety competitions,
+                                and more.
+                            </p>
+
+                            <span class="feature-status">
+                                COMING NEXT
+                            </span>
+
                         </div>
 
-                        <div class="future-feature">
-                            <span>🌀</span>
-                            <strong>Twists</strong>
-                            <p>Create custom twists and powers.</p>
+
+                        <!-- Relationships -->
+
+                        <div class="future-feature-card">
+
+                            <div class="feature-number">
+                                04
+                            </div>
+
+                            <h3>
+                                Relationships
+                            </h3>
+
+                            <p>
+                                Set relationships between every
+                                houseguest and determine who likes,
+                                dislikes, trusts, or targets each other.
+                            </p>
+
+                            <span class="feature-status">
+                                COMING NEXT
+                            </span>
+
                         </div>
 
-                        <div class="future-feature">
-                            <span>🤝</span>
-                            <strong>Alliances</strong>
-                            <p>Build starting alliances and relationships.</p>
+
+                        <!-- Alliances -->
+
+                        <div class="future-feature-card">
+
+                            <div class="feature-number">
+                                05
+                            </div>
+
+                            <h3>
+                                Alliances
+                            </h3>
+
+                            <p>
+                                Create starting alliances, choose
+                                members, name them, and eventually
+                                allow alliances to form and dissolve
+                                during the simulation.
+                            </p>
+
+                            <span class="feature-status">
+                                COMING NEXT
+                            </span>
+
                         </div>
 
-                        <div class="future-feature">
-                            <span>⚙️</span>
-                            <strong>Game Rules</strong>
-                            <p>Customize how your season operates.</p>
+
+                        <!-- Competitions -->
+
+                        <div class="future-feature-card">
+
+                            <div class="feature-number">
+                                06
+                            </div>
+
+                            <h3>
+                                Competitions
+                            </h3>
+
+                            <p>
+                                Create custom HOH, POV, Safety,
+                                Luxury, and Final HOH competitions.
+                            </p>
+
+                            <span class="feature-status">
+                                COMING NEXT
+                            </span>
+
+                        </div>
+
+
+                        <!-- Twists -->
+
+                        <div class="future-feature-card">
+
+                            <div class="feature-number">
+                                07
+                            </div>
+
+                            <h3>
+                                Twists
+                            </h3>
+
+                            <p>
+                                Add custom twists with names,
+                                descriptions, activation rules,
+                                and effects on the game.
+                            </p>
+
+                            <span class="feature-status">
+                                COMING NEXT
+                            </span>
+
+                        </div>
+
+
+                        <!-- Simulation -->
+
+                        <div class="future-feature-card">
+
+                            <div class="feature-number">
+                                08
+                            </div>
+
+                            <h3>
+                                Simulation Engine
+                            </h3>
+
+                            <p>
+                                Once your season is configured,
+                                the engine will simulate the game
+                                week by week.
+                            </p>
+
+                            <span class="feature-status">
+                                COMING LATER
+                            </span>
+
                         </div>
 
                     </div>
@@ -378,22 +612,24 @@
 
 
 
-                <!-- =============================================
-                     SAVE / START
-                     ============================================= -->
+                <!-- SAVE SEASON -->
 
                 <div class="creator-actions">
 
                     <button
                         class="secondary-button"
-                        onclick="showPage('home-page')">
-                        CANCEL
+                        type="button"
+                        onclick="showPage('home-page')"
+                    >
+                        Cancel
                     </button>
 
                     <button
                         class="primary-button"
-                        onclick="saveSeason()">
-                        💾 SAVE SEASON
+                        type="button"
+                        onclick="saveSeason()"
+                    >
+                        Save Season
                     </button>
 
                 </div>
@@ -408,154 +644,242 @@
              SIMULATOR PAGE
              ===================================================== -->
 
-        <section id="simulator-page" class="page">
+        <section
+            id="simulator-page"
+            class="page"
+        >
 
             <div class="page-container">
 
-                <div class="page-header">
+                <!-- SIMULATOR HEADER -->
+
+                <div class="simulator-header">
 
                     <div>
 
-                        <p class="eyebrow">LIVE GAME</p>
+                        <p class="section-kicker">
+                            SIMULATION
+                        </p>
 
                         <h1 id="simulator-season-name">
-                            Big Brother
+                            Season
                         </h1>
 
                         <p id="simulator-season-theme">
-                            Season Simulation
+                            Theme
                         </p>
 
                     </div>
 
-                    <button
-                        class="secondary-button"
-                        onclick="showPage('home-page')">
-                        ← EXIT
-                    </button>
+                    <div class="simulator-header-actions">
 
-                </div>
-
-
-                <!-- GAME STATUS -->
-
-                <div class="game-status">
-
-                    <div class="status-box">
-
-                        <strong>WEEK</strong>
-
-                        <span id="current-week">1</span>
-
-                    </div>
-
-
-                    <div class="status-box">
-
-                        <strong>HOH</strong>
-
-                        <span id="current-hoh">—</span>
-
-                    </div>
-
-
-                    <div class="status-box">
-
-                        <strong>NOMINEES</strong>
-
-                        <span id="current-nominees">—</span>
-
-                    </div>
-
-
-                    <div class="status-box">
-
-                        <strong>VETO</strong>
-
-                        <span id="current-veto">—</span>
+                        <button
+                            class="secondary-button"
+                            type="button"
+                            onclick="showPage('home-page')"
+                        >
+                            Exit
+                        </button>
 
                     </div>
 
                 </div>
 
 
-                <!-- WEEK CHAIN -->
+
+                <!-- =================================================
+                     CURRENT STATUS
+                     ================================================= -->
+
+                <div class="simulator-status-grid">
+
+                    <div class="status-box">
+
+                        <strong>
+                            Week
+                        </strong>
+
+                        <span id="current-week">
+                            1
+                        </span>
+
+                    </div>
+
+
+                    <div class="status-box">
+
+                        <strong>
+                            HOH
+                        </strong>
+
+                        <span id="current-hoh">
+                            —
+                        </span>
+
+                    </div>
+
+
+                    <div class="status-box">
+
+                        <strong>
+                            Nominees
+                        </strong>
+
+                        <span id="current-nominees">
+                            —
+                        </span>
+
+                    </div>
+
+
+                    <div class="status-box">
+
+                        <strong>
+                            POV
+                        </strong>
+
+                        <span id="current-veto">
+                            —
+                        </span>
+
+                    </div>
+
+                </div>
+
+
+
+                <!-- =================================================
+                     BRANTSTEELE-STYLE GAME CHAIN
+                     ================================================= -->
 
                 <div class="game-chain">
 
-                    <div class="chain-step active">
-                        <span>1</span>
-                        <strong>HOH</strong>
+                    <div
+                        class="chain-step active"
+                        data-step="hoh"
+                    >
+                        <span class="chain-number">
+                            1
+                        </span>
+
+                        <span>
+                            HOH
+                        </span>
                     </div>
 
-                    <div class="chain-line"></div>
 
-                    <div class="chain-step">
-                        <span>2</span>
-                        <strong>NOMINATIONS</strong>
+                    <div
+                        class="chain-step"
+                        data-step="nominations"
+                    >
+                        <span class="chain-number">
+                            2
+                        </span>
+
+                        <span>
+                            Nominations
+                        </span>
                     </div>
 
-                    <div class="chain-line"></div>
 
-                    <div class="chain-step">
-                        <span>3</span>
-                        <strong>POV PLAYERS</strong>
+                    <div
+                        class="chain-step"
+                        data-step="pov-players"
+                    >
+                        <span class="chain-number">
+                            3
+                        </span>
+
+                        <span>
+                            POV Players
+                        </span>
                     </div>
 
-                    <div class="chain-line"></div>
 
-                    <div class="chain-step">
-                        <span>4</span>
-                        <strong>POV</strong>
+                    <div
+                        class="chain-step"
+                        data-step="pov"
+                    >
+                        <span class="chain-number">
+                            4
+                        </span>
+
+                        <span>
+                            POV
+                        </span>
                     </div>
 
-                    <div class="chain-line"></div>
 
-                    <div class="chain-step">
-                        <span>5</span>
-                        <strong>VETO CEREMONY</strong>
+                    <div
+                        class="chain-step"
+                        data-step="veto-ceremony"
+                    >
+                        <span class="chain-number">
+                            5
+                        </span>
+
+                        <span>
+                            Veto Ceremony
+                        </span>
                     </div>
 
-                    <div class="chain-line"></div>
 
-                    <div class="chain-step">
-                        <span>6</span>
-                        <strong>EVICTION</strong>
+                    <div
+                        class="chain-step"
+                        data-step="eviction"
+                    >
+                        <span class="chain-number">
+                            6
+                        </span>
+
+                        <span>
+                            Eviction
+                        </span>
                     </div>
 
                 </div>
 
 
-                <!-- CURRENT EVENT -->
+
+                <!-- =================================================
+                     EVENT DISPLAY
+                     ================================================= -->
 
                 <div class="event-display">
 
-                    <p class="eyebrow" id="event-type">
-                        HEAD OF HOUSEHOLD
-                    </p>
+                    <div class="event-label">
+                        <span id="event-type">
+                            WEEK 1
+                        </span>
+                    </div>
 
                     <h2 id="event-title">
-                        The Houseguests are competing for HOH!
+                        Ready to Begin
                     </h2>
 
-                    <div id="event-content">
-
+                    <div
+                        id="event-content"
+                        class="event-content"
+                    >
                         <p>
-                            The simulation will appear here.
+                            Your season is ready to simulate.
                         </p>
-
                     </div>
 
                 </div>
 
+
+                <!-- CONTINUE -->
 
                 <div class="simulation-controls">
 
                     <button
-                        id="next-event-button"
+                        id="continue-button"
                         class="primary-button"
-                        onclick="runNextEvent()">
-                        CONTINUE →
+                        type="button"
+                        onclick="runNextEvent()"
+                    >
+                        Continue
                     </button>
 
                 </div>
@@ -570,90 +894,116 @@
              RESULTS PAGE
              ===================================================== -->
 
-        <section id="results-page" class="page">
+        <section
+            id="results-page"
+            class="page"
+        >
 
             <div class="page-container">
 
-                <div class="results-header">
+                <div class="page-header">
 
-                    <p class="eyebrow">SEASON COMPLETE</p>
+                    <div>
 
-                    <h1 id="results-season-name">
-                        Big Brother
-                    </h1>
+                        <p class="section-kicker">
+                            SEASON COMPLETE
+                        </p>
 
-                    <div class="winner-display">
+                        <h1>
+                            Final Results
+                        </h1>
 
-                        <p>WINNER</p>
-
-                        <div id="winner-name">
-                            —
-                        </div>
+                        <p id="results-season-name">
+                            Season
+                        </p>
 
                     </div>
+
+                    <button
+                        class="secondary-button"
+                        type="button"
+                        onclick="showPage('home-page')"
+                    >
+                        Return Home
+                    </button>
 
                 </div>
 
 
-                <!-- FINAL PLACEMENTS -->
 
-                <div class="results-card">
+                <!-- WINNER -->
 
-                    <div class="card-header">
+                <div class="winner-card">
+
+                    <p class="section-kicker">
+                        WINNER
+                    </p>
+
+                    <h2 id="winner-name">
+                        —
+                    </h2>
+
+                </div>
+
+
+
+                <!-- PLACEMENTS -->
+
+                <div class="results-section">
+
+                    <div class="section-title">
 
                         <div>
-                            <p class="eyebrow">FINAL RESULTS</p>
-                            <h2>Placements</h2>
+
+                            <p class="section-kicker">
+                                FINAL ORDER
+                            </p>
+
+                            <h2>
+                                Placements
+                            </h2>
+
                         </div>
 
                     </div>
 
-                    <div id="final-placements">
-
-                        <!-- Results inserted by JavaScript -->
-
+                    <div
+                        id="final-placements"
+                        class="placements-list"
+                    >
+                        <!-- Generated by JavaScript -->
                     </div>
 
                 </div>
+
 
 
                 <!-- STATISTICS -->
 
-                <div class="results-card">
+                <div class="results-section">
 
-                    <div class="card-header">
+                    <div class="section-title">
 
                         <div>
-                            <p class="eyebrow">SEASON STATISTICS</p>
-                            <h2>Statistics</h2>
+
+                            <p class="section-kicker">
+                                SEASON DATA
+                            </p>
+
+                            <h2>
+                                Statistics
+                            </h2>
+
                         </div>
 
                     </div>
 
                     <div
                         id="season-statistics"
-                        class="statistics-grid">
-
-                        <!-- Statistics inserted by JavaScript -->
-
+                        class="statistics-grid"
+                    >
+                        <!-- Generated by JavaScript -->
                     </div>
-
-                </div>
-
-
-                <div class="results-actions">
-
-                    <button
-                        class="secondary-button"
-                        onclick="showPage('home-page')">
-                        ← HOME
-                    </button>
-
-                    <button
-                        class="primary-button"
-                        onclick="showPage('creator-page')">
-                        + CREATE NEW SEASON
-                    </button>
 
                 </div>
 
@@ -664,34 +1014,45 @@
     </main>
 
 
+
     <!-- =========================================================
          MODAL
          ========================================================= -->
 
     <div
         id="modal"
-        class="modal hidden"
-        onclick="closeModal(event)">
+        class="modal"
+        aria-hidden="true"
+    >
+
+        <div
+            class="modal-overlay"
+            onclick="closeModal()"
+        ></div>
 
         <div
             class="modal-content"
-            onclick="event.stopPropagation()">
+            role="dialog"
+            aria-modal="true"
+        >
 
             <button
                 class="modal-close"
-                onclick="closeModal()">
+                type="button"
+                onclick="closeModal()"
+                aria-label="Close"
+            >
                 ×
             </button>
 
             <div id="modal-body">
-
-                <!-- Modal content inserted by JavaScript -->
-
+                <!-- Modal content generated by JavaScript -->
             </div>
 
         </div>
 
     </div>
+
 
 
     <!-- =========================================================
