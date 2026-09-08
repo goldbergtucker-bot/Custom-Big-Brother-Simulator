@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Big Brother Simulator</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <!-- =========================================================
+         APPLICATION HEADER
+         ========================================================= -->
+
+    <header class="site-header">
+
+        <div class="header-left">
+            <button class="logo-button" onclick="showPage('home-page')">
+                BIG BROTHER
+                <span>SIMULATOR</span>
+            </button>
+        </div>
+
+        <nav class="main-nav">
+            <button onclick="showPage('home-page')">Home</button>
+            <button onclick="showPage('creator-page')">Create Season</button>
+        </nav>
+
+    </header>
+
+
+    <!-- =========================================================
+         MAIN APPLICATION
+         ========================================================= -->
+
+    <main id="app">
+
+
+        <!-- =====================================================
+             HOME PAGE
+             ===================================================== -->
+
+        <section id="home-page" class="page active">
+
+            <div class="hero-section">
+
+                <div class="hero-content">
+
+                    <p class="eyebrow">WELCOME TO</p>
+
+                    <h1>BIG BROTHER<br>SIMULATOR</h1>
+
+                    <p class="hero-description">
+                        Create your own Big Brother seasons, customize
+                        your houseguests, competitions, twists, themes,
+                        and watch your season play out.
+                    </p>
+
+                    <div class="hero-buttons">
+
+                        <button
+                            class="primary-button"
+                            onclick="showPage('creator-page')">
+                            + CREATE NEW SEASON
+                        </button>
+
+                        <button
+                            class="secondary-button"
+                            onclick="scrollToSavedSeasons()">
+                            VIEW SAVED SEASONS
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- SAVED SEASONS -->
+
+            <section class="saved-seasons-section" id="saved-seasons">
+
+                <div class="section-heading">
+
+                    <div>
+                        <p class="eyebrow">YOUR SEASONS</p>
+                        <h2>Saved Seasons</h2>
+                    </div>
+
+                    <button
+                        class="small-button"
+                        onclick="showPage('creator-page')">
+                        + New Season
+                    </button>
+
+                </div>
+
+
+                <div id="saved-seasons-container" class="saved-seasons-grid">
+
+                    <!-- Saved seasons will be inserted here by JavaScript -->
+
+                    <div class="empty-state">
+
+                        <div class="empty-icon">🏠</div>
+
+                        <h3>No Seasons Yet</h3>
+
+                        <p>
+                            Create your first custom Big Brother season
+                            to get started.
+                        </p>
+
+                        <button
+                            class="primary-button"
+                            onclick="showPage('creator-page')">
+                            CREATE YOUR FIRST SEASON
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </section>
+
+        </section>
+
+
+
+        <!-- =====================================================
+             SEASON CREATOR
+             ===================================================== -->
+
+        <section id="creator-page" class="page">
+
+            <div class="page-container">
+
+                <div class="page-header">
+
+                    <div>
+
+                        <p class="eyebrow">SEASON CREATOR</p>
+
+                        <h1>Create Your Season</h1>
+
+                        <p>
+                            Build your own custom Big Brother season.
+                        </p>
+
+                    </div>
+
+                    <button
+                        class="secondary-button"
+                        onclick="showPage('home-page')">
+                        ← BACK
+                    </button>
+
+                </div>
+
+
+                <!-- =============================================
+                     SEASON INFORMATION
+                     ============================================= -->
+
+                <div class="editor-card">
+
+                    <div class="card-header">
+
+                        <div>
+                            <p class="eyebrow">STEP 1</p>
+                            <h2>Season Information</h2>
+                        </div>
+
+                    </div>
+
+
+                    <div class="form-grid">
+
+                        <div class="form-group">
+
+                            <label for="season-name">
+                                Season Name
+                            </label>
+
+                            <input
+                                type="text"
+                                id="season-name"
+                                placeholder="Big Brother 1"
+                                maxlength="100">
+
+                        </div>
+
+
+                        <div class="form-group">
+
+                            <label for="season-theme">
+                                Season Theme
+                            </label>
+
+                            <input
+                                type="text"
+                                id="season-theme"
+                                placeholder="Big Brother Hotel"
+                                maxlength="100">
+
+                        </div>
+
+
+                        <div class="form-group full-width">
+
+                            <label for="season-description">
+                                Season Description
+                            </label>
+
+                            <textarea
+                                id="season-description"
+                                rows="4"
+                                placeholder="Describe your season..."></textarea>
+
+                        </div>
+
+
+                        <div class="form-group">
+
+                            <label for="season-logo">
+                                Season Logo URL
+                            </label>
+
+                            <input
+                                type="url"
+                                id="season-logo"
+                                placeholder="https://i.imgur.com/example.png">
+
+                            <small>
+                                You can use an Imgur image URL.
+                            </small>
+
+                        </div>
+
+
+                        <div class="form-group">
+
+                            <label for="season-background">
+                                Background Image URL
+                            </label>
+
+                            <input
+                                type="url"
+                                id="season-background"
+                                placeholder="https://i.imgur.com/example.jpg">
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- LOGO PREVIEW -->
+
+                    <div
+                        id="season-logo-preview"
+                        class="image-preview hidden">
+
+                        <p class="preview-label">LOGO PREVIEW</p>
+
+                        <img
+                            id="season-logo-preview-image"
+                            src=""
+                            alt="Season logo preview">
+
+                    </div>
+
+                </div>
+
+
+
+                <!-- =============================================
+                     HOUSEGUESTS
+                     ============================================= -->
+
+                <div class="editor-card">
+
+                    <div class="card-header">
+
+                        <div>
+                            <p class="eyebrow">STEP 2</p>
+                            <h2>Houseguests</h2>
+                            <p>
+                                Add the cast for your season.
+                            </p>
+                        </div>
+
+                        <div class="cast-count">
+
+                            <strong id="houseguest-count">0</strong>
+
+                            <span>Houseguests</span>
+
+                        </div>
+
+                    </div>
+
+
+                    <div
+                        id="houseguest-editor"
+                        class="houseguest-editor">
+
+                        <!-- Houseguest cards will be inserted here -->
+
+                    </div>
+
+
+                    <button
+                        class="add-houseguest-button"
+                        onclick="addHouseguest()">
+
+                        <span>+</span>
+
+                        Add Houseguest
+
+                    </button>
+
+                </div>
+
+
+
+                <!-- =============================================
+                     FUTURE FEATURES
+                     ============================================= -->
+
+                <div class="editor-card coming-soon-card">
+
+                    <div class="card-header">
+
+                        <div>
+
+                            <p class="eyebrow">COMING NEXT</p>
+
+                            <h2>Season Rules & Customization</h2>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="future-features">
+
+                        <div class="future-feature">
+                            <span>🏆</span>
+                            <strong>Competitions</strong>
+                            <p>Create your own HOH, POV and safety competitions.</p>
+                        </div>
+
+                        <div class="future-feature">
+                            <span>🌀</span>
+                            <strong>Twists</strong>
+                            <p>Create custom twists and powers.</p>
+                        </div>
+
+                        <div class="future-feature">
+                            <span>🤝</span>
+                            <strong>Alliances</strong>
+                            <p>Build starting alliances and relationships.</p>
+                        </div>
+
+                        <div class="future-feature">
+                            <span>⚙️</span>
+                            <strong>Game Rules</strong>
+                            <p>Customize how your season operates.</p>
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+
+                <!-- =============================================
+                     SAVE / START
+                     ============================================= -->
+
+                <div class="creator-actions">
+
+                    <button
+                        class="secondary-button"
+                        onclick="showPage('home-page')">
+                        CANCEL
+                    </button>
+
+                    <button
+                        class="primary-button"
+                        onclick="saveSeason()">
+                        💾 SAVE SEASON
+                    </button>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =====================================================
+             SIMULATOR PAGE
+             ===================================================== -->
+
+        <section id="simulator-page" class="page">
+
+            <div class="page-container">
+
+                <div class="page-header">
+
+                    <div>
+
+                        <p class="eyebrow">LIVE GAME</p>
+
+                        <h1 id="simulator-season-name">
+                            Big Brother
+                        </h1>
+
+                        <p id="simulator-season-theme">
+                            Season Simulation
+                        </p>
+
+                    </div>
+
+                    <button
+                        class="secondary-button"
+                        onclick="showPage('home-page')">
+                        ← EXIT
+                    </button>
+
+                </div>
+
+
+                <!-- GAME STATUS -->
+
+                <div class="game-status">
+
+                    <div class="status-box">
+
+                        <strong>WEEK</strong>
+
+                        <span id="current-week">1</span>
+
+                    </div>
+
+
+                    <div class="status-box">
+
+                        <strong>HOH</strong>
+
+                        <span id="current-hoh">—</span>
+
+                    </div>
+
+
+                    <div class="status-box">
+
+                        <strong>NOMINEES</strong>
+
+                        <span id="current-nominees">—</span>
+
+                    </div>
+
+
+                    <div class="status-box">
+
+                        <strong>VETO</strong>
+
+                        <span id="current-veto">—</span>
+
+                    </div>
+
+                </div>
+
+
+                <!-- WEEK CHAIN -->
+
+                <div class="game-chain">
+
+                    <div class="chain-step active">
+                        <span>1</span>
+                        <strong>HOH</strong>
+                    </div>
+
+                    <div class="chain-line"></div>
+
+                    <div class="chain-step">
+                        <span>2</span>
+                        <strong>NOMINATIONS</strong>
+                    </div>
+
+                    <div class="chain-line"></div>
+
+                    <div class="chain-step">
+                        <span>3</span>
+                        <strong>POV PLAYERS</strong>
+                    </div>
+
+                    <div class="chain-line"></div>
+
+                    <div class="chain-step">
+                        <span>4</span>
+                        <strong>POV</strong>
+                    </div>
+
+                    <div class="chain-line"></div>
+
+                    <div class="chain-step">
+                        <span>5</span>
+                        <strong>VETO CEREMONY</strong>
+                    </div>
+
+                    <div class="chain-line"></div>
+
+                    <div class="chain-step">
+                        <span>6</span>
+                        <strong>EVICTION</strong>
+                    </div>
+
+                </div>
+
+
+                <!-- CURRENT EVENT -->
+
+                <div class="event-display">
+
+                    <p class="eyebrow" id="event-type">
+                        HEAD OF HOUSEHOLD
+                    </p>
+
+                    <h2 id="event-title">
+                        The Houseguests are competing for HOH!
+                    </h2>
+
+                    <div id="event-content">
+
+                        <p>
+                            The simulation will appear here.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="simulation-controls">
+
+                    <button
+                        id="next-event-button"
+                        class="primary-button"
+                        onclick="runNextEvent()">
+                        CONTINUE →
+                    </button>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =====================================================
+             RESULTS PAGE
+             ===================================================== -->
+
+        <section id="results-page" class="page">
+
+            <div class="page-container">
+
+                <div class="results-header">
+
+                    <p class="eyebrow">SEASON COMPLETE</p>
+
+                    <h1 id="results-season-name">
+                        Big Brother
+                    </h1>
+
+                    <div class="winner-display">
+
+                        <p>WINNER</p>
+
+                        <div id="winner-name">
+                            —
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- FINAL PLACEMENTS -->
+
+                <div class="results-card">
+
+                    <div class="card-header">
+
+                        <div>
+                            <p class="eyebrow">FINAL RESULTS</p>
+                            <h2>Placements</h2>
+                        </div>
+
+                    </div>
+
+                    <div id="final-placements">
+
+                        <!-- Results inserted by JavaScript -->
+
+                    </div>
+
+                </div>
+
+
+                <!-- STATISTICS -->
+
+                <div class="results-card">
+
+                    <div class="card-header">
+
+                        <div>
+                            <p class="eyebrow">SEASON STATISTICS</p>
+                            <h2>Statistics</h2>
+                        </div>
+
+                    </div>
+
+                    <div
+                        id="season-statistics"
+                        class="statistics-grid">
+
+                        <!-- Statistics inserted by JavaScript -->
+
+                    </div>
+
+                </div>
+
+
+                <div class="results-actions">
+
+                    <button
+                        class="secondary-button"
+                        onclick="showPage('home-page')">
+                        ← HOME
+                    </button>
+
+                    <button
+                        class="primary-button"
+                        onclick="showPage('creator-page')">
+                        + CREATE NEW SEASON
+                    </button>
+
+                </div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+
+    <!-- =========================================================
+         MODAL
+         ========================================================= -->
+
+    <div
+        id="modal"
+        class="modal hidden"
+        onclick="closeModal(event)">
+
+        <div
+            class="modal-content"
+            onclick="event.stopPropagation()">
+
+            <button
+                class="modal-close"
+                onclick="closeModal()">
+                ×
+            </button>
+
+            <div id="modal-body">
+
+                <!-- Modal content inserted by JavaScript -->
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- =========================================================
+         JAVASCRIPT
+         ========================================================= -->
+
+    <script src="app.js"></script>
+
+</body>
+</html>
