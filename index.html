@@ -1374,206 +1374,66 @@
 
 
             <!-- =================================================
-                 ALLIANCES
+                 ADVANCED SEASON SYSTEMS
                  ================================================= -->
-            <section class="creator-section" id="alliances-section">
+
+            <section class="creator-section advanced-systems-section">
                 <div class="section-heading">
                     <div>
                         <span class="section-label">STEP 5</span>
                         <h2>Alliances</h2>
-                        <p>Create strategic alliances and choose their members.</p>
+                        <p>Create overlapping alliances and control their status.</p>
                     </div>
                 </div>
-
-                <div class="alliance-editor">
-                    <div class="alliance-editor-header">
-                        <span class="section-label">ALLIANCE EDITOR</span>
+                <div class="advanced-editor-grid">
+                    <div class="editor-panel">
                         <h3 id="alliance-form-title">Create Alliance</h3>
-                        <p>Alliances can overlap, so a houseguest may belong to multiple groups.</p>
-                    </div>
-
-                    <div class="alliance-form-grid">
-                        <div class="form-group">
-                            <label for="alliance-name">Alliance Name</label>
-                            <input type="text" id="alliance-name" placeholder="Example: The Brigade">
+                        <div class="form-grid">
+                            <div class="form-group form-group-full"><label for="alliance-name">Alliance Name</label><input id="alliance-name" type="text" placeholder="Example: The Brigade"></div>
+                            <div class="form-group form-group-full"><label for="alliance-description">Description</label><textarea id="alliance-description" rows="3" placeholder="Describe the alliance..."></textarea></div>
+                            <div class="form-group"><label for="alliance-status">Status</label><select id="alliance-status"><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
+                            <div class="form-group form-group-full"><label for="alliance-members">Members</label><select id="alliance-members" multiple size="7"></select><small>Hold Ctrl/Cmd to select multiple houseguests.</small></div>
                         </div>
-                        <div class="form-group">
-                            <label for="alliance-status">Status</label>
-                            <select id="alliance-status">
-                                <option value="active">Active</option>
-                                <option value="inactive">Inactive</option>
-                            </select>
-                        </div>
+                        <div class="editor-actions"><button id="save-alliance-btn" class="primary-button" type="button">Add Alliance</button><button id="cancel-alliance-btn" class="secondary-button" type="button">Clear</button></div>
                     </div>
-
-                    <div class="form-group alliance-description-field">
-                        <label for="alliance-description">Description</label>
-                        <textarea id="alliance-description" rows="3" placeholder="Describe the alliance's purpose, history, or strategy."></textarea>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="alliance-members">Members</label>
-                        <select id="alliance-members" class="alliance-member-select" multiple size="8"></select>
-                        <small>Hold Ctrl/Cmd while clicking to select multiple houseguests.</small>
-                        <div id="alliance-member-count" class="alliance-member-count">0 members selected</div>
-                    </div>
-
-                    <div class="alliance-actions-form">
-                        <button type="button" class="primary-button" id="alliance-save-button" onclick="saveAlliance()">Add Alliance</button>
-                        <button type="button" class="secondary-button" onclick="resetAllianceEditor()">Clear</button>
-                    </div>
-                </div>
-
-                <div class="saved-alliances">
-                    <div class="section-heading">
-                        <div>
-                            <span class="section-label">CURRENT SEASON</span>
-                            <h3>Alliance Chart</h3>
-                            <p>All alliances created for this season will appear here.</p>
-                        </div>
-                    </div>
-                    <div id="alliances-container" class="alliances-container">
-                        <div class="empty-state">
-                            <div class="empty-state-icon">👥</div>
-                            <h3>No Alliances Added</h3>
-                            <p>Create your first alliance above.</p>
-                        </div>
-                    </div>
+                    <div class="editor-panel"><h3>Created Alliances</h3><div id="alliances-container" class="advanced-list"></div></div>
                 </div>
             </section>
 
-            <!-- =================================================
-                 FUTURE CUSTOMIZATION
-                 ================================================= -->
-
-            <section class="creator-section">
-
-                <div class="section-heading">
-
-                    <div>
-
-                        <span class="section-label">
-                            FUTURE CUSTOMIZATION
-                        </span>
-
-                        <h2>
-                            More Season Systems
-                        </h2>
-
-                        <p>
-                            Additional season customization will be added
-                            here as the simulator develops.
-                        </p>
-
+            <section class="creator-section advanced-systems-section">
+                <div class="section-heading"><div><span class="section-label">STEP 6</span><h2>Competitions</h2><p>Define custom HOH, POV, Safety, Luxury, and Final HOH competitions.</p></div></div>
+                <div class="advanced-editor-grid">
+                    <div class="editor-panel">
+                        <h3 id="competition-form-title">Create Competition</h3>
+                        <div class="form-grid">
+                            <div class="form-group"><label for="competition-name">Competition Name</label><input id="competition-name" type="text" placeholder="Example: Wall Endurance"></div>
+                            <div class="form-group"><label for="competition-type">Competition Type</label><select id="competition-type"><option value="hoh">HOH</option><option value="pov">POV</option><option value="safety">Safety</option><option value="luxury">Luxury</option><option value="finalHoh">Final HOH</option></select></div>
+                            <div class="form-group"><label for="competition-primary">Primary Skill</label><select id="competition-primary"><option>physical</option><option>mental</option><option>social</option><option>strategic</option><option>general</option></select></div>
+                            <div class="form-group"><label for="competition-secondary">Secondary Skill</label><select id="competition-secondary"><option>mental</option><option>physical</option><option>social</option><option>strategic</option><option>general</option></select></div>
+                            <div class="form-group form-group-full"><label for="competition-description">Description</label><textarea id="competition-description" rows="3" placeholder="How does this competition work?"></textarea></div>
+                        </div>
+                        <div class="editor-actions"><button id="save-competition-btn" class="primary-button" type="button">Add Competition</button><button id="cancel-competition-btn" class="secondary-button" type="button">Clear</button></div>
                     </div>
-
+                    <div class="editor-panel"><h3>Competition Library</h3><div id="competitions-container" class="advanced-list"></div></div>
                 </div>
-
-
-                <div class="feature-grid">
-
-
-                    <!-- ALLIANCES -->
-
-                    <div class="feature-card">
-
-                        <div class="feature-icon">
-                            👥
-                        </div>
-
-                        <h3>
-                            Alliances
-                        </h3>
-
-                        <p>
-                            Create alliances, define members, set loyalty,
-                            and track alliance history.
-                        </p>
-
-                        <span class="feature-status">
-                            Added
-                        </span>
-
-                    </div>
-
-
-                    <!-- COMPETITIONS -->
-
-                    <div class="feature-card">
-
-                        <div class="feature-icon">
-                            🏆
-                        </div>
-
-                        <h3>
-                            Competitions
-                        </h3>
-
-                        <p>
-                            Create custom HOH, POV, Safety, Luxury, and Final
-                            HOH competitions.
-                        </p>
-
-                        <span class="feature-status">
-                            Coming Soon
-                        </span>
-
-                    </div>
-
-
-                    <!-- TWISTS -->
-
-                    <div class="feature-card">
-
-                        <div class="feature-icon">
-                            🎲
-                        </div>
-
-                        <h3>
-                            Twists
-                        </h3>
-
-                        <p>
-                            Add custom twists and special mechanics to your
-                            season.
-                        </p>
-
-                        <span class="feature-status">
-                            Coming Soon
-                        </span>
-
-                    </div>
-
-
-                    <!-- SIMULATION ENGINE -->
-
-                    <div class="feature-card">
-
-                        <div class="feature-icon">
-                            ⚙️
-                        </div>
-
-                        <h3>
-                            Simulation Engine
-                        </h3>
-
-                        <p>
-                            Configure how relationships, strategy,
-                            competitions, and decisions affect the game.
-                        </p>
-
-                        <span class="feature-status">
-                            Coming Soon
-                        </span>
-
-                    </div>
-
-                </div>
-
             </section>
 
-
-
+            <section class="creator-section advanced-systems-section">
+                <div class="section-heading"><div><span class="section-label">STEP 7</span><h2>Twists</h2><p>Add custom twists and choose when they affect the season.</p></div></div>
+                <div class="advanced-editor-grid">
+                    <div class="editor-panel">
+                        <h3 id="twist-form-title">Create Twist</h3>
+                        <div class="form-grid">
+                            <div class="form-group"><label for="twist-name">Twist Name</label><input id="twist-name" type="text" placeholder="Example: Safety Suite"></div>
+                            <div class="form-group"><label for="twist-timing">Timing</label><select id="twist-timing"><option value="season">Season Long</option><option value="week1">Week 1</option><option value="weekly">Weekly</option><option value="midseason">Midseason</option><option value="endgame">Endgame</option></select></div>
+                            <div class="form-group form-group-full"><label for="twist-description">Description</label><textarea id="twist-description" rows="4" placeholder="Explain the twist..."></textarea></div>
+                            <div class="form-group"><label><input id="twist-active" type="checkbox" checked> Active</label></div>
+                        </div>
+                        <div class="editor-actions"><button id="save-twist-btn" class="primary-button" type="button">Add Twist</button><button id="cancel-twist-btn" class="secondary-button" type="button">Clear</button></div>
+                    </div>
+                    <div class="editor-panel"><h3>Twist Library</h3><div id="twists-container" class="advanced-list"></div></div>
+                </div>
+            </section>
             <!-- =================================================
                  SAVE SEASON
                  ================================================= -->
@@ -1747,10 +1607,6 @@
                 <div class="chain-line"></div>
 
                 <div class="chain-step">
-
-                    <span class="chain-number">
-                        5
-                    </span>
 
                     <span class="chain-number">
                         5
