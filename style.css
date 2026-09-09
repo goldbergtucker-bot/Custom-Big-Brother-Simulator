@@ -1914,3 +1914,750 @@ select {
         font-size: 22px;
     }
 }
+
+
+/* =========================================================
+   RELATIONSHIPS
+   ========================================================= */
+
+.relationships-section {
+    position: relative;
+}
+
+.relationship-editor {
+    background: #ffffff;
+    border: 1px solid #e1e4e8;
+    border-radius: 14px;
+    padding: 24px;
+    margin-top: 20px;
+}
+
+.relationship-editor-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+}
+
+.relationship-editor-header h3 {
+    margin: 0 0 6px;
+    font-size: 20px;
+}
+
+.relationship-editor-header p {
+    margin: 0;
+    color: #777;
+    font-size: 14px;
+}
+
+
+/* ---------------------------------------------------------
+   RELATIONSHIP HOUSEGUEST SELECTION
+   --------------------------------------------------------- */
+
+.relationship-houseguest-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 40px minmax(0, 1fr);
+    align-items: end;
+    gap: 16px;
+    margin-bottom: 28px;
+}
+
+.relationship-direction {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 44px;
+    font-size: 24px;
+    font-weight: 700;
+    color: #888;
+}
+
+
+/* ---------------------------------------------------------
+   RELATIONSHIP METRICS
+   --------------------------------------------------------- */
+
+.relationship-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+    margin-top: 10px;
+}
+
+.relationship-metric {
+    background: #f8f9fa;
+    border: 1px solid #e4e7eb;
+    border-radius: 12px;
+    padding: 18px;
+}
+
+.relationship-metric-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.relationship-metric-header label {
+    margin: 0;
+    font-weight: 700;
+    font-size: 14px;
+    color: #333;
+}
+
+.relationship-metric-header span {
+    min-width: 34px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: #e9ecef;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 800;
+    color: #333;
+}
+
+.relationship-metric input[type="range"] {
+    width: 100%;
+    margin: 4px 0 8px;
+    cursor: pointer;
+}
+
+.relationship-scale {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: #888;
+}
+
+
+/* ---------------------------------------------------------
+   OVERALL RELATIONSHIP
+   --------------------------------------------------------- */
+
+.relationship-overall {
+    margin-top: 24px;
+    padding: 20px;
+    border: 1px solid #dfe3e7;
+    border-radius: 12px;
+    background: #f8f9fa;
+}
+
+.relationship-overall-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.relationship-overall-header span {
+    font-size: 14px;
+    font-weight: 700;
+    color: #444;
+}
+
+.relationship-overall-header strong {
+    font-size: 20px;
+    font-weight: 800;
+}
+
+.relationship-overall-bar {
+    width: 100%;
+    height: 10px;
+    background: #e2e5e9;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.relationship-overall-fill {
+    height: 100%;
+    width: 0;
+    border-radius: 999px;
+    transition: width 0.2s ease;
+}
+
+.relationship-overall p {
+    margin: 10px 0 0;
+    color: #777;
+    font-size: 12px;
+}
+
+
+/* ---------------------------------------------------------
+   RELATIONSHIP FORM ACTIONS
+   --------------------------------------------------------- */
+
+.relationship-form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 22px;
+}
+
+
+/* ---------------------------------------------------------
+   EXISTING RELATIONSHIPS
+   --------------------------------------------------------- */
+
+.existing-relationships {
+    margin-top: 30px;
+}
+
+.relationships-list {
+    margin-top: 16px;
+    width: 100%;
+    overflow-x: auto;
+}
+
+.relationship-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 850px;
+    background: #ffffff;
+    border: 1px solid #e1e4e8;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.relationship-table th {
+    padding: 13px 12px;
+    text-align: left;
+    background: #f4f5f7;
+    border-bottom: 1px solid #dfe3e7;
+    color: #555;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
+.relationship-table td {
+    padding: 13px 12px;
+    border-bottom: 1px solid #eceef0;
+    font-size: 13px;
+    color: #333;
+    vertical-align: middle;
+}
+
+.relationship-table tr:last-child td {
+    border-bottom: none;
+}
+
+.relationship-table tbody tr:hover {
+    background: #fafbfc;
+}
+
+.relationship-direction-cell {
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.relationship-number {
+    text-align: center;
+    font-weight: 700;
+}
+
+.relationship-overall-cell {
+    font-weight: 800;
+}
+
+
+/* ---------------------------------------------------------
+   RELATIONSHIP ACTION BUTTONS
+   --------------------------------------------------------- */
+
+.relationship-actions {
+    display: flex;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.relationship-action-button {
+    border: 1px solid #d9dde2;
+    background: #ffffff;
+    border-radius: 6px;
+    padding: 6px 9px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease,
+        transform 0.15s ease;
+}
+
+.relationship-action-button:hover {
+    background: #f1f3f5;
+    border-color: #c6cbd1;
+    transform: translateY(-1px);
+}
+
+.relationship-action-button.delete {
+    color: #b42318;
+}
+
+.relationship-action-button.delete:hover {
+    background: #fff2f0;
+    border-color: #f0b8b0;
+}
+
+
+/* =========================================================
+   ALLIANCES
+   ========================================================= */
+
+.alliances-section {
+    position: relative;
+}
+
+.alliance-editor {
+    background: #ffffff;
+    border: 1px solid #e1e4e8;
+    border-radius: 14px;
+    padding: 24px;
+    margin-top: 20px;
+}
+
+.alliance-editor-header {
+    margin-bottom: 24px;
+}
+
+.alliance-editor-header h3 {
+    margin: 0 0 6px;
+    font-size: 20px;
+}
+
+.alliance-editor-header p {
+    margin: 0;
+    color: #777;
+    font-size: 14px;
+}
+
+
+/* ---------------------------------------------------------
+   ALLIANCE FORM
+   --------------------------------------------------------- */
+
+.alliance-form-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+}
+
+
+/* ---------------------------------------------------------
+   ALLIANCE MEMBERS
+   --------------------------------------------------------- */
+
+.alliance-members-group {
+    margin-top: 20px;
+}
+
+.alliance-members-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.alliance-member-option {
+    position: relative;
+}
+
+.alliance-member-option input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.alliance-member-option label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 48px;
+    padding: 10px 12px;
+    background: #f8f9fa;
+    border: 1px solid #dfe3e7;
+    border-radius: 9px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 700;
+    color: #444;
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease,
+        transform 0.15s ease;
+}
+
+.alliance-member-option label:hover {
+    background: #f1f3f5;
+    border-color: #c8cdd3;
+    transform: translateY(-1px);
+}
+
+.alliance-member-option input:checked + label {
+    background: #eef3f8;
+    border-color: #8c99a8;
+    color: #222;
+}
+
+.alliance-member-option input:checked + label::before {
+    content: "✓";
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #333;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 800;
+    flex-shrink: 0;
+}
+
+.alliance-member-option label::before {
+    content: "";
+    display: block;
+    width: 20px;
+    height: 20px;
+    border: 1px solid #c8cdd3;
+    border-radius: 50%;
+    background: #ffffff;
+    flex-shrink: 0;
+}
+
+.form-help {
+    margin: 5px 0 0;
+    color: #888;
+    font-size: 12px;
+}
+
+
+/* ---------------------------------------------------------
+   ALLIANCE STRENGTH
+   --------------------------------------------------------- */
+
+.alliance-strength-preview {
+    margin-top: 24px;
+    padding: 20px;
+    background: #f8f9fa;
+    border: 1px solid #dfe3e7;
+    border-radius: 12px;
+}
+
+.alliance-strength-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.alliance-strength-header span {
+    font-size: 14px;
+    font-weight: 700;
+    color: #444;
+}
+
+.alliance-strength-header strong {
+    font-size: 20px;
+    font-weight: 800;
+}
+
+.alliance-strength-bar {
+    width: 100%;
+    height: 10px;
+    background: #e2e5e9;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.alliance-strength-fill {
+    width: 0;
+    height: 100%;
+    border-radius: 999px;
+    transition: width 0.2s ease;
+}
+
+.alliance-strength-preview p {
+    margin: 10px 0 0;
+    color: #777;
+    font-size: 12px;
+}
+
+
+/* ---------------------------------------------------------
+   ALLIANCE FORM ACTIONS
+   --------------------------------------------------------- */
+
+.alliance-form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 22px;
+}
+
+
+/* ---------------------------------------------------------
+   EXISTING ALLIANCES
+   --------------------------------------------------------- */
+
+.existing-alliances {
+    margin-top: 30px;
+}
+
+.alliances-list {
+    margin-top: 16px;
+}
+
+
+/* ---------------------------------------------------------
+   ALLIANCE CARDS
+   --------------------------------------------------------- */
+
+.alliance-card {
+    background: #ffffff;
+    border: 1px solid #e1e4e8;
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 14px;
+    transition:
+        border-color 0.15s ease,
+        box-shadow 0.15s ease;
+}
+
+.alliance-card:hover {
+    border-color: #cbd0d6;
+    box-shadow: 0 5px 18px rgba(0, 0, 0, 0.05);
+}
+
+.alliance-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 16px;
+}
+
+.alliance-card-title {
+    margin: 0 0 5px;
+    font-size: 18px;
+    font-weight: 800;
+}
+
+.alliance-card-description {
+    margin: 0;
+    color: #777;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.alliance-status {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5px 9px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
+.alliance-status.active {
+    background: #edf7ed;
+    color: #287a32;
+}
+
+.alliance-status.dissolved {
+    background: #f2f2f2;
+    color: #777;
+}
+
+
+/* ---------------------------------------------------------
+   ALLIANCE MEMBERS DISPLAY
+   --------------------------------------------------------- */
+
+.alliance-card-members {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin-bottom: 18px;
+}
+
+.alliance-member-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 9px;
+    border-radius: 7px;
+    background: #f1f3f5;
+    border: 1px solid #e0e3e6;
+    color: #444;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+
+/* ---------------------------------------------------------
+   ALLIANCE CARD DETAILS
+   --------------------------------------------------------- */
+
+.alliance-card-details {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 10px;
+}
+
+.alliance-detail {
+    padding: 11px 13px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.alliance-detail-label {
+    display: block;
+    margin-bottom: 4px;
+    color: #888;
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.alliance-detail-value {
+    display: block;
+    color: #333;
+    font-size: 14px;
+    font-weight: 800;
+}
+
+
+/* ---------------------------------------------------------
+   ALLIANCE CARD ACTIONS
+   --------------------------------------------------------- */
+
+.alliance-card-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 7px;
+    margin-top: 18px;
+    padding-top: 15px;
+    border-top: 1px solid #eceef0;
+}
+
+.alliance-action-button {
+    border: 1px solid #d9dde2;
+    background: #ffffff;
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease,
+        transform 0.15s ease;
+}
+
+.alliance-action-button:hover {
+    background: #f1f3f5;
+    border-color: #c6cbd1;
+    transform: translateY(-1px);
+}
+
+.alliance-action-button.delete {
+    color: #b42318;
+}
+
+.alliance-action-button.delete:hover {
+    background: #fff2f0;
+    border-color: #f0b8b0;
+}
+
+
+/* =========================================================
+   RESPONSIVE — RELATIONSHIPS & ALLIANCES
+   ========================================================= */
+
+@media (max-width: 1000px) {
+
+    .alliance-members-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+}
+
+
+@media (max-width: 800px) {
+
+    .relationship-houseguest-row {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .relationship-direction {
+        height: 24px;
+        transform: rotate(90deg);
+    }
+
+    .relationship-metrics {
+        grid-template-columns: 1fr;
+    }
+
+    .alliance-members-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .alliance-card-details {
+        grid-template-columns: 1fr;
+    }
+
+}
+
+
+@media (max-width: 600px) {
+
+    .relationship-editor,
+    .alliance-editor {
+        padding: 16px;
+    }
+
+    .alliance-form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .alliance-members-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .alliance-card-header {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .alliance-card-actions {
+        justify-content: stretch;
+    }
+
+    .alliance-action-button {
+        flex: 1;
+    }
+
+}
+
+
+@media (max-width: 400px) {
+
+    .relationship-form-actions,
+    .alliance-form-actions {
+        flex-direction: column;
+    }
+
+    .relationship-form-actions button,
+    .alliance-form-actions button {
+        width: 100%;
+    }
+
+}
