@@ -447,7 +447,7 @@ function addHouseguest(data = null) {
         <div class="houseguest-card-header">
 
             <div>
-                <h3 class="houseguest-number">
+                <h3 class="houseguest-number" id="houseguest-number-${id}">
                     Houseguest
                 </h3>
                 <div
@@ -1030,6 +1030,86 @@ function formatHouseguestName(firstName, lastName) {
 }
 
 
+function getLiveCreatorHouseguests() {
+    const editor = document.getElementById("houseguest-editor");
+    if (!editor || !editor.querySelector(".houseguest-card")) return null;
+    return collectHouseguests();
+}
+
+function syncLiveHouseguestNames(id) {
+    const liveGuests = getLiveCreatorHouseguests();
+    if (!liveGuests) return;
+
+    const guestsById = new Map(liveGuests.map(h => [h.id, h]));
+
+    // Update the name shown in every houseguest card.
+    liveGuests.forEach((guest, index) => {
+        const fullName = guest.name || `Houseguest ${index + 1}`;
+        const card = document.querySelector(`.houseguest-card[data-houseguest-id="${CSS.escape(guest.id)}"]`);
+        if (!card) return;
+        const number = card.querySelector(".houseguest-number");
+        const display = card.querySelector(".houseguest-display-name");
+        if (number) number.textContent = fullName;
+        if (display) display.textContent = fullName;
+    });
+
+    // Update relationship dropdowns without rebuilding the houseguest cards.
+    ["relationship-from", "relationship-to"].forEach(selectId => {
+        const select = document.getElementById(selectId);
+        if (!select) return;
+        const selected = select.value;
+        select.querySelectorAll("option[value]").forEach(option => {
+            const guest = guestsById.get(option.value);
+            if (guest) option.textContent = guest.name || `Houseguest ${liveGuests.findIndex(h => h.id === guest.id) + 1}`;
+        });
+        if (selected) select.value = selected;
+    });
+
+    // Update alliance member labels in place so typing a name is reflected immediately.
+    const picker = document.getElementById("alliance-member-picker");
+    if (picker) {
+        picker.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+            const guest = guestsById.get(cb.value);
+            const label = cb.closest("label");
+            const span = label?.querySelector("span");
+            if (guest && span) span.textContent = guest.name || `Houseguest ${liveGuests.findIndex(h => h.id === guest.id) + 1}`;
+        });
+    }
+
+    // Update existing alliance cards and relationship rows using the live names.
+    const allianceCards = document.querySelectorAll("#alliances-container .advanced-card");
+    const alliances = getAdvancedArrays().alliances;
+    allianceCards.forEach((card, index) => {
+        const alliance = alliances[index];
+        if (!alliance) return;
+        const memberParagraphs = card.querySelectorAll("p");
+        const memberParagraph = memberParagraphs[memberParagraphs.length - 1];
+        if (memberParagraph) memberParagraph.textContent = alliance.members.map(memberId => {
+            const guest = guestsById.get(memberId);
+            return guest ? (guest.name || `Houseguest ${liveGuests.findIndex(h => h.id === guest.id) + 1}`) : "Unknown";
+        }).join(", ");
+    });
+
+    const relationshipContainer = document.getElementById("relationships-container");
+    if (relationshipContainer) {
+        relationshipContainer.querySelectorAll("[data-relationship-from], [data-relationship-to]").forEach(el => {
+            const from = el.dataset.relationshipFrom ? guestsById.get(el.dataset.relationshipFrom) : null;
+            const to = el.dataset.relationshipTo ? guestsById.get(el.dataset.relationshipTo) : null;
+            if (from && el.dataset.relationshipFrom) el.textContent = from.name || el.textContent;
+            if (to && el.dataset.relationshipTo) el.textContent = to.name || el.textContent;
+        });
+    }
+
+    // Matrix headers/row labels use data IDs and can be updated without re-rendering the matrix.
+    const matrix = document.querySelector(".relationship-matrix");
+    if (matrix) {
+        matrix.querySelectorAll("th[data-houseguest-id]").forEach(th => {
+            const guest = guestsById.get(th.dataset.houseguestId);
+            if (guest) th.textContent = guest.name || "HG";
+        });
+    }
+}
+
 function updateHouseguestNameDisplay(id) {
 
     const firstName = getInputValue(
@@ -1049,9 +1129,13 @@ function updateHouseguestNameDisplay(id) {
         return;
     }
 
-    display.textContent =
+    const fullName =
         formatHouseguestName(firstName, lastName) ||
         "Unnamed Houseguest";
+
+    display.textContent = fullName;
+
+    syncLiveHouseguestNames(id);
 }
 
 
@@ -2761,10 +2845,10 @@ function renderRelationshipMatrix() {
     }
     const options = `<option value="">—</option><option value="enemy">Enemy</option><option value="dislike">Dislike</option><option value="neutral">Neutral</option><option value="good">Good</option><option value="close">Close</option><option value="bestfriends">Best Friends</option><option value="showmance">Showmance</option><option value="rivalry">Rivals</option>`;
     let html = '<div class="relationship-matrix-scroll"><table class="relationship-matrix"><thead><tr><th class="matrix-corner">FEELS ABOUT →</th>';
-    guests.forEach(g => html += `<th title="${escapeAttribute(g.name || "Houseguest")}">${escapeHTML(g.name || "HG")}</th>`);
+    guests.forEach(g => html += `<th data-houseguest-id="${escapeAttribute(g.id)}" title="${escapeAttribute(g.name || "Houseguest")}">${escapeHTML(g.name || "HG")}</th>`);
     html += '</tr></thead><tbody>';
     guests.forEach(from => {
-        html += `<tr><th title="${escapeAttribute(from.name || "Houseguest")}">${escapeHTML(from.name || "Houseguest")}</th>`;
+        html += `<tr><th data-houseguest-id="${escapeAttribute(from.id)}" title="${escapeAttribute(from.name || "Houseguest")}">${escapeHTML(from.name || "Houseguest")}</th>`;
         guests.forEach(to => {
             if (from.id === to.id) { html += '<td class="matrix-self">—</td>'; return; }
             const r = findRelationship(from.id, to.id);
@@ -2873,12 +2957,10 @@ function renderRelationships() {
 
 
     const houseguests =
-        currentSeason &&
-        Array.isArray(
-            currentSeason.houseguests
-        )
+        getLiveCreatorHouseguests() ||
+        (currentSeason && Array.isArray(currentSeason.houseguests)
             ? currentSeason.houseguests
-            : collectHouseguests();
+            : collectHouseguests());
 
 
     const getName =
@@ -5503,7 +5585,7 @@ function resetAllianceEditor() {
 function editAlliance(id) { const a=getAdvancedArrays().alliances.find(x=>x.id===id); if(!a)return; editingAllianceId=id; setValue("alliance-name",a.name);setValue("alliance-description",a.description||"");setValue("alliance-status",a.status||"active");refreshAdvancedHouseguestOptions();const picker=document.getElementById("alliance-member-picker");if(picker)picker.querySelectorAll("input[type=\"checkbox\"]").forEach(o=>o.checked=a.members.includes(o.value));updateAllianceMemberHint();setText("alliance-form-title","Edit Alliance");setText("save-alliance-btn","Save Alliance");document.getElementById("alliance-name")?.scrollIntoView({behavior:"smooth",block:"center"}); }
 function deleteAlliance(id) { if(!confirm("Delete this alliance?"))return; getAdvancedArrays().alliances=getAdvancedArrays().alliances.filter(a=>a.id!==id); renderAlliances(); persistCurrentSeasonIfSaved(); }
 function cleanupAlliancesForHouseguest(id) { getAdvancedArrays().alliances.forEach(a=>a.members=(a.members||[]).filter(x=>x!==id)); getAdvancedArrays().alliances=getAdvancedArrays().alliances.filter(a=>(a.members||[]).length>=2); renderAlliances(); }
-function renderAlliances() { const c=document.getElementById("alliances-container"); if(!c)return; refreshAdvancedHouseguestOptions(); const gs=collectHouseguests(); const as=getAdvancedArrays().alliances; if(!as.length){c.innerHTML='<div class="empty-state"><p>No alliances created yet.</p></div>';return;} c.innerHTML=as.map(a=>`<div class="advanced-card"><div class="advanced-card-header"><div><h4>${escapeHTML(a.name)}</h4><span class="feature-status">${escapeHTML(a.status||"active")}</span></div><div class="advanced-card-actions"><button type="button" onclick="editAlliance('${escapeAttribute(a.id)}')">Edit</button><button type="button" onclick="deleteAlliance('${escapeAttribute(a.id)}')">Delete</button></div></div><p>${escapeHTML(a.description||"No description.")}</p><strong>Members (${a.members.length})</strong><p>${escapeHTML(a.members.map(id=>getHouseguestDisplayName(id,gs)).join(", "))}</p></div>`).join(""); }
+function renderAlliances() { const c=document.getElementById("alliances-container"); if(!c)return; refreshAdvancedHouseguestOptions(); const gs=getLiveCreatorHouseguests() || collectHouseguests(); const as=getAdvancedArrays().alliances; if(!as.length){c.innerHTML='<div class="empty-state"><p>No alliances created yet.</p></div>';return;} c.innerHTML=as.map(a=>`<div class="advanced-card"><div class="advanced-card-header"><div><h4>${escapeHTML(a.name)}</h4><span class="feature-status">${escapeHTML(a.status||"active")}</span></div><div class="advanced-card-actions"><button type="button" onclick="editAlliance('${escapeAttribute(a.id)}')">Edit</button><button type="button" onclick="deleteAlliance('${escapeAttribute(a.id)}')">Delete</button></div></div><p>${escapeHTML(a.description||"No description.")}</p><strong>Members (${a.members.length})</strong><p>${escapeHTML(a.members.map(id=>getHouseguestDisplayName(id,gs)).join(", "))}</p></div>`).join(""); }
 
 function saveCompetition() { const season=getAdvancedArrays(); const name=getInputValue("competition-name").trim(); if(!name)return alert("Please enter a competition name."); const type=getValue("competition-type")||"hoh"; const obj={id:editingCompetitionId||uid("competition"),name,type,description:getInputValue("competition-description").trim(),primary:getValue("competition-primary")||"physical",secondary:getValue("competition-secondary")||"mental"}; const arr=season.competitions[type]||(season.competitions[type]=[]); let found=false; Object.keys(season.competitions).forEach(k=>{const i=season.competitions[k].findIndex(x=>x.id===obj.id);if(i>=0){season.competitions[k].splice(i,1);found=true;}}); arr.push(obj); editingCompetitionId=null; resetCompetitionEditor(); renderCompetitions(); persistCurrentSeasonIfSaved(); }
 function resetCompetitionEditor(){editingCompetitionId=null;setValue("competition-name","");setValue("competition-type","hoh");setValue("competition-description","");setValue("competition-primary","physical");setValue("competition-secondary","mental");setText("competition-form-title","Create Competition");setText("save-competition-btn","Add Competition");}
