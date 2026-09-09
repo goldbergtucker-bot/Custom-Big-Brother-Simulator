@@ -7424,38 +7424,262 @@ window.showResults = showResults;
         display(s,"Power of Veto Players","VETO SELECTIONS",`<p>The following houseguests will compete:</p>${simulationPortraits(s.currentPOVPlayers,"medium")}<p><strong>${escapeHTML(selected.map(p=>name(p.id)).join(", "))}</strong></p>`,"pov-players");
     }
 
-    function runCleanPOV(){
-        const s=sim();
-        if(currentSeason.rules?.vetoEnabled===false){s.currentPOVWinner=null;display(s,"Power of Veto Disabled","POV RESULTS","<p>The Power of Veto is disabled for this season.</p>","pov");return;}
-        const players=s.currentPOVPlayers.map(player).filter(Boolean);
-        const comp=chooseCustomCompetition("pov") || getCompetitionForWeekType(s.currentWeek,"pov");
-        const winner=chooseWinner(players,comp,"physical","mental");
-        s.currentPOVWinner=winner?.id||null;
-        if(winner) winner.povWins=Number(winner.povWins||0)+1;
-        display(s,comp?.name||"Power of Veto","POV RESULTS",winner?`${simulationPortrait(winner,"large")}<p><strong>${escapeHTML(name(winner.id))}</strong> has won <strong>${escapeHTML(comp?.name||"the Power of Veto")}</strong>.</p>${comp?.description?`<p class="event-description">${escapeHTML(comp.description)}</p>`:""}`:"<p>No eligible Power of Veto winner was available.</p>","pov");
+   function runCleanVeto(){
+
+    const s = sim();
+
+    const veto = s.currentPOVWinner;
+
+    const original = [
+        ...(s.currentNominees || [])
+    ];
+
+    if (
+        currentSeason.rules?.vetoEnabled === false
+    ) {
+
+        display(
+            s,
+            "Veto Ceremony",
+            "VETO CEREMONY",
+            `
+                <p>
+                    The Power of Veto is disabled
+                    for this season.
+                </p>
+            `,
+            "veto-ceremony"
+        );
+
+        return;
     }
 
-    function runCleanVeto(){
-        const s=sim(), veto=s.currentPOVWinner, original=[...(s.currentNominees||[])];
-        if(currentSeason.rules?.vetoEnabled===false){display(s,"Veto Ceremony","VETO CEREMONY","<p>The Power of Veto is disabled for this season.</p>","veto-ceremony");return;}
-        let used=false,replacement=null,note="";
-        if(veto && original.includes(veto)){
-            const pool=active().filter(p=>p.id!==s.currentHOH&&!original.includes(p.id));
-            if(pool.length){
-                const diamond=getUsableTwistStates(s.currentWeek,"diamondPOV").find(x=>x.state.holderId===veto);
-                replacement=diamond?pool.slice().sort((a,b)=>allianceBond(veto,a.id)-allianceBond(veto,b.id))[0]:randomItem(pool);
-                if(diamond){diamond.state.used=true;note=`<p><strong>${escapeHTML(diamond.twist.name)}</strong> upgraded the veto to a Diamond Power of Veto, allowing the veto holder to choose the replacement.</p>`;}
-                const idx=s.currentNominees.indexOf(veto); if(idx>=0&&replacement){s.currentNominees[idx]=replacement.id;used=true;}
+    let used = false;
+    let replacement = null;
+    let note = "";
+
+    /*
+     * If the veto holder is nominated,
+     * determine the replacement nominee.
+     */
+    if (
+        veto &&
+        original.includes(veto)
+    ) {
+
+        const pool = active().filter(
+            p =>
+                p.id !== s.currentHOH &&
+                !original.includes(p.id)
+        );
+
+        if (pool.length) {
+
+            const diamond =
+                getUsableTwistStates(
+                    s.currentWeek,
+                    "diamondPOV"
+                ).find(
+                    x =>
+                        x.state.holderId === veto
+                );
+
+            replacement = diamond
+                ? pool
+                    .slice()
+                    .sort(
+                        (a, b) =>
+                            allianceBond(
+                                veto,
+                                a.id
+                            ) -
+                            allianceBond(
+                                veto,
+                                b.id
+                            )
+                    )[0]
+                : randomItem(pool);
+
+            if (diamond) {
+
+                diamond.state.used = true;
+
+                note = `
+                    <p class="veto-twist-note">
+
+                        <strong>
+                            ${escapeHTML(
+                                diamond.twist.name
+                            )}
+                        </strong>
+
+                        upgraded the veto to a
+                        Diamond Power of Veto,
+                        allowing the veto holder
+                        to choose the replacement.
+
+                    </p>
+                `;
+            }
+
+            const idx =
+                s.currentNominees.indexOf(veto);
+
+            if (
+                idx >= 0 &&
+                replacement
+            ) {
+
+                s.currentNominees[idx] =
+                    replacement.id;
+
+                used = true;
             }
         }
-        const nominees=s.currentNominees.map(player).filter(Boolean);
-        let statement="No Power of Veto holder was available.";
-        if(veto){
-            statement=used ? `<strong>${escapeHTML(name(veto))}</strong> used the Power of Veto.${replacement ? ` <strong>${escapeHTML(name(replacement.id))}</strong> is the replacement nominee.` : ""}` : `<strong>${escapeHTML(name(veto))}</strong> did not use the Power of Veto.`;
-        }
-        const content=`<div class="ceremony-leaders"><div class="ceremony-role-section"><h3>Head of Household</h3>${simulationPortrait(player(s.currentHOH),"large")}</div><div class="ceremony-role-section"><h3>Power of Veto Holder</h3>${simulationPortrait(player(veto),"large")}</div></div>${note}<p class="ceremony-statement">${statement}</p><div class="ceremony-role-section"><h3>Final Nominees</h3>${simulationPortraits(nominees.map(p=>p.id),"large")}</div>`;
-        display(s,"Veto Ceremony","VETO CEREMONY",content,"veto-ceremony");
     }
+
+    const nominees =
+        s.currentNominees
+            .map(player)
+            .filter(Boolean);
+
+    let statement =
+        "No Power of Veto holder was available.";
+
+    if (veto) {
+
+        if (used) {
+
+            statement = `
+                <strong>
+                    ${escapeHTML(
+                        name(veto)
+                    )}
+                </strong>
+
+                used the Power of Veto.
+
+                ${
+                    replacement
+                        ? `
+                            <strong>
+                                ${escapeHTML(
+                                    name(
+                                        replacement.id
+                                    )
+                                )}
+                            </strong>
+
+                            is the replacement nominee.
+                        `
+                        : ""
+                }
+            `;
+
+        } else {
+
+            statement = `
+                <strong>
+                    ${escapeHTML(
+                        name(veto)
+                    )}
+                </strong>
+
+                did not use the Power of Veto.
+            `;
+        }
+    }
+
+    /*
+     * Build centered nominee cards.
+     */
+    const finalNomineeCards =
+        nominees
+            .map(nominee => {
+
+                return `
+                    <div class="nominee-card">
+
+                        <div class="nominee-placement">
+                            NOMINEE
+                        </div>
+
+                        ${simulationPortrait(
+                            nominee,
+                            "large"
+                        )}
+
+                    </div>
+                `;
+            })
+            .join("");
+
+    const content = `
+
+        <div class="ceremony-leaders">
+
+            <div class="ceremony-role-section">
+
+                <h3>
+                    Head of Household
+                </h3>
+
+                ${simulationPortrait(
+                    player(s.currentHOH),
+                    "large"
+                )}
+
+            </div>
+
+
+            <div class="ceremony-role-section">
+
+                <h3>
+                    Power of Veto Holder
+                </h3>
+
+                ${simulationPortrait(
+                    player(veto),
+                    "large"
+                )}
+
+            </div>
+
+        </div>
+
+
+        ${note}
+
+
+        <p class="ceremony-statement">
+            ${statement}
+        </p>
+
+
+        <div class="final-nominees-section">
+
+            <h3>
+                Final Nominees
+            </h3>
+
+            <div class="nominee-grid">
+
+                ${finalNomineeCards}
+
+            </div>
+
+        </div>
+
+    `;
+
+    display(
+        s,
+        "Veto Ceremony",
+        "VETO CEREMONY",
+        content,
+        "veto-ceremony"
+    );
+}
 
     function runCleanSpecial(compId){
         const s=sim(), players=active(), comp=getWeekCompetitions(s.currentWeek).find(c=>c.id===compId);
