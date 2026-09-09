@@ -1,28 +1,32 @@
 /*
- * =========================================================
+ * ============================================================
  * BIG BROTHER SIMULATOR
  * APPLICATION CONTROLLER
- * =========================================================
+ * ============================================================
  *
  * Current systems:
- * - Season creation
- * - Houseguest editor
- * - Houseguest ratings
- * - Season rules
- * - Relationships
- * - Saved seasons
- * - Simulator foundation
- * - Event chain
- * - Results foundation
+ *  - Season information
+ *  - Houseguests
+ *  - Houseguest ratings
+ *  - Season rules
+ *  - Relationships
+ *  - Alliances
+ *  - Saved seasons
+ *  - Basic simulator event chain
  *
- * The actual strategic simulation engine will be added later.
- * =========================================================
+ * Future systems:
+ *  - Competitions
+ *  - Twists
+ *  - Full simulation engine
+ *  - Detailed season history
+ *  - Final statistics
+ * ============================================================
  */
 
 
-/* =========================================================
+/* ============================================================
    CONSTANTS
-   ========================================================= */
+   ============================================================ */
 
 const STORAGE_KEY = "bigBrotherSimulatorSeasons";
 
@@ -34,28 +38,58 @@ const STAT_KEYS = [
     "strategic"
 ];
 
-const EVENT_CHAIN = [
-    "hoh",
-    "nominations",
-    "pov-players",
-    "pov",
-    "veto-ceremony",
-    "eviction"
-];
-
 const RELATIONSHIP_KEYS = [
     "friendship",
     "trust",
     "loyalty",
     "rivalry",
-    "respect",
-    "attraction"
+    "attraction",
+    "respect"
+];
+
+const EVENT_CHAIN = [
+    {
+        id: "hoh",
+        label: "HOH",
+        type: "HOH",
+        title: "Head of Household"
+    },
+    {
+        id: "nominations",
+        label: "Nominations",
+        type: "NOMINATIONS",
+        title: "Nomination Ceremony"
+    },
+    {
+        id: "pov-players",
+        label: "POV Players",
+        type: "POV PLAYERS",
+        title: "Power of Veto Players"
+    },
+    {
+        id: "pov",
+        label: "POV",
+        type: "POV",
+        title: "Power of Veto Competition"
+    },
+    {
+        id: "veto-ceremony",
+        label: "Veto Ceremony",
+        type: "VETO CEREMONY",
+        title: "Veto Ceremony"
+    },
+    {
+        id: "eviction",
+        label: "Eviction",
+        type: "EVICTION",
+        title: "Live Eviction"
+    }
 ];
 
 
-/* =========================================================
+/* ============================================================
    APPLICATION STATE
-   ========================================================= */
+   ============================================================ */
 
 let savedSeasons = [];
 
@@ -67,14 +101,20 @@ let currentHouseguestId = 0;
 
 let editingRelationshipId = null;
 
+let creatorRelationships = [];
 
-/* =========================================================
+let editingAllianceId = null;
+
+let creatorAlliances = [];
+
+
+/* ============================================================
    INITIALIZATION
-   ========================================================= */
+   ============================================================ */
 
 document.addEventListener("DOMContentLoaded", () => {
 
-    loadSeasonsFromStorage();
+    loadSavedSeasons();
 
     setupImagePreviews();
 
@@ -82,29 +122,65 @@ document.addEventListener("DOMContentLoaded", () => {
 
     setupRelationshipControls();
 
-    initializeHouseguestCount();
+    setupAllianceControls();
+
+    initializeHouseguestEditor();
 
     renderSavedSeasons();
+
+    refreshRelationshipHouseguestOptions();
+
+    refreshAllianceHouseguestOptions();
+
+    renderRelationships();
+
+    renderAlliances();
+
+    updateRelationshipMetricDisplays();
+
+    updateAllianceStrength();
 
 });
 
 
-/* =========================================================
+/* ============================================================
+   GENERAL DOM HELPERS
+   ============================================================ */
+
+function getElement(id) {
+    return document.getElementById(id);
+}
+
+
+function escapeHtml(value) {
+
+    if (value === null || value === undefined) {
+        return "";
+    }
+
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+
+/* ============================================================
    PAGE NAVIGATION
-   ========================================================= */
+   ============================================================ */
 
 function showPage(pageId) {
 
-    const pages = document.querySelectorAll(".page");
-
-    pages.forEach(page => {
-        page.classList.remove("active");
+    document.querySelectorAll(".page").forEach(page => {
+        page.classList.remove("active-page");
     });
 
-    const targetPage = document.getElementById(pageId);
+    const page = getElement(pageId);
 
-    if (targetPage) {
-        targetPage.classList.add("active");
+    if (page) {
+        page.classList.add("active-page");
     }
 
     window.scrollTo({
@@ -114,11 +190,11 @@ function showPage(pageId) {
 }
 
 
-/* =========================================================
+/* ============================================================
    LOCAL STORAGE
-   ========================================================= */
+   ============================================================ */
 
-function loadSeasonsFromStorage() {
+function loadSavedSeasons() {
 
     try {
 
@@ -129,16 +205,18 @@ function loadSeasonsFromStorage() {
             return;
         }
 
-        savedSeasons = JSON.parse(stored);
+        const parsed = JSON.parse(stored);
 
-        if (!Array.isArray(savedSeasons)) {
+        if (Array.isArray(parsed)) {
+            savedSeasons = parsed.map(normalizeSeason);
+        } else {
             savedSeasons = [];
         }
 
     } catch (error) {
 
         console.error(
-            "Unable to load saved seasons:",
+            "Could not load saved seasons:",
             error
         );
 
@@ -147,7 +225,7 @@ function loadSeasonsFromStorage() {
 }
 
 
-function saveSeasonsToStorage() {
+function persistSavedSeasons() {
 
     try {
 
@@ -159,38 +237,125 @@ function saveSeasonsToStorage() {
     } catch (error) {
 
         console.error(
-            "Unable to save seasons:",
+            "Could not save seasons:",
             error
-        );
-
-        alert(
-            "There was a problem saving your season."
         );
     }
 }
 
 
-/* =========================================================
+/* ============================================================
+   SEASON NORMALIZATION
+   ============================================================ */
+
+function normalizeSeason(season) {
+
+    const normalized = {
+        ...season
+    };
+
+    normalized.houseguests = Array.isArray(
+        season.houseguests
+    )
+        ? season.houseguests
+        : [];
+
+    normalized.relationships = Array.isArray(
+        season.relationships
+    )
+        ? season.relationships
+        : [];
+
+    normalized.alliances = Array.isArray(
+        season.alliances
+    )
+        ? season.alliances
+        : [];
+
+    normalized.competitions = season.competitions || {
+        hoh: [],
+        pov: [],
+        safety: [],
+        luxury: [],
+        finalHoh: []
+    };
+
+    normalized.twists = Array.isArray(
+        season.twists
+    )
+        ? season.twists
+        : [];
+
+    normalized.rules = {
+        finalists: 2,
+        jurySize: 7,
+        vetoEnabled: true,
+        safetyCompetitionEnabled: false,
+        battleBackEnabled: false,
+        doubleEvictionEnabled: false,
+        nomineesPerWeek: 2,
+        vetoPlayers: 6,
+        evictionType: "house",
+        startingHOH: "random",
+        specificStartingHOH: "",
+        juryVotingEnabled: true,
+        ...(season.rules || {})
+    };
+
+    normalized.simulation = {
+        started: false,
+        completed: false,
+        currentWeek: 1,
+        currentPhase: "setup",
+        currentEventIndex: 0,
+        history: [],
+        finalPlacements: [],
+        winner: null,
+        runnerUp: null,
+        jury: [],
+        finalists: [],
+        currentHOH: null,
+        currentNominees: [],
+        currentPOVPlayers: [],
+        currentPOVWinner: null,
+        currentSafetyWinner: null,
+        currentEviction: null,
+        ...(season.simulation || {})
+    };
+
+    normalized.alliances = normalized.alliances.map(
+        normalizeAlliance
+    );
+
+    normalized.relationships = normalized.relationships.map(
+        normalizeRelationship
+    );
+
+    return normalized;
+}
+
+
+/* ============================================================
    SAVED SEASONS
-   ========================================================= */
+   ============================================================ */
 
 function renderSavedSeasons() {
 
-    const container =
-        document.getElementById("saved-seasons-container");
+    const container = getElement(
+        "saved-seasons-container"
+    );
 
     if (!container) {
         return;
     }
 
-    container.innerHTML = "";
-
-    if (savedSeasons.length === 0) {
+    if (!savedSeasons.length) {
 
         container.innerHTML = `
             <div class="empty-state">
+
                 <div class="empty-state-icon">
-                    ★
+                    🏠
                 </div>
 
                 <h3>
@@ -198,93 +363,146 @@ function renderSavedSeasons() {
                 </h3>
 
                 <p>
-                    Create your first custom Big Brother season
+                    Create your first Big Brother season
                     to get started.
                 </p>
+
+                <button
+                    type="button"
+                    class="primary-button"
+                    onclick="showPage('creator-page')"
+                >
+                    Create Season
+                </button>
+
             </div>
         `;
 
         return;
     }
 
-    savedSeasons.forEach(season => {
+    container.innerHTML = savedSeasons.map(season => {
 
-        const card =
-            document.createElement("div");
+        const castCount =
+            season.houseguests.length;
 
-        card.className = "saved-season-card";
-
-        const houseguestCount =
-            Array.isArray(season.houseguests)
-                ? season.houseguests.length
-                : 0;
+        const allianceCount =
+            season.alliances.length;
 
         const relationshipCount =
-            Array.isArray(season.relationships)
-                ? season.relationships.length
-                : 0;
+            season.relationships.length;
 
-        card.innerHTML = `
-            <h3>
-                ${escapeHTML(season.name || "Untitled Season")}
-            </h3>
+        const backgroundStyle =
+            season.background
+                ? `style="background-image:url('${escapeHtml(season.background)}')"`
+                : "";
 
-            <p>
-                ${escapeHTML(
-                    season.theme || "Custom Season"
-                )}
-            </p>
+        return `
+            <article
+                class="saved-season-card"
+                ${backgroundStyle}
+            >
 
-            <p>
-                ${houseguestCount} Houseguests
-                •
-                ${relationshipCount} Relationships
-            </p>
+                <div class="saved-season-card-overlay"></div>
 
-            <div class="saved-season-actions">
+                <div class="saved-season-card-content">
 
-                <button
-                    class="primary-button"
-                    onclick="openSeason('${season.id}')"
-                >
-                    Open
-                </button>
+                    ${
+                        season.logo
+                            ? `
+                                <img
+                                    class="saved-season-logo"
+                                    src="${escapeHtml(season.logo)}"
+                                    alt="${escapeHtml(season.name)} logo"
+                                >
+                            `
+                            : ""
+                    }
 
-                <button
-                    class="secondary-button"
-                    onclick="editSeason('${season.id}')"
-                >
-                    Edit
-                </button>
+                    <div class="saved-season-info">
 
-                <button
-                    class="secondary-button"
-                    onclick="deleteSeason('${season.id}')"
-                >
-                    Delete
-                </button>
+                        <h3>
+                            ${escapeHtml(season.name || "Untitled Season")}
+                        </h3>
 
-            </div>
+                        <p>
+                            ${escapeHtml(season.theme || "Custom Season")}
+                        </p>
+
+                        <div class="saved-season-meta">
+
+                            <span>
+                                ${castCount} Houseguests
+                            </span>
+
+                            <span>
+                                ${relationshipCount} Relationships
+                            </span>
+
+                            <span>
+                                ${allianceCount} Alliances
+                            </span>
+
+                        </div>
+
+                    </div>
+
+                    <div class="saved-season-actions">
+
+                        <button
+                            type="button"
+                            class="primary-button"
+                            onclick="openSeason('${season.id}')"
+                        >
+                            Open
+                        </button>
+
+                        <button
+                            type="button"
+                            class="secondary-button"
+                            onclick="editSeason('${season.id}')"
+                        >
+                            Edit
+                        </button>
+
+                        <button
+                            type="button"
+                            class="danger-button"
+                            onclick="deleteSeason('${season.id}')"
+                        >
+                            Delete
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </article>
         `;
 
-        container.appendChild(card);
-    });
+    }).join("");
 }
 
 
-/* =========================================================
+/* ============================================================
    CREATE / RESET SEASON
-   ========================================================= */
+   ============================================================ */
 
 function resetSeasonCreator() {
 
-    editingSeasonId = null;
-
     currentSeason = null;
+
+    editingSeasonId = null;
 
     currentHouseguestId = 0;
 
+    creatorRelationships = [];
+
     editingRelationshipId = null;
+
+    creatorAlliances = [];
+
+    editingAllianceId = null;
 
     const fields = [
         "season-name",
@@ -296,56 +514,57 @@ function resetSeasonCreator() {
 
     fields.forEach(id => {
 
-        const element = document.getElementById(id);
+        const element = getElement(id);
 
         if (element) {
             element.value = "";
         }
+
     });
 
     resetSeasonRules();
 
-    const editor =
-        document.getElementById("houseguest-editor");
+    const editor = getElement(
+        "houseguest-editor"
+    );
 
     if (editor) {
         editor.innerHTML = "";
     }
 
-    const countInput =
-        document.getElementById("houseguest-count");
+    const countInput = getElement(
+        "houseguest-count"
+    );
 
     if (countInput) {
         countInput.value = 16;
     }
 
-    initializeHouseguestCount();
+    initializeHouseguestEditor();
 
-    resetRelationshipEditor();
+    resetRelationshipForm();
+
+    resetAllianceForm();
 
     renderRelationships();
 
-    setupImagePreviews();
+    renderAlliances();
 
-}
+    refreshRelationshipHouseguestOptions();
 
+    refreshAllianceHouseguestOptions();
 
-function createNewSeason() {
-
-    resetSeasonCreator();
+    updateSeasonLogoPreview("");
 
     showPage("creator-page");
 }
 
 
-/* =========================================================
-   HOUSEGUEST EDITOR
-   ========================================================= */
+function initializeHouseguestEditor() {
 
-function initializeHouseguestCount() {
-
-    const editor =
-        document.getElementById("houseguest-editor");
+    const editor = getElement(
+        "houseguest-editor"
+    );
 
     if (!editor) {
         return;
@@ -353,65 +572,101 @@ function initializeHouseguestCount() {
 
     if (editor.children.length > 0) {
         updateHouseguestNumbers();
-        populateRelationshipHouseguestOptions();
         return;
     }
 
-    const countInput =
-        document.getElementById("houseguest-count");
+    const countInput = getElement(
+        "houseguest-count"
+    );
 
-    const count =
-        countInput
-            ? parseInt(countInput.value, 10) || 16
-            : 16;
+    const count = countInput
+        ? Math.max(
+            2,
+            Math.min(
+                100,
+                Number(countInput.value) || 16
+            )
+        )
+        : 16;
 
     for (let i = 0; i < count; i++) {
         addHouseguest();
     }
 
     updateHouseguestNumbers();
+}
 
-    populateRelationshipHouseguestOptions();
+
+/* ============================================================
+   HOUSEGUEST EDITOR
+   ============================================================ */
+
+function createDefaultHouseguest() {
+
+    return {
+        name: "",
+        image: "",
+        age: "",
+        occupation: "",
+        ratings: {
+            general: 5,
+            physical: 5,
+            mental: 5,
+            social: 5,
+            strategic: 5
+        },
+        status: "active",
+        placement: null,
+        weeksInGame: 0,
+        hohWins: 0,
+        povWins: 0,
+        safetyWins: 0,
+        nominationCount: 0,
+        vetoUsedOn: [],
+        evictionVotesReceived: 0
+    };
 }
 
 
 function addHouseguest(data = null) {
 
-    const editor =
-        document.getElementById("houseguest-editor");
+    const editor = getElement(
+        "houseguest-editor"
+    );
 
     if (!editor) {
         return;
     }
 
-    currentHouseguestId++;
+    const houseguest =
+        data || createDefaultHouseguest();
 
     const id =
-        data && data.id
-            ? data.id
-            : `hg-${currentHouseguestId}`;
+        houseguest.id ||
+        `hg-${++currentHouseguestId}`;
 
-    const card =
-        document.createElement("div");
+    const card = document.createElement("article");
 
     card.className = "houseguest-card";
 
     card.dataset.houseguestId = id;
 
-    const houseguest =
-        data || createDefaultHouseguest(id);
-
     card.innerHTML = `
-
         <div class="houseguest-card-header">
 
-            <h3 class="houseguest-number">
-                Houseguest
-            </h3>
+            <div>
+                <span class="houseguest-number">
+                    Houseguest
+                </span>
+
+                <h3 class="houseguest-title">
+                    Houseguest
+                </h3>
+            </div>
 
             <button
                 type="button"
-                class="secondary-button"
+                class="danger-button"
                 onclick="removeHouseguest('${id}')"
             >
                 Remove
@@ -420,153 +675,126 @@ function addHouseguest(data = null) {
         </div>
 
 
-        <div class="houseguest-photo-section">
+        <div class="houseguest-card-body">
 
-            <div
-                class="houseguest-photo-preview"
-                id="houseguest-photo-preview-${id}"
-            >
+            <div class="houseguest-photo-section">
 
-                <span>
-                    Photo Preview
-                </span>
-
-                <img
-                    id="houseguest-photo-image-${id}"
-                    src=""
-                    alt="Houseguest"
+                <div
+                    class="houseguest-photo-preview"
+                    id="photo-preview-${id}"
                 >
-
-            </div>
-
-
-            <div class="form-group">
-
-                <label for="houseguest-image-${id}">
-                    Image URL
-                </label>
+                    ${
+                        houseguest.image
+                            ? `
+                                <img
+                                    src="${escapeHtml(houseguest.image)}"
+                                    alt="Houseguest"
+                                >
+                            `
+                            : `
+                                <span>
+                                    No Photo
+                                </span>
+                            `
+                    }
+                </div>
 
                 <input
                     type="url"
-                    id="houseguest-image-${id}"
-                    value="${escapeAttribute(
-                        houseguest.image || ""
-                    )}"
-                    placeholder="https://..."
-                    oninput="updateHouseguestImage(
-                        '${id}',
-                        this.value
-                    )"
-                >
-
-            </div>
-
-        </div>
-
-
-        <div class="houseguest-basic-info">
-
-            <div class="form-group">
-
-                <label for="houseguest-name-${id}">
-                    Name
-                </label>
-
-                <input
-                    type="text"
-                    id="houseguest-name-${id}"
-                    value="${escapeAttribute(
-                        houseguest.name || ""
-                    )}"
-                    placeholder="Houseguest Name"
+                    class="houseguest-image-input"
+                    data-field="image"
+                    placeholder="Houseguest image URL"
+                    value="${escapeHtml(houseguest.image || "")}"
+                    oninput="updateHouseguestImage('${id}', this.value)"
                 >
 
             </div>
 
 
-            <div class="form-group">
+            <div class="houseguest-basic-info">
 
-                <label for="houseguest-age-${id}">
-                    Age
-                </label>
+                <div class="form-group">
 
-                <input
-                    type="number"
-                    id="houseguest-age-${id}"
-                    value="${escapeAttribute(
-                        houseguest.age ?? ""
-                    )}"
-                    min="18"
-                    max="100"
-                    placeholder="Age"
-                >
+                    <label>
+                        Name
+                    </label>
+
+                    <input
+                        type="text"
+                        data-field="name"
+                        placeholder="Houseguest name"
+                        value="${escapeHtml(houseguest.name || "")}"
+                        oninput="updateHouseguestNumbers()"
+                    >
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label>
+                        Age
+                    </label>
+
+                    <input
+                        type="number"
+                        data-field="age"
+                        min="18"
+                        max="100"
+                        value="${escapeHtml(houseguest.age || "")}"
+                    >
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label>
+                        Occupation
+                    </label>
+
+                    <input
+                        type="text"
+                        data-field="occupation"
+                        placeholder="Occupation"
+                        value="${escapeHtml(houseguest.occupation || "")}"
+                    >
+
+                </div>
 
             </div>
 
 
-            <div class="form-group">
+            <div class="houseguest-ratings">
 
-                <label for="houseguest-occupation-${id}">
-                    Occupation
-                </label>
+                <h4>
+                    Ratings
+                </h4>
 
-                <input
-                    type="text"
-                    id="houseguest-occupation-${id}"
-                    value="${escapeAttribute(
-                        houseguest.occupation || ""
-                    )}"
-                    placeholder="Occupation"
-                >
+                <div class="ratings-grid">
 
-            </div>
+                    ${STAT_KEYS.map(key => `
+                        <div class="rating-group">
 
-        </div>
+                            <label>
+                                ${capitalize(key)}
+                            </label>
 
+                            <input
+                                type="number"
+                                data-rating="${key}"
+                                min="1"
+                                max="10"
+                                value="${getRatingValue(
+                                    houseguest.ratings,
+                                    key
+                                )}"
+                            >
 
-        <div class="houseguest-ratings">
+                        </div>
+                    `).join("")}
 
-            <div class="section-label">
-                PLAYER RATINGS
-            </div>
-
-
-            <div class="ratings-grid">
-
-                ${createRatingInput(
-                    id,
-                    "general",
-                    "General",
-                    houseguest.ratings?.general
-                )}
-
-                ${createRatingInput(
-                    id,
-                    "physical",
-                    "Physical",
-                    houseguest.ratings?.physical
-                )}
-
-                ${createRatingInput(
-                    id,
-                    "mental",
-                    "Mental",
-                    houseguest.ratings?.mental
-                )}
-
-                ${createRatingInput(
-                    id,
-                    "social",
-                    "Social",
-                    houseguest.ratings?.social
-                )}
-
-                ${createRatingInput(
-                    id,
-                    "strategic",
-                    "Strategic",
-                    houseguest.ratings?.strategic
-                )}
+                </div>
 
             </div>
 
@@ -575,160 +803,138 @@ function addHouseguest(data = null) {
 
     editor.appendChild(card);
 
-    updateHouseguestImage(
-        id,
-        houseguest.image || ""
-    );
+    currentHouseguestId++;
 
     updateHouseguestNumbers();
 
-    populateRelationshipHouseguestOptions();
+    refreshRelationshipHouseguestOptions();
+
+    refreshAllianceHouseguestOptions();
+
+    updateSpecificHOHOptions();
 }
 
 
-function createDefaultHouseguest(id) {
+function getRatingValue(ratings, key) {
 
-    return {
+    if (!ratings) {
+        return 5;
+    }
 
-        id,
+    const value = Number(ratings[key]);
 
-        name: "",
+    if (!Number.isFinite(value)) {
+        return 5;
+    }
 
-        image: "",
-
-        age: "",
-
-        occupation: "",
-
-        ratings: {
-
-            general: 5,
-
-            physical: 5,
-
-            mental: 5,
-
-            social: 5,
-
-            strategic: 5
-
-        },
-
-        status: "active",
-
-        placement: null,
-
-        weeksInGame: 0,
-
-        hohWins: 0,
-
-        povWins: 0,
-
-        safetyWins: 0,
-
-        nominationCount: 0,
-
-        vetoUsedOn: [],
-
-        evictionVotesReceived: 0
-
-    };
-}
-
-
-function createRatingInput(
-    houseguestId,
-    key,
-    label,
-    value
-) {
-
-    const rating =
-        value !== undefined &&
-        value !== null &&
-        value !== ""
-            ? value
-            : 5;
-
-    return `
-
-        <div class="rating-group">
-
-            <label for="rating-${houseguestId}-${key}">
-                ${label}
-            </label>
-
-            <input
-                type="number"
-                id="rating-${houseguestId}-${key}"
-                min="1"
-                max="10"
-                value="${rating}"
-            >
-
-        </div>
-
-    `;
+    return Math.max(
+        1,
+        Math.min(10, value)
+    );
 }
 
 
 function removeHouseguest(id) {
 
-    const card =
-        document.querySelector(
-            `.houseguest-card[data-houseguest-id="${id}"]`
-        );
+    const card = document.querySelector(
+        `.houseguest-card[data-houseguest-id="${id}"]`
+    );
 
-    if (!card) {
-        return;
+    if (card) {
+        card.remove();
     }
 
-    const confirmed =
-        confirm(
-            "Remove this houseguest?"
+    creatorRelationships =
+        creatorRelationships.filter(
+            relationship =>
+                relationship.from !== id &&
+                relationship.to !== id
         );
 
-    if (!confirmed) {
-        return;
+    creatorAlliances =
+        creatorAlliances.map(alliance => ({
+            ...alliance,
+            members: alliance.members.filter(
+                memberId => memberId !== id
+            )
+        })).filter(
+            alliance => alliance.members.length >= 2
+        );
+
+    if (
+        editingRelationshipId &&
+        !creatorRelationships.some(
+            relationship =>
+                relationship.id === editingRelationshipId
+        )
+    ) {
+        resetRelationshipForm();
     }
 
-    card.remove();
-
-    cleanupRelationshipsForHouseguest(id);
+    if (
+        editingAllianceId &&
+        !creatorAlliances.some(
+            alliance =>
+                alliance.id === editingAllianceId
+        )
+    ) {
+        resetAllianceForm();
+    }
 
     updateHouseguestNumbers();
 
-    populateRelationshipHouseguestOptions();
+    refreshRelationshipHouseguestOptions();
+
+    refreshAllianceHouseguestOptions();
 
     renderRelationships();
+
+    renderAlliances();
+
+    updateSpecificHOHOptions();
+
+    updateAllianceStrength();
 }
 
 
 function updateHouseguestNumbers() {
 
-    const cards =
-        document.querySelectorAll(
-            ".houseguest-card"
-        );
+    const cards = document.querySelectorAll(
+        ".houseguest-card"
+    );
 
     cards.forEach((card, index) => {
 
-        const heading =
-            card.querySelector(
-                ".houseguest-number"
-            );
+        const number = card.querySelector(
+            ".houseguest-number"
+        );
 
-        if (heading) {
+        const title = card.querySelector(
+            ".houseguest-title"
+        );
 
-            heading.textContent =
+        const nameInput = card.querySelector(
+            '[data-field="name"]'
+        );
+
+        const name =
+            nameInput?.value.trim();
+
+        if (number) {
+            number.textContent =
                 `Houseguest ${index + 1}`;
         }
+
+        if (title) {
+            title.textContent =
+                name || `Houseguest ${index + 1}`;
+        }
+
     });
 
-    const countInput =
-        document.getElementById(
-            "houseguest-count"
-        );
+    const countInput = getElement(
+        "houseguest-count"
+    );
 
     if (countInput) {
         countInput.value = cards.length;
@@ -738,460 +944,303 @@ function updateHouseguestNumbers() {
 
 function updateHouseguestCount() {
 
-    const countInput =
-        document.getElementById(
-            "houseguest-count"
-        );
+    const countInput = getElement(
+        "houseguest-count"
+    );
 
-    const editor =
-        document.getElementById(
-            "houseguest-editor"
-        );
+    const editor = getElement(
+        "houseguest-editor"
+    );
 
     if (!countInput || !editor) {
         return;
     }
 
-    let requestedCount =
-        parseInt(
-            countInput.value,
-            10
-        );
+    let target =
+        parseInt(countInput.value, 10);
 
-    if (isNaN(requestedCount)) {
-        requestedCount = 16;
+    if (!Number.isFinite(target)) {
+        target = 16;
     }
 
-    requestedCount =
-        Math.max(
-            2,
-            Math.min(
-                100,
-                requestedCount
-            )
-        );
+    target = Math.max(
+        2,
+        Math.min(100, target)
+    );
 
-    countInput.value = requestedCount;
+    countInput.value = target;
 
-    const currentCount =
+    const current =
         editor.querySelectorAll(
             ".houseguest-card"
         ).length;
 
-    if (requestedCount > currentCount) {
+    if (target > current) {
 
-        for (
-            let i = currentCount;
-            i < requestedCount;
-            i++
-        ) {
+        for (let i = current; i < target; i++) {
             addHouseguest();
         }
 
-    } else if (
-        requestedCount < currentCount
-    ) {
+    } else if (target < current) {
 
-        const cards =
-            Array.from(
-                editor.querySelectorAll(
-                    ".houseguest-card"
-                )
-            );
+        const cards = [
+            ...editor.querySelectorAll(
+                ".houseguest-card"
+            )
+        ];
 
         for (
             let i = cards.length - 1;
-            i >= requestedCount;
+            i >= target;
             i--
         ) {
 
             const id =
                 cards[i].dataset.houseguestId;
 
-            cards[i].remove();
-
-            cleanupRelationshipsForHouseguest(
-                id
-            );
+            removeHouseguest(id);
         }
     }
 
     updateHouseguestNumbers();
 
-    populateRelationshipHouseguestOptions();
+    refreshRelationshipHouseguestOptions();
 
-    renderRelationships();
-}
-
-
-function updateHouseguestImage(id, url) {
-
-    const image =
-        document.getElementById(
-            `houseguest-photo-image-${id}`
-        );
-
-    const preview =
-        document.getElementById(
-            `houseguest-photo-preview-${id}`
-        );
-
-    if (!image || !preview) {
-        return;
-    }
-
-    if (!url || !url.trim()) {
-
-        showHouseguestPlaceholder(id);
-
-        return;
-    }
-
-    image.onload = () => {
-
-        image.style.display = "block";
-
-        const span =
-            preview.querySelector(
-                "span"
-            );
-
-        if (span) {
-            span.style.display = "none";
-        }
-    };
-
-    image.onerror = () => {
-
-        showHouseguestPlaceholder(id);
-    };
-
-    image.src = url.trim();
-}
-
-
-function showHouseguestPlaceholder(id) {
-
-    const image =
-        document.getElementById(
-            `houseguest-photo-image-${id}`
-        );
-
-    const preview =
-        document.getElementById(
-            `houseguest-photo-preview-${id}`
-        );
-
-    if (!image || !preview) {
-        return;
-    }
-
-    image.style.display = "none";
-
-    image.removeAttribute("src");
-
-    let span =
-        preview.querySelector(
-            "span"
-        );
-
-    if (!span) {
-
-        span =
-            document.createElement(
-                "span"
-            );
-
-        preview.appendChild(span);
-    }
-
-    span.textContent =
-        "Photo Preview";
-
-    span.style.display = "block";
+    refreshAllianceHouseguestOptions();
 }
 
 
 function collectHouseguests() {
 
-    const cards =
-        document.querySelectorAll(
-            ".houseguest-card"
-        );
+    const cards = document.querySelectorAll(
+        ".houseguest-card"
+    );
 
-    return Array.from(cards).map(
-        (card, index) => {
+    return [...cards].map((card, index) => {
 
-            const id =
+        const getField = field =>
+            card.querySelector(
+                `[data-field="${field}"]`
+            );
+
+        const name =
+            getField("name")?.value.trim() || "";
+
+        const image =
+            getField("image")?.value.trim() || "";
+
+        const age =
+            getField("age")?.value || "";
+
+        const occupation =
+            getField("occupation")?.value.trim() || "";
+
+        const ratings = {};
+
+        STAT_KEYS.forEach(key => {
+
+            const input = card.querySelector(
+                `[data-rating="${key}"]`
+            );
+
+            ratings[key] =
+                Math.max(
+                    1,
+                    Math.min(
+                        10,
+                        Number(input?.value) || 5
+                    )
+                );
+        });
+
+        return {
+            id:
                 card.dataset.houseguestId ||
-                `hg-${index + 1}`;
+                `hg-${index + 1}`,
 
-            return {
+            name,
+            image,
+            age,
+            occupation,
+            ratings,
 
-                id,
+            status: "active",
+            placement: null,
+            weeksInGame: 0,
+            hohWins: 0,
+            povWins: 0,
+            safetyWins: 0,
+            nominationCount: 0,
+            vetoUsedOn: [],
+            evictionVotesReceived: 0
+        };
 
-                name:
-                    getInputValue(
-                        `houseguest-name-${id}`
-                    ),
-
-                image:
-                    getInputValue(
-                        `houseguest-image-${id}`
-                    ),
-
-                age:
-                    getInputValue(
-                        `houseguest-age-${id}`
-                    ),
-
-                occupation:
-                    getInputValue(
-                        `houseguest-occupation-${id}`
-                    ),
-
-                ratings: {
-
-                    general:
-                        getRatingValue(
-                            `rating-${id}-general`
-                        ),
-
-                    physical:
-                        getRatingValue(
-                            `rating-${id}-physical`
-                        ),
-
-                    mental:
-                        getRatingValue(
-                            `rating-${id}-mental`
-                        ),
-
-                    social:
-                        getRatingValue(
-                            `rating-${id}-social`
-                        ),
-
-                    strategic:
-                        getRatingValue(
-                            `rating-${id}-strategic`
-                        )
-
-                },
-
-                status: "active",
-
-                placement: null,
-
-                weeksInGame: 0,
-
-                hohWins: 0,
-
-                povWins: 0,
-
-                safetyWins: 0,
-
-                nominationCount: 0,
-
-                vetoUsedOn: [],
-
-                evictionVotesReceived: 0
-            };
-        }
-    );
+    });
 }
 
 
-function getRatingValue(id) {
+function updateHouseguestImage(id, url) {
 
-    const input =
-        document.getElementById(id);
-
-    if (!input) {
-        return 5;
-    }
-
-    let value =
-        parseInt(
-            input.value,
-            10
-        );
-
-    if (isNaN(value)) {
-        value = 5;
-    }
-
-    return Math.max(
-        1,
-        Math.min(
-            10,
-            value
-        )
+    const preview = getElement(
+        `photo-preview-${id}`
     );
+
+    if (!preview) {
+        return;
+    }
+
+    const cleanUrl =
+        String(url || "").trim();
+
+    if (!cleanUrl) {
+        showHouseguestPlaceholder(id);
+        return;
+    }
+
+    preview.innerHTML = `
+        <img
+            src="${escapeHtml(cleanUrl)}"
+            alt="Houseguest"
+            onerror="showHouseguestPlaceholder('${id}')"
+        >
+    `;
 }
 
 
-/* =========================================================
+function showHouseguestPlaceholder(id) {
+
+    const preview = getElement(
+        `photo-preview-${id}`
+    );
+
+    if (!preview) {
+        return;
+    }
+
+    preview.innerHTML = `
+        <span>
+            No Photo
+        </span>
+    `;
+}
+
+
+/* ============================================================
    IMAGE PREVIEWS
-   ========================================================= */
+   ============================================================ */
 
 function setupImagePreviews() {
 
     const logoInput =
-        document.getElementById(
-            "season-logo"
-        );
-
-    const backgroundInput =
-        document.getElementById(
-            "season-background"
-        );
+        getElement("season-logo");
 
     if (logoInput) {
 
-        logoInput.oninput =
-            updateSeasonLogoPreview;
+        logoInput.addEventListener(
+            "input",
+            () => {
+                updateSeasonLogoPreview(
+                    logoInput.value
+                );
+            }
+        );
     }
+
+    const backgroundInput =
+        getElement("season-background");
 
     if (backgroundInput) {
 
-        backgroundInput.oninput =
-            updateSeasonBackground;
+        backgroundInput.addEventListener(
+            "input",
+            () => {
+                updateSeasonBackgroundPreview(
+                    backgroundInput.value
+                );
+            }
+        );
     }
 }
 
 
-function updateSeasonLogoPreview() {
+function updateSeasonLogoPreview(url) {
 
-    const input =
-        document.getElementById(
-            "season-logo"
-        );
+    const container =
+        getElement("season-logo-preview");
 
     const image =
-        document.getElementById(
-            "season-logo-preview-image"
-        );
+        getElement("season-logo-preview-image");
 
-    const preview =
-        document.getElementById(
-            "season-logo-preview"
-        );
-
-    if (!input || !image || !preview) {
+    if (!container || !image) {
         return;
     }
 
-    const url =
-        input.value.trim();
+    const cleanUrl =
+        String(url || "").trim();
 
-    if (!url) {
+    if (!cleanUrl) {
 
-        image.style.display = "none";
+        image.removeAttribute("src");
 
-        const span =
-            preview.querySelector(
-                "span"
-            );
-
-        if (span) {
-            span.style.display = "block";
-        }
+        container.classList.remove(
+            "has-image"
+        );
 
         return;
     }
 
-    image.onload = () => {
-
-        image.style.display = "block";
-
-        const span =
-            preview.querySelector(
-                "span"
-            );
-
-        if (span) {
-            span.style.display = "none";
-        }
-    };
+    image.src = cleanUrl;
 
     image.onerror = () => {
-
-        image.style.display = "none";
-
-        const span =
-            preview.querySelector(
-                "span"
-            );
-
-        if (span) {
-            span.textContent =
-                "Unable to load logo";
-            span.style.display = "block";
-        }
+        container.classList.remove(
+            "has-image"
+        );
     };
 
-    image.src = url;
+    image.onload = () => {
+        container.classList.add(
+            "has-image"
+        );
+    };
 }
 
 
-function updateSeasonBackground() {
+function updateSeasonBackgroundPreview(url) {
 
-    const input =
-        document.getElementById(
-            "season-background"
-        );
+    const creator =
+        getElement("creator-page");
 
-    if (!input) {
+    if (!creator) {
         return;
     }
 
-    const url =
-        input.value.trim();
+    const cleanUrl =
+        String(url || "").trim();
 
-    if (url) {
+    if (cleanUrl) {
 
-        document.body.style.backgroundImage =
-            `linear-gradient(
-                rgba(11,13,18,0.90),
-                rgba(11,13,18,0.90)
-            ),
-            url("${url}")`;
-
-        document.body.style.backgroundSize =
-            "cover";
-
-        document.body.style.backgroundAttachment =
-            "fixed";
+        creator.style.setProperty(
+            "--season-background-image",
+            `url("${cleanUrl}")`
+        );
 
     } else {
 
-        document.body.style.backgroundImage =
-            "";
+        creator.style.removeProperty(
+            "--season-background-image"
+        );
     }
 }
 
 
-/* =========================================================
+/* ============================================================
    SEASON RULES
-   ========================================================= */
+   ============================================================ */
 
 function setupRuleControls() {
 
     const nominees =
-        document.getElementById(
-            "rule-nominees"
-        );
-
-    const vetoPlayers =
-        document.getElementById(
-            "rule-veto-players"
-        );
-
-    const startingHOH =
-        document.getElementById(
-            "rule-starting-hoh"
-        );
+        getElement("rule-nominees");
 
     if (nominees) {
 
@@ -1201,6 +1250,9 @@ function setupRuleControls() {
         );
     }
 
+    const vetoPlayers =
+        getElement("rule-veto-players");
+
     if (vetoPlayers) {
 
         vetoPlayers.addEventListener(
@@ -1209,11 +1261,25 @@ function setupRuleControls() {
         );
     }
 
+    const startingHOH =
+        getElement("rule-starting-hoh");
+
     if (startingHOH) {
 
         startingHOH.addEventListener(
             "change",
             updateSpecificHOHVisibility
+        );
+    }
+
+    const count =
+        getElement("houseguest-count");
+
+    if (count) {
+
+        count.addEventListener(
+            "change",
+            updateHouseguestCount
         );
     }
 
@@ -1227,74 +1293,48 @@ function setupRuleControls() {
 
 function resetSeasonRules() {
 
-    setValue(
-        "rule-finalists",
-        2
+    const defaults = {
+        "rule-finalists": 2,
+        "rule-jury-size": 7,
+        "rule-nominees": "2",
+        "rule-custom-nominees": 2,
+        "rule-veto-players": "6",
+        "rule-custom-veto-players": 6,
+        "rule-eviction-type": "house",
+        "rule-starting-hoh": "random",
+        "rule-specific-hoh": ""
+    };
+
+    Object.entries(defaults).forEach(
+        ([id, value]) => {
+
+            const element = getElement(id);
+
+            if (element) {
+                element.value = value;
+            }
+
+        }
     );
 
-    setValue(
-        "rule-jury-size",
-        7
-    );
+    const toggles = {
+        "rule-veto-enabled": true,
+        "rule-safety-enabled": false,
+        "rule-battle-back": false,
+        "rule-double-eviction": false,
+        "rule-jury-voting": true
+    };
 
-    setChecked(
-        "rule-veto-enabled",
-        true
-    );
+    Object.entries(toggles).forEach(
+        ([id, value]) => {
 
-    setChecked(
-        "rule-safety-enabled",
-        false
-    );
+            const element = getElement(id);
 
-    setChecked(
-        "rule-battle-back",
-        false
-    );
+            if (element) {
+                element.checked = value;
+            }
 
-    setChecked(
-        "rule-double-eviction",
-        false
-    );
-
-    setValue(
-        "rule-nominees",
-        "2"
-    );
-
-    setValue(
-        "rule-custom-nominees",
-        2
-    );
-
-    setValue(
-        "rule-veto-players",
-        "6"
-    );
-
-    setValue(
-        "rule-custom-veto-players",
-        6
-    );
-
-    setValue(
-        "rule-eviction-type",
-        "house"
-    );
-
-    setValue(
-        "rule-starting-hoh",
-        "random"
-    );
-
-    setValue(
-        "rule-specific-hoh",
-        ""
-    );
-
-    setChecked(
-        "rule-jury-voting",
-        true
+        }
     );
 
     updateCustomNomineesVisibility();
@@ -1302,198 +1342,176 @@ function resetSeasonRules() {
     updateCustomVetoPlayersVisibility();
 
     updateSpecificHOHVisibility();
+
+    updateSpecificHOHOptions();
 }
 
 
 function collectSeasonRules() {
 
-    let nominees =
-        getValue(
-            "rule-nominees"
-        );
+    const nominees =
+        getElement("rule-nominees");
 
-    if (nominees === "custom") {
+    const vetoPlayers =
+        getElement("rule-veto-players");
 
-        nominees =
-            parseInt(
-                getValue(
+    const finalists =
+        Number(
+            getElement("rule-finalists")?.value
+        ) || 2;
+
+    const jurySize =
+        Number(
+            getElement("rule-jury-size")?.value
+        ) || 7;
+
+    let nomineesPerWeek =
+        nominees?.value === "custom"
+            ? Number(
+                getElement(
                     "rule-custom-nominees"
-                ),
-                10
-            ) || 2;
-    } else {
+                )?.value
+            ) || 2
+            : Number(nominees?.value) || 2;
 
-        nominees =
-            parseInt(
-                nominees,
-                10
-            ) || 2;
-    }
-
-
-    let vetoPlayers =
-        getValue(
-            "rule-veto-players"
-        );
-
-    if (vetoPlayers === "custom") {
-
-        vetoPlayers =
-            parseInt(
-                getValue(
+    let vetoPlayerCount =
+        vetoPlayers?.value === "custom"
+            ? Number(
+                getElement(
                     "rule-custom-veto-players"
-                ),
-                10
-            ) || 6;
-
-    } else {
-
-        vetoPlayers =
-            parseInt(
-                vetoPlayers,
-                10
-            ) || 6;
-    }
-
+                )?.value
+            ) || 6
+            : Number(vetoPlayers?.value) || 6;
 
     return {
 
-        finalists:
-            parseInt(
-                getValue(
-                    "rule-finalists"
-                ),
-                10
-            ) || 2,
+        finalists: Math.max(
+            2,
+            finalists
+        ),
 
-        jurySize:
-            parseInt(
-                getValue(
-                    "rule-jury-size"
-                ),
-                10
-            ) || 7,
+        jurySize: Math.max(
+            0,
+            jurySize
+        ),
 
         vetoEnabled:
-            getChecked(
+            getElement(
                 "rule-veto-enabled"
-            ),
+            )?.checked ?? true,
 
         safetyCompetitionEnabled:
-            getChecked(
+            getElement(
                 "rule-safety-enabled"
-            ),
+            )?.checked ?? false,
 
         battleBackEnabled:
-            getChecked(
+            getElement(
                 "rule-battle-back"
-            ),
+            )?.checked ?? false,
 
         doubleEvictionEnabled:
-            getChecked(
+            getElement(
                 "rule-double-eviction"
-            ),
+            )?.checked ?? false,
 
         nomineesPerWeek:
-            nominees,
+            Math.max(
+                1,
+                nomineesPerWeek
+            ),
 
         vetoPlayers:
-            vetoPlayers,
+            Math.max(
+                2,
+                vetoPlayerCount
+            ),
 
         evictionType:
-            getValue(
+            getElement(
                 "rule-eviction-type"
-            ) || "house",
+            )?.value || "house",
 
         startingHOH:
-            getValue(
+            getElement(
                 "rule-starting-hoh"
-            ) || "random",
+            )?.value || "random",
 
         specificStartingHOH:
-            getValue(
+            getElement(
                 "rule-specific-hoh"
-            ) || "",
+            )?.value || "",
 
         juryVotingEnabled:
-            getChecked(
+            getElement(
                 "rule-jury-voting"
-            )
+            )?.checked ?? true
     };
 }
 
 
 function updateCustomNomineesVisibility() {
 
-    const select =
-        document.getElementById(
-            "rule-nominees"
-        );
+    const selector =
+        getElement("rule-nominees");
 
     const container =
-        document.getElementById(
+        getElement(
             "custom-nominees-container"
         );
 
-    if (!select || !container) {
+    if (!selector || !container) {
         return;
     }
 
     container.style.display =
-        select.value === "custom"
-            ? "block"
+        selector.value === "custom"
+            ? ""
             : "none";
 }
 
 
 function updateCustomVetoPlayersVisibility() {
 
-    const select =
-        document.getElementById(
-            "rule-veto-players"
-        );
+    const selector =
+        getElement("rule-veto-players");
 
     const container =
-        document.getElementById(
+        getElement(
             "custom-veto-players-container"
         );
 
-    if (!select || !container) {
+    if (!selector || !container) {
         return;
     }
 
     container.style.display =
-        select.value === "custom"
-            ? "block"
+        selector.value === "custom"
+            ? ""
             : "none";
 }
 
 
 function updateSpecificHOHVisibility() {
 
-    const select =
-        document.getElementById(
-            "rule-starting-hoh"
-        );
+    const selector =
+        getElement("rule-starting-hoh");
 
     const container =
-        document.getElementById(
+        getElement(
             "specific-hoh-container"
         );
 
-    if (!select || !container) {
+    if (!selector || !container) {
         return;
     }
 
     container.style.display =
-        select.value === "specific"
-            ? "block"
+        selector.value === "specific"
+            ? ""
             : "none";
 
-    if (
-        select.value === "specific"
-    ) {
-
+    if (selector.value === "specific") {
         populateSpecificHOHOptions();
     }
 }
@@ -1502,16 +1520,17 @@ function updateSpecificHOHVisibility() {
 function populateSpecificHOHOptions() {
 
     const select =
-        document.getElementById(
-            "rule-specific-hoh"
-        );
+        getElement("rule-specific-hoh");
 
     if (!select) {
         return;
     }
 
-    const currentValue =
+    const current =
         select.value;
+
+    const houseguests =
+        collectHouseguests();
 
     select.innerHTML = `
         <option value="">
@@ -1519,139 +1538,160 @@ function populateSpecificHOHOptions() {
         </option>
     `;
 
-    const houseguests =
-        collectHouseguests();
+    houseguests.forEach(houseguest => {
 
-    houseguests.forEach(
-        houseguest => {
-
-            const option =
-                document.createElement(
-                    "option"
-                );
-
-            option.value =
-                houseguest.id;
-
-            option.textContent =
-                houseguest.name ||
-                "Unnamed Houseguest";
-
-            select.appendChild(option);
+        if (!houseguest.name.trim()) {
+            return;
         }
-    );
+
+        const option =
+            document.createElement("option");
+
+        option.value =
+            houseguest.id;
+
+        option.textContent =
+            houseguest.name;
+
+        select.appendChild(option);
+    });
 
     if (
         houseguests.some(
             houseguest =>
-                houseguest.id === currentValue
+                houseguest.id === current
         )
     ) {
-
-        select.value =
-            currentValue;
+        select.value = current;
     }
 }
 
 
-function loadSeasonRules(rules = {}) {
+function updateSpecificHOHOptions() {
+    populateSpecificHOHOptions();
+}
+
+
+function loadSeasonRules(rules) {
+
+    const normalized = {
+        ...{
+            finalists: 2,
+            jurySize: 7,
+            vetoEnabled: true,
+            safetyCompetitionEnabled: false,
+            battleBackEnabled: false,
+            doubleEvictionEnabled: false,
+            nomineesPerWeek: 2,
+            vetoPlayers: 6,
+            evictionType: "house",
+            startingHOH: "random",
+            specificStartingHOH: "",
+            juryVotingEnabled: true
+        },
+        ...(rules || {})
+    };
+
+    const setValue = (id, value) => {
+
+        const element = getElement(id);
+
+        if (element) {
+            element.value = value;
+        }
+    };
+
+    const setChecked = (id, value) => {
+
+        const element = getElement(id);
+
+        if (element) {
+            element.checked = Boolean(value);
+        }
+    };
 
     setValue(
         "rule-finalists",
-        rules.finalists ?? 2
+        normalized.finalists
     );
 
     setValue(
         "rule-jury-size",
-        rules.jurySize ?? 7
+        normalized.jurySize
     );
-
-    setChecked(
-        "rule-veto-enabled",
-        rules.vetoEnabled !== false
-    );
-
-    setChecked(
-        "rule-safety-enabled",
-        rules.safetyCompetitionEnabled === true
-    );
-
-    setChecked(
-        "rule-battle-back",
-        rules.battleBackEnabled === true
-    );
-
-    setChecked(
-        "rule-double-eviction",
-        rules.doubleEvictionEnabled === true
-    );
-
-    setValue(
-        "rule-nominees",
-        rules.nomineesPerWeek ?? 2
-    );
-
-    if (
-        !["2", "3", "4"].includes(
-            String(
-                rules.nomineesPerWeek ?? 2
-            )
-        )
-    ) {
-
-        setValue(
-            "rule-nominees",
-            "custom"
-        );
-
-        setValue(
-            "rule-custom-nominees",
-            rules.nomineesPerWeek ?? 2
-        );
-    }
-
-    setValue(
-        "rule-veto-players",
-        rules.vetoPlayers ?? 6
-    );
-
-    if (
-        !["3", "4", "5", "6"].includes(
-            String(
-                rules.vetoPlayers ?? 6
-            )
-        )
-    ) {
-
-        setValue(
-            "rule-veto-players",
-            "custom"
-        );
-
-        setValue(
-            "rule-custom-veto-players",
-            rules.vetoPlayers ?? 6
-        );
-    }
 
     setValue(
         "rule-eviction-type",
-        rules.evictionType || "house"
+        normalized.evictionType
     );
 
     setValue(
         "rule-starting-hoh",
-        rules.startingHOH || "random"
+        normalized.startingHOH
     );
 
     setValue(
         "rule-specific-hoh",
-        rules.specificStartingHOH || ""
+        normalized.specificStartingHOH
+    );
+
+    setChecked(
+        "rule-veto-enabled",
+        normalized.vetoEnabled
+    );
+
+    setChecked(
+        "rule-safety-enabled",
+        normalized.safetyCompetitionEnabled
+    );
+
+    setChecked(
+        "rule-battle-back",
+        normalized.battleBackEnabled
+    );
+
+    setChecked(
+        "rule-double-eviction",
+        normalized.doubleEvictionEnabled
     );
 
     setChecked(
         "rule-jury-voting",
-        rules.juryVotingEnabled !== false
+        normalized.juryVotingEnabled
+    );
+
+    const standardNominees =
+        [2, 3].includes(
+            Number(normalized.nomineesPerWeek)
+        );
+
+    setValue(
+        "rule-nominees",
+        standardNominees
+            ? String(normalized.nomineesPerWeek)
+            : "custom"
+    );
+
+    setValue(
+        "rule-custom-nominees",
+        normalized.nomineesPerWeek
+    );
+
+    const standardVeto =
+        [4, 5, 6].includes(
+            Number(normalized.vetoPlayers)
+        );
+
+    setValue(
+        "rule-veto-players",
+        standardVeto
+            ? String(normalized.vetoPlayers)
+            : "custom"
+    );
+
+    setValue(
+        "rule-custom-veto-players",
+        normalized.vetoPlayers
     );
 
     updateCustomNomineesVisibility();
@@ -1664,22 +1704,37 @@ function loadSeasonRules(rules = {}) {
 }
 
 
-/* =========================================================
+/* ============================================================
    RELATIONSHIPS
-   ========================================================= */
+   ============================================================ */
 
 function setupRelationshipControls() {
 
-    const relationshipInputs =
-        RELATIONSHIP_KEYS.map(
-            key =>
-                document.getElementById(
-                    `relationship-${key}`
-                )
-        );
+    const metricMap = {
+        friendship:
+            "relationship-friendship",
 
-    relationshipInputs.forEach(
-        input => {
+        trust:
+            "relationship-trust",
+
+        loyalty:
+            "relationship-loyalty",
+
+        rivalry:
+            "relationship-rivalry",
+
+        attraction:
+            "relationship-attraction",
+
+        respect:
+            "relationship-respect"
+    };
+
+    Object.entries(metricMap).forEach(
+        ([key, id]) => {
+
+            const input =
+                getElement(id);
 
             if (!input) {
                 return;
@@ -1687,469 +1742,487 @@ function setupRelationshipControls() {
 
             input.addEventListener(
                 "input",
-                updateRelationshipDisplay
-            );
-
-            input.addEventListener(
-                "change",
-                updateRelationshipDisplay
+                () => {
+                    updateRelationshipMetricDisplays();
+                }
             );
         }
     );
 
-    const fromSelect =
-        document.getElementById(
-            "relationship-from"
-        );
+    const from =
+        getElement("relationship-from");
 
-    const toSelect =
-        document.getElementById(
-            "relationship-to"
-        );
+    const to =
+        getElement("relationship-to");
 
-    if (fromSelect) {
-
-        fromSelect.addEventListener(
+    if (from) {
+        from.addEventListener(
             "change",
-            handleRelationshipSelectionChange
+            updateRelationshipFormForPair
         );
     }
 
-    if (toSelect) {
-
-        toSelect.addEventListener(
+    if (to) {
+        to.addEventListener(
             "change",
-            handleRelationshipSelectionChange
+            updateRelationshipFormForPair
         );
-    }
-
-    resetRelationshipEditor();
-
-    updateRelationshipDisplay();
-
-    populateRelationshipHouseguestOptions();
-}
-
-
-function resetRelationshipEditor() {
-
-    editingRelationshipId = null;
-
-    setValue(
-        "relationship-from",
-        ""
-    );
-
-    setValue(
-        "relationship-to",
-        ""
-    );
-
-    setRelationshipValue(
-        "friendship",
-        5
-    );
-
-    setRelationshipValue(
-        "trust",
-        5
-    );
-
-    setRelationshipValue(
-        "loyalty",
-        5
-    );
-
-    setRelationshipValue(
-        "rivalry",
-        0
-    );
-
-    setRelationshipValue(
-        "respect",
-        5
-    );
-
-    setRelationshipValue(
-        "attraction",
-        0
-    );
-
-    updateRelationshipDisplay();
-
-    const button =
-        document.querySelector(
-            ".relationship-actions .primary-button"
-        );
-
-    if (button) {
-
-        button.textContent =
-            "Add Relationship";
     }
 }
 
 
-function setRelationshipValue(
-    key,
-    value
+function normalizeRelationship(
+    relationship,
+    index = 0
 ) {
 
-    const input =
-        document.getElementById(
-            `relationship-${key}`
-        );
+    return {
+        id:
+            relationship?.id ||
+            `relationship-${Date.now()}-${index}`,
 
-    if (input) {
+        from:
+            relationship?.from || "",
 
-        input.value =
-            Math.max(
+        to:
+            relationship?.to || "",
+
+        friendship:
+            clamp(
+                relationship?.friendship,
                 0,
-                Math.min(
-                    10,
-                    Number(value)
-                )
-            );
-    }
+                10,
+                5
+            ),
+
+        trust:
+            clamp(
+                relationship?.trust,
+                0,
+                10,
+                5
+            ),
+
+        loyalty:
+            clamp(
+                relationship?.loyalty,
+                0,
+                10,
+                5
+            ),
+
+        rivalry:
+            clamp(
+                relationship?.rivalry,
+                0,
+                10,
+                0
+            ),
+
+        attraction:
+            clamp(
+                relationship?.attraction,
+                0,
+                10,
+                0
+            ),
+
+        respect:
+            clamp(
+                relationship?.respect,
+                0,
+                10,
+                5
+            )
+    };
 }
 
 
-function getRelationshipValue(key) {
+function clamp(
+    value,
+    min,
+    max,
+    fallback
+) {
 
-    const input =
-        document.getElementById(
-            `relationship-${key}`
-        );
+    const number =
+        Number(value);
 
-    if (!input) {
-        return 0;
-    }
-
-    const value =
-        Number(
-            input.value
-        );
-
-    if (isNaN(value)) {
-        return 0;
+    if (!Number.isFinite(number)) {
+        return fallback;
     }
 
     return Math.max(
-        0,
-        Math.min(
-            10,
-            value
-        )
+        min,
+        Math.min(max, number)
     );
 }
 
 
-function updateRelationshipDisplay() {
-
-    RELATIONSHIP_KEYS.forEach(
-        key => {
-
-            const value =
-                getRelationshipValue(
-                    key
-                );
-
-            const display =
-                document.getElementById(
-                    `relationship-${key}-value`
-                );
-
-            if (display) {
-
-                display.textContent =
-                    Number.isInteger(value)
-                        ? value
-                        : value.toFixed(1);
-            }
-        }
-    );
-
-
-    const overall =
-        calculateOverallRelationship({
-
-            friendship:
-                getRelationshipValue(
-                    "friendship"
-                ),
-
-            trust:
-                getRelationshipValue(
-                    "trust"
-                ),
-
-            loyalty:
-                getRelationshipValue(
-                    "loyalty"
-                ),
-
-            rivalry:
-                getRelationshipValue(
-                    "rivalry"
-                ),
-
-            respect:
-                getRelationshipValue(
-                    "respect"
-                ),
-
-            attraction:
-                getRelationshipValue(
-                    "attraction"
-                )
-        });
-
-
-    const overallDisplay =
-        document.getElementById(
-            "relationship-overall-value"
-        );
-
-    if (overallDisplay) {
-
-        overallDisplay.textContent =
-            overall.toFixed(1);
-    }
-}
-
-
-function calculateOverallRelationship(
+function calculateRelationshipOverall(
     relationship
 ) {
 
-    /*
-     * Overall relationship is intentionally based on:
-     *
-     * Friendship
-     * Trust
-     * Loyalty
-     * Respect
-     *
-     * Rivalry acts as a negative modifier.
-     *
-     * Attraction is kept separate so that romantic attraction
-     * does not automatically turn into a stronger strategic
-     * relationship.
-     */
-
-    const positiveAverage =
+    const positive =
         (
-            Number(
-                relationship.friendship || 0
-            ) +
-
-            Number(
-                relationship.trust || 0
-            ) +
-
-            Number(
-                relationship.loyalty || 0
-            ) +
-
-            Number(
-                relationship.respect || 0
-            )
+            Number(relationship.friendship) +
+            Number(relationship.trust) +
+            Number(relationship.loyalty) +
+            Number(relationship.respect)
         ) / 4;
 
+    /*
+     * Rivalry reduces the overall relationship.
+     *
+     * Attraction is intentionally kept separate.
+     * It can later influence showmances or strategic
+     * behavior without automatically making two players
+     * "better friends."
+     */
 
-    const rivalry =
-        Number(
-            relationship.rivalry || 0
-        );
-
-
-    const overall =
-        positiveAverage -
-        (
-            rivalry * 0.5
-        );
-
+    const adjusted =
+        positive -
+        (Number(relationship.rivalry) * 0.5);
 
     return Math.max(
         0,
         Math.min(
             10,
-            overall
+            Math.round(adjusted * 10) / 10
         )
     );
 }
 
 
-function populateRelationshipHouseguestOptions() {
+function getCurrentCreatorHouseguests() {
 
-    const fromSelect =
-        document.getElementById(
-            "relationship-from"
-        );
+    return collectHouseguests();
+}
 
-    const toSelect =
-        document.getElementById(
-            "relationship-to"
-        );
 
-    if (!fromSelect || !toSelect) {
+function refreshRelationshipHouseguestOptions() {
+
+    const from =
+        getElement("relationship-from");
+
+    const to =
+        getElement("relationship-to");
+
+    if (!from || !to) {
         return;
     }
 
     const currentFrom =
-        fromSelect.value;
+        from.value;
 
     const currentTo =
-        toSelect.value;
+        to.value;
 
     const houseguests =
-        collectHouseguests();
-
-
-    fromSelect.innerHTML = `
-        <option value="">
-            Select Houseguest
-        </option>
-    `;
-
-    toSelect.innerHTML = `
-        <option value="">
-            Select Houseguest
-        </option>
-    `;
-
-
-    houseguests.forEach(
-        houseguest => {
-
-            const name =
-                houseguest.name ||
-                `Houseguest ${getHouseguestNumber(
-                    houseguest.id
-                )}`;
-
-
-            const fromOption =
-                document.createElement(
-                    "option"
-                );
-
-            fromOption.value =
-                houseguest.id;
-
-            fromOption.textContent =
-                name;
-
-            fromSelect.appendChild(
-                fromOption
+        getCurrentCreatorHouseguests()
+            .filter(
+                houseguest =>
+                    houseguest.name.trim()
             );
 
+    const createOptions = () => {
 
-            const toOption =
-                document.createElement(
-                    "option"
+        const fragment =
+            document.createDocumentFragment();
+
+        const placeholder =
+            document.createElement("option");
+
+        placeholder.value = "";
+
+        placeholder.textContent =
+            "Select Houseguest";
+
+        fragment.appendChild(
+            placeholder
+        );
+
+        houseguests.forEach(
+            houseguest => {
+
+                const option =
+                    document.createElement("option");
+
+                option.value =
+                    houseguest.id;
+
+                option.textContent =
+                    houseguest.name;
+
+                fragment.appendChild(
+                    option
                 );
+            }
+        );
 
-            toOption.value =
-                houseguest.id;
+        return fragment;
+    };
 
-            toOption.textContent =
-                name;
+    from.innerHTML = "";
 
-            toSelect.appendChild(
-                toOption
-            );
+    to.innerHTML = "";
+
+    from.appendChild(
+        createOptions()
+    );
+
+    to.appendChild(
+        createOptions()
+    );
+
+    if (
+        houseguests.some(
+            houseguest =>
+                houseguest.id === currentFrom
+        )
+    ) {
+        from.value = currentFrom;
+    }
+
+    if (
+        houseguests.some(
+            houseguest =>
+                houseguest.id === currentTo
+        )
+    ) {
+        to.value = currentTo;
+    }
+
+    const disabled =
+        houseguests.length < 2;
+
+    from.disabled = disabled;
+
+    to.disabled = disabled;
+
+    updateRelationshipFormForPair();
+}
+
+
+function getRelationshipFromForm() {
+
+    const relationship = {
+
+        from:
+            getElement(
+                "relationship-from"
+            )?.value || "",
+
+        to:
+            getElement(
+                "relationship-to"
+            )?.value || "",
+
+        friendship:
+            Number(
+                getElement(
+                    "relationship-friendship"
+                )?.value
+            ) || 0,
+
+        trust:
+            Number(
+                getElement(
+                    "relationship-trust"
+                )?.value
+            ) || 0,
+
+        loyalty:
+            Number(
+                getElement(
+                    "relationship-loyalty"
+                )?.value
+            ) || 0,
+
+        rivalry:
+            Number(
+                getElement(
+                    "relationship-rivalry"
+                )?.value
+            ) || 0,
+
+        attraction:
+            Number(
+                getElement(
+                    "relationship-attraction"
+                )?.value
+            ) || 0,
+
+        respect:
+            Number(
+                getElement(
+                    "relationship-respect"
+                )?.value
+            ) || 0
+    };
+
+    return normalizeRelationship(
+        relationship,
+        0
+    );
+}
+
+
+function setRelationshipForm(
+    relationship
+) {
+
+    const normalized =
+        normalizeRelationship(
+            relationship
+        );
+
+    const values = {
+        "relationship-from":
+            normalized.from,
+
+        "relationship-to":
+            normalized.to,
+
+        "relationship-friendship":
+            normalized.friendship,
+
+        "relationship-trust":
+            normalized.trust,
+
+        "relationship-loyalty":
+            normalized.loyalty,
+
+        "relationship-rivalry":
+            normalized.rivalry,
+
+        "relationship-attraction":
+            normalized.attraction,
+
+        "relationship-respect":
+            normalized.respect
+    };
+
+    Object.entries(values).forEach(
+        ([id, value]) => {
+
+            const element =
+                getElement(id);
+
+            if (element) {
+                element.value = value;
+            }
         }
     );
 
+    updateRelationshipMetricDisplays();
+}
 
-    if (
-        houseguests.some(
-            hg =>
-                hg.id === currentFrom
-        )
-    ) {
 
-        fromSelect.value =
-            currentFrom;
+function updateRelationshipMetricDisplays() {
+
+    const keys =
+        RELATIONSHIP_KEYS;
+
+    keys.forEach(key => {
+
+        const input =
+            getElement(
+                `relationship-${key}`
+            );
+
+        const output =
+            getElement(
+                `relationship-${key}-value`
+            );
+
+        if (input && output) {
+            output.textContent =
+                input.value;
+        }
+    });
+
+    const relationship =
+        getRelationshipFromForm();
+
+    const overall =
+        calculateRelationshipOverall(
+            relationship
+        );
+
+    const overallElement =
+        getElement(
+            "relationship-overall"
+        );
+
+    const fill =
+        getElement(
+            "relationship-overall-fill"
+        );
+
+    if (overallElement) {
+        overallElement.textContent =
+            `${overall.toFixed(1)} / 10`;
     }
 
-    if (
-        houseguests.some(
-            hg =>
-                hg.id === currentTo
-        )
-    ) {
-
-        toSelect.value =
-            currentTo;
+    if (fill) {
+        fill.style.width =
+            `${overall * 10}%`;
     }
 }
 
 
-function handleRelationshipSelectionChange() {
+function updateRelationshipFormForPair() {
 
     const from =
-        getValue(
+        getElement(
             "relationship-from"
-        );
+        )?.value;
 
     const to =
-        getValue(
+        getElement(
             "relationship-to"
-        );
+        )?.value;
 
-
-    if (
-        !from ||
-        !to ||
-        from === to
-    ) {
-
+    if (!from || !to || from === to) {
+        updateRelationshipMetricDisplays();
         return;
     }
 
+    /*
+     * When creating a new relationship, automatically load
+     * an existing A → B relationship if one exists.
+     *
+     * The reverse B → A relationship remains independent.
+     */
 
-    if (
-        !currentSeason ||
-        !Array.isArray(
-            currentSeason.relationships
-        )
-    ) {
+    if (!editingRelationshipId) {
 
-        return;
-    }
+        const existing =
+            creatorRelationships.find(
+                relationship =>
+                    relationship.from === from &&
+                    relationship.to === to
+            );
 
-
-    const existing =
-        currentSeason.relationships.find(
-            relationship =>
-                relationship.from === from &&
-                relationship.to === to
-        );
-
-
-    if (existing) {
-
-        loadRelationshipIntoEditor(
-            existing
-        );
+        if (existing) {
+            setRelationshipForm(existing);
+        }
     }
 }
 
 
-function addRelationship() {
+function saveRelationship() {
 
     const from =
-        getValue(
+        getElement(
             "relationship-from"
-        );
+        )?.value || "";
 
     const to =
-        getValue(
+        getElement(
             "relationship-to"
-        );
-
+        )?.value || "";
 
     if (!from || !to) {
 
@@ -2160,206 +2233,212 @@ function addRelationship() {
         return;
     }
 
-
     if (from === to) {
 
         alert(
-            "A houseguest cannot have a relationship with themselves."
+            "Houseguest A and Houseguest B must be different."
         );
 
         return;
     }
 
+    const houseguests =
+        getCurrentCreatorHouseguests();
 
-    if (!currentSeason) {
-
-        /*
-         * The creator has not been saved yet.
-         *
-         * Keep a temporary relationship collection so the
-         * user can build relationships before saving.
-         */
-
-        currentSeason = {
-            relationships: []
-        };
-    }
-
-
-    if (
-        !Array.isArray(
-            currentSeason.relationships
-        )
-    ) {
-
-        currentSeason.relationships = [];
-    }
-
-
-    const relationship = {
-
-        id:
-            editingRelationshipId ||
-            generateRelationshipId(),
-
-        from,
-
-        to,
-
-        friendship:
-            getRelationshipValue(
-                "friendship"
-            ),
-
-        trust:
-            getRelationshipValue(
-                "trust"
-            ),
-
-        loyalty:
-            getRelationshipValue(
-                "loyalty"
-            ),
-
-        rivalry:
-            getRelationshipValue(
-                "rivalry"
-            ),
-
-        respect:
-            getRelationshipValue(
-                "respect"
-            ),
-
-        attraction:
-            getRelationshipValue(
-                "attraction"
-            )
-    };
-
-
-    const duplicate =
-        currentSeason.relationships.find(
-            existing =>
-                existing.from === from &&
-                existing.to === to &&
-                existing.id !== relationship.id
+    const fromExists =
+        houseguests.some(
+            houseguest =>
+                houseguest.id === from
         );
 
+    const toExists =
+        houseguests.some(
+            houseguest =>
+                houseguest.id === to
+        );
 
-    if (duplicate) {
+    if (!fromExists || !toExists) {
 
-        /*
-         * If the pair already exists, update that
-         * directional relationship instead of creating
-         * a duplicate.
-         */
+        alert(
+            "Both selected houseguests must exist."
+        );
 
-        relationship.id =
-            duplicate.id;
+        return;
     }
 
+    const relationship =
+        getRelationshipFromForm();
 
     const existingIndex =
-        currentSeason.relationships.findIndex(
-            existing =>
-                existing.id === relationship.id
-        );
-
+        editingRelationshipId
+            ? creatorRelationships.findIndex(
+                item =>
+                    item.id ===
+                    editingRelationshipId
+            )
+            : creatorRelationships.findIndex(
+                item =>
+                    item.from ===
+                        relationship.from &&
+                    item.to ===
+                        relationship.to
+            );
 
     if (existingIndex >= 0) {
 
-        currentSeason.relationships[
+        relationship.id =
+            creatorRelationships[
+                existingIndex
+            ].id;
+
+        creatorRelationships[
             existingIndex
         ] = relationship;
 
     } else {
 
-        currentSeason.relationships.push(
+        relationship.id =
+            `relationship-${Date.now()}-${Math.random()
+                .toString(36)
+                .slice(2, 8)}`;
+
+        creatorRelationships.push(
             relationship
         );
     }
 
+    renderRelationships();
+
+    resetRelationshipForm();
+
+    /*
+     * Alliances use relationships to calculate their
+     * strength, so updating a relationship immediately
+     * updates the alliance preview.
+     */
+
+    updateAllianceStrength();
+}
+
+
+function resetRelationshipForm() {
 
     editingRelationshipId = null;
 
-    renderRelationships();
+    const title =
+        getElement(
+            "relationship-form-title"
+        );
 
-    resetRelationshipEditor();
+    const button =
+        getElement(
+            "add-relationship-btn"
+        );
 
-    /*
-     * If the season is already a saved season, update it
-     * immediately in localStorage.
-     */
+    const cancel =
+        getElement(
+            "cancel-relationship-btn"
+        );
 
-    if (
-        currentSeason.id &&
-        savedSeasons.some(
-            season =>
-                season.id === currentSeason.id
-        )
-    ) {
-
-        const savedIndex =
-            savedSeasons.findIndex(
-                season =>
-                    season.id === currentSeason.id
-            );
-
-        if (savedIndex >= 0) {
-
-            savedSeasons[
-                savedIndex
-            ].relationships =
-                currentSeason.relationships;
-
-            savedSeasons[
-                savedIndex
-            ].updatedAt =
-                new Date().toISOString();
-
-            saveSeasonsToStorage();
-
-            renderSavedSeasons();
-        }
+    if (title) {
+        title.textContent =
+            "Create Relationship";
     }
+
+    if (button) {
+        button.textContent =
+            "Add Relationship";
+    }
+
+    if (cancel) {
+        cancel.style.display =
+            "none";
+    }
+
+    const defaults = {
+        "relationship-from": "",
+        "relationship-to": "",
+        "relationship-friendship": 5,
+        "relationship-trust": 5,
+        "relationship-loyalty": 5,
+        "relationship-rivalry": 0,
+        "relationship-attraction": 0,
+        "relationship-respect": 5
+    };
+
+    Object.entries(defaults).forEach(
+        ([id, value]) => {
+
+            const element =
+                getElement(id);
+
+            if (element) {
+                element.value = value;
+            }
+        }
+    );
+
+    updateRelationshipMetricDisplays();
 }
 
 
 function editRelationship(id) {
 
-    if (!currentSeason) {
-        return;
-    }
-
     const relationship =
-        (
-            currentSeason.relationships ||
-            []
-        ).find(
-            item =>
-                item.id === id
+        creatorRelationships.find(
+            item => item.id === id
         );
-
 
     if (!relationship) {
         return;
     }
 
+    editingRelationshipId = id;
 
-    loadRelationshipIntoEditor(
+    refreshRelationshipHouseguestOptions();
+
+    setRelationshipForm(
         relationship
     );
 
-
-    const section =
-        document.getElementById(
-            "relationships-section"
+    const title =
+        getElement(
+            "relationship-form-title"
         );
 
-    if (section) {
+    const button =
+        getElement(
+            "add-relationship-btn"
+        );
 
-        section.scrollIntoView({
+    const cancel =
+        getElement(
+            "cancel-relationship-btn"
+        );
+
+    if (title) {
+        title.textContent =
+            "Edit Relationship";
+    }
+
+    if (button) {
+        button.textContent =
+            "Update Relationship";
+    }
+
+    if (cancel) {
+        cancel.style.display =
+            "";
+    }
+
+    const editor =
+        document.querySelector(
+            ".relationship-editor"
+        );
+
+    if (editor) {
+
+        editor.scrollIntoView({
             behavior: "smooth",
             block: "start"
         });
@@ -2367,532 +2446,1381 @@ function editRelationship(id) {
 }
 
 
-function loadRelationshipIntoEditor(
-    relationship
-) {
+function deleteRelationship(id) {
+
+    const relationship =
+        creatorRelationships.find(
+            item => item.id === id
+        );
 
     if (!relationship) {
         return;
     }
 
-    editingRelationshipId =
-        relationship.id;
+    const houseguests =
+        getCurrentCreatorHouseguests();
 
-
-    setValue(
-        "relationship-from",
-        relationship.from
-    );
-
-    setValue(
-        "relationship-to",
-        relationship.to
-    );
-
-
-    setRelationshipValue(
-        "friendship",
-        relationship.friendship
-    );
-
-    setRelationshipValue(
-        "trust",
-        relationship.trust
-    );
-
-    setRelationshipValue(
-        "loyalty",
-        relationship.loyalty
-    );
-
-    setRelationshipValue(
-        "rivalry",
-        relationship.rivalry
-    );
-
-    setRelationshipValue(
-        "respect",
-        relationship.respect
-    );
-
-    setRelationshipValue(
-        "attraction",
-        relationship.attraction
-    );
-
-
-    updateRelationshipDisplay();
-
-
-    const button =
-        document.querySelector(
-            ".relationship-actions .primary-button"
+    const from =
+        houseguests.find(
+            houseguest =>
+                houseguest.id ===
+                relationship.from
         );
 
-    if (button) {
+    const to =
+        houseguests.find(
+            houseguest =>
+                houseguest.id ===
+                relationship.to
+        );
 
-        button.textContent =
-            "Update Relationship";
-    }
-}
+    const fromName =
+        from?.name || "Houseguest A";
 
-
-function deleteRelationship(id) {
-
-    if (!currentSeason) {
-        return;
-    }
-
+    const toName =
+        to?.name || "Houseguest B";
 
     const confirmed =
         confirm(
-            "Delete this relationship?"
+            `Delete the relationship from ${fromName} to ${toName}?`
         );
-
 
     if (!confirmed) {
         return;
     }
 
-
-    if (
-        !Array.isArray(
-            currentSeason.relationships
-        )
-    ) {
-
-        return;
-    }
-
-
-    currentSeason.relationships =
-        currentSeason.relationships.filter(
-            relationship =>
-                relationship.id !== id
+    creatorRelationships =
+        creatorRelationships.filter(
+            item => item.id !== id
         );
 
-
-    if (
-        editingRelationshipId === id
-    ) {
-
-        resetRelationshipEditor();
+    if (editingRelationshipId === id) {
+        resetRelationshipForm();
     }
-
 
     renderRelationships();
 
-
-    if (
-        currentSeason.id &&
-        savedSeasons.some(
-            season =>
-                season.id === currentSeason.id
-        )
-    ) {
-
-        const savedIndex =
-            savedSeasons.findIndex(
-                season =>
-                    season.id === currentSeason.id
-            );
-
-
-        if (savedIndex >= 0) {
-
-            savedSeasons[
-                savedIndex
-            ].relationships =
-                currentSeason.relationships;
-
-            savedSeasons[
-                savedIndex
-            ].updatedAt =
-                new Date().toISOString();
-
-            saveSeasonsToStorage();
-
-            renderSavedSeasons();
-        }
-    }
+    updateAllianceStrength();
 }
 
 
-function cleanupRelationshipsForHouseguest(
-    houseguestId
-) {
+function getHouseguestById(id) {
 
-    if (
-        !currentSeason ||
-        !Array.isArray(
-            currentSeason.relationships
-        )
-    ) {
-
-        return;
-    }
-
-
-    currentSeason.relationships =
-        currentSeason.relationships.filter(
-            relationship =>
-                relationship.from !== houseguestId &&
-                relationship.to !== houseguestId
+    return getCurrentCreatorHouseguests()
+        .find(
+            houseguest =>
+                houseguest.id === id
         );
-
-
-    if (
-        editingRelationshipId
-    ) {
-
-        const stillExists =
-            currentSeason.relationships.some(
-                relationship =>
-                    relationship.id ===
-                    editingRelationshipId
-            );
-
-
-        if (!stillExists) {
-
-            resetRelationshipEditor();
-        }
-    }
 }
 
 
 function renderRelationships() {
 
     const container =
-        document.getElementById(
-            "relationships-container"
-        );
+        getElement("relationships-list");
 
     if (!container) {
         return;
     }
 
-
-    const relationships =
-        currentSeason &&
-        Array.isArray(
-            currentSeason.relationships
-        )
-            ? currentSeason.relationships
-            : [];
-
-
-    if (relationships.length === 0) {
+    if (!creatorRelationships.length) {
 
         container.innerHTML = `
-
             <div class="empty-state">
 
                 <div class="empty-state-icon">
-                    ♥
+                    ❤️
                 </div>
 
                 <h3>
-                    No Relationships Added
+                    No Relationships Yet
                 </h3>
 
                 <p>
-                    Select two houseguests above to create
-                    the first relationship.
+                    Create your first relationship above.
                 </p>
 
             </div>
-
         `;
 
         return;
     }
 
+    container.innerHTML = `
+        <table class="relationship-table">
 
-    const houseguests =
-        currentSeason &&
-        Array.isArray(
-            currentSeason.houseguests
-        )
-            ? currentSeason.houseguests
-            : collectHouseguests();
-
-
-    const getName =
-        id => {
-
-            const houseguest =
-                houseguests.find(
-                    hg =>
-                        hg.id === id
-                );
-
-
-            return houseguest
-                ? (
-                    houseguest.name ||
-                    `Houseguest ${
-                        getHouseguestNumber(
-                            houseguest.id
-                        )
-                    }`
-                )
-                : "Unknown";
-        };
-
-
-    let html = `
-
-        <div class="relationship-table-wrapper">
-
-            <table class="relationship-table">
-
-                <thead>
-
-                    <tr>
-
-                        <th>
-                            Relationship
-                        </th>
-
-                        <th>
-                            Friendship
-                        </th>
-
-                        <th>
-                            Trust
-                        </th>
-
-                        <th>
-                            Loyalty
-                        </th>
-
-                        <th>
-                            Rivalry
-                        </th>
-
-                        <th>
-                            Respect
-                        </th>
-
-                        <th>
-                            Attraction
-                        </th>
-
-                        <th>
-                            Overall
-                        </th>
-
-                        <th>
-                            Actions
-                        </th>
-
-                    </tr>
-
-                </thead>
-
-                <tbody>
-    `;
-
-
-    relationships.forEach(
-        relationship => {
-
-            const overall =
-                calculateOverallRelationship(
-                    relationship
-                );
-
-
-            html += `
+            <thead>
 
                 <tr>
 
-                    <td>
+                    <th>
+                        Relationship
+                    </th>
 
-                        <span class="relationship-direction">
+                    <th>
+                        Friendship
+                    </th>
 
-                            <span>
-                                ${escapeHTML(
-                                    getName(
-                                        relationship.from
-                                    )
-                                )}
+                    <th>
+                        Trust
+                    </th>
+
+                    <th>
+                        Loyalty
+                    </th>
+
+                    <th>
+                        Rivalry
+                    </th>
+
+                    <th>
+                        Attraction
+                    </th>
+
+                    <th>
+                        Respect
+                    </th>
+
+                    <th>
+                        Overall
+                    </th>
+
+                    <th>
+                        Actions
+                    </th>
+
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+                ${creatorRelationships.map(
+                    relationship => {
+
+                        const from =
+                            getHouseguestById(
+                                relationship.from
+                            );
+
+                        const to =
+                            getHouseguestById(
+                                relationship.to
+                            );
+
+                        const fromName =
+                            from?.name ||
+                            "Unknown";
+
+                        const toName =
+                            to?.name ||
+                            "Unknown";
+
+                        const overall =
+                            calculateRelationshipOverall(
+                                relationship
+                            );
+
+                        return `
+                            <tr>
+
+                                <td
+                                    class="relationship-direction-cell"
+                                >
+                                    ${escapeHtml(fromName)}
+                                    →
+                                    ${escapeHtml(toName)}
+                                </td>
+
+                                <td
+                                    class="relationship-number"
+                                >
+                                    ${relationship.friendship}
+                                </td>
+
+                                <td
+                                    class="relationship-number"
+                                >
+                                    ${relationship.trust}
+                                </td>
+
+                                <td
+                                    class="relationship-number"
+                                >
+                                    ${relationship.loyalty}
+                                </td>
+
+                                <td
+                                    class="relationship-number"
+                                >
+                                    ${relationship.rivalry}
+                                </td>
+
+                                <td
+                                    class="relationship-number"
+                                >
+                                    ${relationship.attraction}
+                                </td>
+
+                                <td
+                                    class="relationship-number"
+                                >
+                                    ${relationship.respect}
+                                </td>
+
+                                <td
+                                    class="relationship-number relationship-overall-cell"
+                                >
+                                    ${overall.toFixed(1)}
+                                </td>
+
+                                <td>
+
+                                    <div
+                                        class="relationship-actions"
+                                    >
+
+                                        <button
+                                            type="button"
+                                            class="relationship-action-button"
+                                            onclick="editRelationship('${relationship.id}')"
+                                        >
+                                            Edit
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            class="relationship-action-button delete"
+                                            onclick="deleteRelationship('${relationship.id}')"
+                                        >
+                                            Delete
+                                        </button>
+
+                                    </div>
+
+                                </td>
+
+                            </tr>
+                        `;
+                    }
+                ).join("")}
+
+            </tbody>
+
+        </table>
+    `;
+}
+
+
+function collectRelationships() {
+
+    return creatorRelationships.map(
+        relationship =>
+            normalizeRelationship(
+                relationship
+            )
+    );
+}
+
+
+function loadRelationships(
+    relationships
+) {
+
+    creatorRelationships =
+        Array.isArray(relationships)
+            ? relationships.map(
+                (relationship, index) =>
+                    normalizeRelationship(
+                        relationship,
+                        index
+                    )
+            )
+            : [];
+
+    editingRelationshipId = null;
+
+    refreshRelationshipHouseguestOptions();
+
+    renderRelationships();
+
+    resetRelationshipForm();
+
+    updateAllianceStrength();
+}
+
+
+/* ============================================================
+   ALLIANCES
+   ============================================================ */
+
+function setupAllianceControls() {
+
+    const members =
+        getElement("alliance-members");
+
+    if (members) {
+
+        members.addEventListener(
+            "change",
+            updateAllianceStrength
+        );
+    }
+
+    /*
+     * The strength is also recalculated whenever the
+     * alliance form itself changes.
+     */
+
+    const name =
+        getElement("alliance-name");
+
+    const description =
+        getElement("alliance-description");
+
+    const week =
+        getElement("alliance-formation-week");
+
+    const status =
+        getElement("alliance-status");
+
+    [
+        name,
+        description,
+        week,
+        status
+    ].forEach(element => {
+
+        if (!element) {
+            return;
+        }
+
+        element.addEventListener(
+            "input",
+            updateAllianceStrength
+        );
+
+        element.addEventListener(
+            "change",
+            updateAllianceStrength
+        );
+    });
+}
+
+
+function normalizeAlliance(
+    alliance,
+    index = 0
+) {
+
+    return {
+
+        id:
+            alliance?.id ||
+            `alliance-${Date.now()}-${index}`,
+
+        name:
+            String(
+                alliance?.name || ""
+            ).trim(),
+
+        description:
+            String(
+                alliance?.description || ""
+            ).trim(),
+
+        formationWeek:
+            Math.max(
+                1,
+                Number(
+                    alliance?.formationWeek
+                ) || 1
+            ),
+
+        status:
+            alliance?.status === "dissolved"
+                ? "dissolved"
+                : "active",
+
+        members:
+            Array.isArray(
+                alliance?.members
+            )
+                ? [
+                    ...new Set(
+                        alliance.members
+                    )
+                ]
+                : [],
+
+        strength:
+            Number.isFinite(
+                Number(alliance?.strength)
+            )
+                ? Math.max(
+                    0,
+                    Math.min(
+                        10,
+                        Number(
+                            alliance.strength
+                        )
+                    )
+                )
+                : 0,
+
+        history:
+            Array.isArray(
+                alliance?.history
+            )
+                ? alliance.history
+                : []
+    };
+}
+
+
+function refreshAllianceHouseguestOptions() {
+
+    const container =
+        getElement("alliance-members");
+
+    if (!container) {
+        return;
+    }
+
+    const houseguests =
+        getCurrentCreatorHouseguests()
+            .filter(
+                houseguest =>
+                    houseguest.name.trim()
+            );
+
+    if (houseguests.length < 2) {
+
+        container.innerHTML = `
+            <div class="empty-state">
+
+                <p>
+                    Add at least two named houseguests
+                    to create an alliance.
+                </p>
+
+            </div>
+        `;
+
+        updateAllianceStrength();
+
+        return;
+    }
+
+    let selectedMembers = [];
+
+    if (editingAllianceId) {
+
+        const editing =
+            creatorAlliances.find(
+                alliance =>
+                    alliance.id ===
+                    editingAllianceId
+            );
+
+        if (editing) {
+            selectedMembers =
+                editing.members;
+        }
+
+    } else {
+
+        selectedMembers =
+            [...container.querySelectorAll(
+                'input[type="checkbox"]:checked'
+            )].map(
+                input => input.value
+            );
+    }
+
+    container.innerHTML =
+        houseguests.map(
+            houseguest => {
+
+                const checkboxId =
+                    `alliance-member-${houseguest.id}`;
+
+                const checked =
+                    selectedMembers.includes(
+                        houseguest.id
+                    )
+                        ? "checked"
+                        : "";
+
+                return `
+                    <div
+                        class="alliance-member-option"
+                    >
+
+                        <input
+                            type="checkbox"
+                            id="${checkboxId}"
+                            value="${escapeHtml(houseguest.id)}"
+                            ${checked}
+                            onchange="updateAllianceStrength()"
+                        >
+
+                        <label for="${checkboxId}">
+
+                            ${escapeHtml(
+                                houseguest.name
+                            )}
+
+                        </label>
+
+                    </div>
+                `;
+            }
+        ).join("");
+
+    updateAllianceStrength();
+}
+
+
+function getSelectedAllianceMembers() {
+
+    const container =
+        getElement("alliance-members");
+
+    if (!container) {
+        return [];
+    }
+
+    return [
+        ...container.querySelectorAll(
+            'input[type="checkbox"]:checked'
+        )
+    ].map(
+        input => input.value
+    );
+}
+
+
+function calculateAllianceStrength(
+    memberIds
+) {
+
+    const uniqueMembers =
+        [
+            ...new Set(
+                memberIds || []
+            )
+        ];
+
+    if (uniqueMembers.length < 2) {
+        return 0;
+    }
+
+    /*
+     * Alliance strength is based on every directional
+     * relationship between every member.
+     *
+     * If A likes B but B dislikes A, both directions
+     * matter.
+     */
+
+    const scores = [];
+
+    for (
+        let i = 0;
+        i < uniqueMembers.length;
+        i++
+    ) {
+
+        for (
+            let j = i + 1;
+            j < uniqueMembers.length;
+            j++
+        ) {
+
+            const a =
+                uniqueMembers[i];
+
+            const b =
+                uniqueMembers[j];
+
+            const forward =
+                creatorRelationships.find(
+                    relationship =>
+                        relationship.from === a &&
+                        relationship.to === b
+                );
+
+            const reverse =
+                creatorRelationships.find(
+                    relationship =>
+                        relationship.from === b &&
+                        relationship.to === a
+                );
+
+            if (forward) {
+
+                scores.push(
+                    calculateRelationshipOverall(
+                        forward
+                    )
+                );
+            }
+
+            if (reverse) {
+
+                scores.push(
+                    calculateRelationshipOverall(
+                        reverse
+                    )
+                );
+            }
+
+            /*
+             * If no relationship has been explicitly
+             * created, use a neutral score of 5.
+             */
+
+            if (!forward && !reverse) {
+
+                scores.push(5);
+
+                scores.push(5);
+
+            } else {
+
+                if (!forward) {
+                    scores.push(5);
+                }
+
+                if (!reverse) {
+                    scores.push(5);
+                }
+            }
+        }
+    }
+
+    if (!scores.length) {
+        return 5;
+    }
+
+    const average =
+        scores.reduce(
+            (total, score) =>
+                total + score,
+            0
+        ) / scores.length;
+
+    return Math.round(
+        average * 10
+    ) / 10;
+}
+
+
+function updateAllianceStrength() {
+
+    const selectedMembers =
+        getSelectedAllianceMembers();
+
+    const strength =
+        calculateAllianceStrength(
+            selectedMembers
+        );
+
+    const value =
+        getElement(
+            "alliance-strength-value"
+        );
+
+    const fill =
+        getElement(
+            "alliance-strength-fill"
+        );
+
+    if (value) {
+
+        value.textContent =
+            `${strength.toFixed(1)} / 10`;
+    }
+
+    if (fill) {
+
+        fill.style.width =
+            `${strength * 10}%`;
+    }
+}
+
+
+function getAllianceFromForm() {
+
+    const members =
+        getSelectedAllianceMembers();
+
+    return normalizeAlliance({
+
+        name:
+            getElement(
+                "alliance-name"
+            )?.value.trim() || "",
+
+        description:
+            getElement(
+                "alliance-description"
+            )?.value.trim() || "",
+
+        formationWeek:
+            Number(
+                getElement(
+                    "alliance-formation-week"
+                )?.value
+            ) || 1,
+
+        status:
+            getElement(
+                "alliance-status"
+            )?.value || "active",
+
+        members,
+
+        strength:
+            calculateAllianceStrength(
+                members
+            )
+    });
+}
+
+
+function saveAlliance() {
+
+    const name =
+        getElement(
+            "alliance-name"
+        )?.value.trim() || "";
+
+    if (!name) {
+
+        alert(
+            "Please enter an alliance name."
+        );
+
+        return;
+    }
+
+    const members =
+        getSelectedAllianceMembers();
+
+    if (members.length < 2) {
+
+        alert(
+            "An alliance must have at least two houseguests."
+        );
+
+        return;
+    }
+
+    const houseguests =
+        getCurrentCreatorHouseguests();
+
+    const validMembers =
+        members.every(
+            memberId =>
+                houseguests.some(
+                    houseguest =>
+                        houseguest.id ===
+                        memberId
+                )
+        );
+
+    if (!validMembers) {
+
+        alert(
+            "One or more selected houseguests no longer exist."
+        );
+
+        return;
+    }
+
+    const alliance =
+        getAllianceFromForm();
+
+    const existingIndex =
+        editingAllianceId
+            ? creatorAlliances.findIndex(
+                item =>
+                    item.id ===
+                    editingAllianceId
+            )
+            : -1;
+
+    if (existingIndex >= 0) {
+
+        alliance.id =
+            creatorAlliances[
+                existingIndex
+            ].id;
+
+        alliance.history =
+            creatorAlliances[
+                existingIndex
+            ].history || [];
+
+        creatorAlliances[
+            existingIndex
+        ] = alliance;
+
+    } else {
+
+        alliance.id =
+            `alliance-${Date.now()}-${Math.random()
+                .toString(36)
+                .slice(2, 8)}`;
+
+        alliance.history = [
+            {
+                week:
+                    alliance.formationWeek,
+
+                event:
+                    "Alliance formed",
+
+                members:
+                    [...alliance.members]
+            }
+        ];
+
+        creatorAlliances.push(
+            alliance
+        );
+    }
+
+    renderAlliances();
+
+    resetAllianceForm();
+}
+
+
+function resetAllianceForm() {
+
+    editingAllianceId = null;
+
+    const title =
+        getElement(
+            "alliance-form-title"
+        );
+
+    const button =
+        getElement(
+            "add-alliance-btn"
+        );
+
+    const cancel =
+        getElement(
+            "cancel-alliance-btn"
+        );
+
+    if (title) {
+        title.textContent =
+            "Create Alliance";
+    }
+
+    if (button) {
+        button.textContent =
+            "Add Alliance";
+    }
+
+    if (cancel) {
+        cancel.style.display =
+            "none";
+    }
+
+    const name =
+        getElement("alliance-name");
+
+    const description =
+        getElement(
+            "alliance-description"
+        );
+
+    const week =
+        getElement(
+            "alliance-formation-week"
+        );
+
+    const status =
+        getElement(
+            "alliance-status"
+        );
+
+    if (name) {
+        name.value = "";
+    }
+
+    if (description) {
+        description.value = "";
+    }
+
+    if (week) {
+        week.value = 1;
+    }
+
+    if (status) {
+        status.value = "active";
+    }
+
+    refreshAllianceHouseguestOptions();
+
+    /*
+     * refreshAllianceHouseguestOptions preserves selected
+     * members when editing. We want a completely blank
+     * form after saving/cancelling.
+     */
+
+    const container =
+        getElement("alliance-members");
+
+    if (container) {
+
+        container
+            .querySelectorAll(
+                'input[type="checkbox"]'
+            )
+            .forEach(
+                checkbox =>
+                    checkbox.checked = false
+            );
+    }
+
+    updateAllianceStrength();
+}
+
+
+function editAlliance(id) {
+
+    const alliance =
+        creatorAlliances.find(
+            item => item.id === id
+        );
+
+    if (!alliance) {
+        return;
+    }
+
+    editingAllianceId = id;
+
+    const name =
+        getElement(
+            "alliance-name"
+        );
+
+    const description =
+        getElement(
+            "alliance-description"
+        );
+
+    const week =
+        getElement(
+            "alliance-formation-week"
+        );
+
+    const status =
+        getElement(
+            "alliance-status"
+        );
+
+    if (name) {
+        name.value =
+            alliance.name;
+    }
+
+    if (description) {
+        description.value =
+            alliance.description;
+    }
+
+    if (week) {
+        week.value =
+            alliance.formationWeek;
+    }
+
+    if (status) {
+        status.value =
+            alliance.status;
+    }
+
+    refreshAllianceHouseguestOptions();
+
+    const title =
+        getElement(
+            "alliance-form-title"
+        );
+
+    const button =
+        getElement(
+            "add-alliance-btn"
+        );
+
+    const cancel =
+        getElement(
+            "cancel-alliance-btn"
+        );
+
+    if (title) {
+        title.textContent =
+            "Edit Alliance";
+    }
+
+    if (button) {
+        button.textContent =
+            "Update Alliance";
+    }
+
+    if (cancel) {
+        cancel.style.display =
+            "";
+    }
+
+    updateAllianceStrength();
+
+    const editor =
+        document.querySelector(
+            ".alliance-editor"
+        );
+
+    if (editor) {
+
+        editor.scrollIntoView({
+            behavior: "smooth",
+            block: "start"
+        });
+    }
+}
+
+
+function deleteAlliance(id) {
+
+    const alliance =
+        creatorAlliances.find(
+            item => item.id === id
+        );
+
+    if (!alliance) {
+        return;
+    }
+
+    const confirmed =
+        confirm(
+            `Delete the alliance "${alliance.name}"?`
+        );
+
+    if (!confirmed) {
+        return;
+    }
+
+    creatorAlliances =
+        creatorAlliances.filter(
+            item => item.id !== id
+        );
+
+    if (editingAllianceId === id) {
+        resetAllianceForm();
+    }
+
+    renderAlliances();
+}
+
+
+function collectAlliances() {
+
+    return creatorAlliances.map(
+        alliance => ({
+            ...normalizeAlliance(
+                alliance
+            ),
+
+            /*
+             * Strength is recalculated before saving
+             * so it always reflects the latest
+             * relationships.
+             */
+
+            strength:
+                calculateAllianceStrength(
+                    alliance.members
+                )
+        })
+    );
+}
+
+
+function loadAlliances(
+    alliances
+) {
+
+    creatorAlliances =
+        Array.isArray(alliances)
+            ? alliances.map(
+                (alliance, index) =>
+                    normalizeAlliance(
+                        alliance,
+                        index
+                    )
+            )
+            : [];
+
+    creatorAlliances =
+        creatorAlliances.map(
+            alliance => ({
+                ...alliance,
+
+                strength:
+                    calculateAllianceStrength(
+                        alliance.members
+                    )
+            })
+        );
+
+    editingAllianceId = null;
+
+    resetAllianceForm();
+
+    renderAlliances();
+}
+
+
+function renderAlliances() {
+
+    const container =
+        getElement("alliances-list");
+
+    if (!container) {
+        return;
+    }
+
+    if (!creatorAlliances.length) {
+
+        container.innerHTML = `
+            <div class="empty-state">
+
+                <div class="empty-state-icon">
+                    🤝
+                </div>
+
+                <h3>
+                    No Alliances Yet
+                </h3>
+
+                <p>
+                    Create your first alliance above.
+                </p>
+
+            </div>
+        `;
+
+        return;
+    }
+
+    container.innerHTML =
+        creatorAlliances.map(
+            alliance => {
+
+                const members =
+                    alliance.members
+                        .map(
+                            memberId =>
+                                getHouseguestById(
+                                    memberId
+                                )
+                        )
+                        .filter(Boolean);
+
+                const strength =
+                    calculateAllianceStrength(
+                        alliance.members
+                    );
+
+                const memberTags =
+                    members.length
+                        ? members.map(
+                            member => `
+                                <span
+                                    class="alliance-member-tag"
+                                >
+                                    ${escapeHtml(
+                                        member.name
+                                    )}
+                                </span>
+                            `
+                        ).join("")
+                        : `
+                            <span
+                                class="alliance-member-tag"
+                            >
+                                No Members
+                            </span>
+                        `;
+
+                const statusLabel =
+                    alliance.status ===
+                    "dissolved"
+                        ? "Dissolved"
+                        : "Active";
+
+                return `
+                    <article
+                        class="alliance-card"
+                    >
+
+                        <div
+                            class="alliance-card-header"
+                        >
+
+                            <div>
+
+                                <h3
+                                    class="alliance-card-title"
+                                >
+                                    ${escapeHtml(
+                                        alliance.name
+                                    )}
+                                </h3>
+
+                                ${
+                                    alliance.description
+                                        ? `
+                                            <p
+                                                class="alliance-card-description"
+                                            >
+                                                ${escapeHtml(
+                                                    alliance.description
+                                                )}
+                                            </p>
+                                        `
+                                        : ""
+                                }
+
+                            </div>
+
+
+                            <span
+                                class="alliance-status ${alliance.status}"
+                            >
+                                ${statusLabel}
                             </span>
 
-                            <span class="relationship-direction-arrow">
-                                →
-                            </span>
-
-                            <span>
-                                ${escapeHTML(
-                                    getName(
-                                        relationship.to
-                                    )
-                                )}
-                            </span>
-
-                        </span>
-
-                    </td>
+                        </div>
 
 
-                    <td>
-                        ${formatRelationshipNumber(
-                            relationship.friendship
-                        )}
-                    </td>
+                        <div
+                            class="alliance-card-members"
+                        >
+                            ${memberTags}
+                        </div>
 
 
-                    <td>
-                        ${formatRelationshipNumber(
-                            relationship.trust
-                        )}
-                    </td>
+                        <div
+                            class="alliance-card-details"
+                        >
+
+                            <div
+                                class="alliance-detail"
+                            >
+
+                                <span
+                                    class="alliance-detail-label"
+                                >
+                                    Members
+                                </span>
+
+                                <span
+                                    class="alliance-detail-value"
+                                >
+                                    ${members.length}
+                                </span>
+
+                            </div>
 
 
-                    <td>
-                        ${formatRelationshipNumber(
-                            relationship.loyalty
-                        )}
-                    </td>
+                            <div
+                                class="alliance-detail"
+                            >
+
+                                <span
+                                    class="alliance-detail-label"
+                                >
+                                    Formation Week
+                                </span>
+
+                                <span
+                                    class="alliance-detail-value"
+                                >
+                                    Week
+                                    ${alliance.formationWeek}
+                                </span>
+
+                            </div>
 
 
-                    <td>
-                        ${formatRelationshipNumber(
-                            relationship.rivalry
-                        )}
-                    </td>
+                            <div
+                                class="alliance-detail"
+                            >
+
+                                <span
+                                    class="alliance-detail-label"
+                                >
+                                    Strength
+                                </span>
+
+                                <span
+                                    class="alliance-detail-value"
+                                >
+                                    ${strength.toFixed(1)}
+                                    / 10
+                                </span>
+
+                            </div>
+
+                        </div>
 
 
-                    <td>
-                        ${formatRelationshipNumber(
-                            relationship.respect
-                        )}
-                    </td>
-
-
-                    <td>
-                        ${formatRelationshipNumber(
-                            relationship.attraction
-                        )}
-                    </td>
-
-
-                    <td>
-
-                        <span class="relationship-score">
-                            ${overall.toFixed(1)}
-                        </span>
-
-                    </td>
-
-
-                    <td>
-
-                        <div class="relationship-table-actions">
+                        <div
+                            class="alliance-card-actions"
+                        >
 
                             <button
                                 type="button"
-                                class="relationship-edit-button"
-                                onclick="editRelationship('${relationship.id}')"
+                                class="alliance-action-button"
+                                onclick="editAlliance('${alliance.id}')"
                             >
                                 Edit
                             </button>
 
                             <button
                                 type="button"
-                                class="relationship-delete-button"
-                                onclick="deleteRelationship('${relationship.id}')"
+                                class="alliance-action-button delete"
+                                onclick="deleteAlliance('${alliance.id}')"
                             >
                                 Delete
                             </button>
 
                         </div>
 
-                    </td>
-
-                </tr>
-
-            `;
-        }
-    );
-
-
-    html += `
-
-                </tbody>
-
-            </table>
-
-        </div>
-
-    `;
-
-
-    container.innerHTML =
-        html;
+                    </article>
+                `;
+            }
+        ).join("");
 }
 
 
-function formatRelationshipNumber(
-    value
-) {
-
-    const number =
-        Number(value);
-
-    if (isNaN(number)) {
-        return "0";
-    }
-
-    return Number.isInteger(number)
-        ? number
-        : number.toFixed(1);
-}
-
-
-function generateRelationshipId() {
-
-    return `
-        relationship-${Date.now()}-${Math.random()
-            .toString(36)
-            .substring(2, 8)}
-    `.replace(/\s+/g, "");
-}
-
-
-/* =========================================================
+/* ============================================================
    SAVE SEASON
-   ========================================================= */
+   ============================================================ */
 
 function saveSeason() {
 
     const name =
-        getValue(
+        getElement(
             "season-name"
-        ).trim();
-
-    const theme =
-        getValue(
-            "season-theme"
-        ).trim();
-
-    const description =
-        getValue(
-            "season-description"
-        ).trim();
-
-    const logo =
-        getValue(
-            "season-logo"
-        ).trim();
-
-    const background =
-        getValue(
-            "season-background"
-        ).trim();
-
+        )?.value.trim() || "";
 
     if (!name) {
 
@@ -2903,10 +3831,8 @@ function saveSeason() {
         return;
     }
 
-
     const houseguests =
         collectHouseguests();
-
 
     if (houseguests.length < 2) {
 
@@ -2917,70 +3843,64 @@ function saveSeason() {
         return;
     }
 
+    const unnamed =
+        houseguests.filter(
+            houseguest =>
+                !houseguest.name.trim()
+        );
 
-    const rules =
-        collectSeasonRules();
+    if (unnamed.length) {
 
+        alert(
+            "Please give every houseguest a name before saving."
+        );
+
+        return;
+    }
 
     /*
-     * Preserve existing simulation data when editing
-     * instead of resetting the simulation.
+     * Make sure the relationship and alliance collections
+     * reflect the current creator state before saving.
      */
 
-    const existingSeason =
-        editingSeasonId
-            ? savedSeasons.find(
-                season =>
-                    season.id ===
-                    editingSeasonId
-            )
-            : null;
+    const relationships =
+        collectRelationships();
 
+    const alliances =
+        collectAlliances();
 
-    const existingRelationships =
-        existingSeason &&
-        Array.isArray(
-            existingSeason.relationships
-        )
-            ? existingSeason.relationships
-            : (
-                currentSeason &&
-                Array.isArray(
-                    currentSeason.relationships
-                )
-                    ? currentSeason.relationships
-                    : []
-            );
-
-
-    const season = {
-
-        id:
-            editingSeasonId ||
-            generateSeasonId(),
+    const seasonData = {
 
         name,
 
-        theme,
+        theme:
+            getElement(
+                "season-theme"
+            )?.value.trim() || "",
 
-        description,
+        description:
+            getElement(
+                "season-description"
+            )?.value.trim() || "",
 
-        logo,
+        logo:
+            getElement(
+                "season-logo"
+            )?.value.trim() || "",
 
-        background,
+        background:
+            getElement(
+                "season-background"
+            )?.value.trim() || "",
 
         houseguests,
 
-        alliances:
-            existingSeason?.alliances ||
-            [],
+        alliances,
 
-        relationships:
-            existingRelationships,
+        relationships,
 
         competitions:
-            existingSeason?.competitions ||
-            {
+            currentSeason?.competitions || {
                 hoh: [],
                 pov: [],
                 safety: [],
@@ -2989,1650 +3909,811 @@ function saveSeason() {
             },
 
         twists:
-            existingSeason?.twists ||
-            [],
+            currentSeason?.twists || [],
 
-        rules,
+        rules:
+            collectSeasonRules(),
 
         simulation:
-            existingSeason?.simulation ||
-            createDefaultSimulation(),
+            currentSeason?.simulation || {
+                started: false,
+                completed: false,
+                currentWeek: 1,
+                currentPhase: "setup",
+                currentEventIndex: 0,
+                history: [],
+                finalPlacements: [],
+                winner: null,
+                runnerUp: null,
+                jury: [],
+                finalists: [],
+                currentHOH: null,
+                currentNominees: [],
+                currentPOVPlayers: [],
+                currentPOVWinner: null,
+                currentSafetyWinner: null,
+                currentEviction: null
+            },
 
         createdAt:
-            existingSeason?.createdAt ||
+            currentSeason?.createdAt ||
             new Date().toISOString(),
 
         updatedAt:
             new Date().toISOString()
     };
 
+    if (editingSeasonId) {
 
-    const existingIndex =
-        savedSeasons.findIndex(
-            savedSeason =>
-                savedSeason.id ===
-                season.id
-        );
+        const index =
+            savedSeasons.findIndex(
+                season =>
+                    season.id ===
+                    editingSeasonId
+            );
 
+        if (index >= 0) {
 
-    if (existingIndex >= 0) {
+            savedSeasons[index] =
+                normalizeSeason({
+                    ...savedSeasons[index],
+                    ...seasonData,
+                    id: editingSeasonId
+                });
 
-        savedSeasons[
-            existingIndex
-        ] = season;
+        }
 
     } else {
 
+        const newSeason = normalizeSeason({
+
+            id:
+                `season-${Date.now()}-${Math.random()
+                    .toString(36)
+                    .slice(2, 8)}`,
+
+            ...seasonData
+        });
+
         savedSeasons.push(
-            season
+            newSeason
         );
     }
 
-
-    currentSeason =
-        deepClone(
-            season
-        );
-
-    editingSeasonId =
-        season.id;
-
-
-    saveSeasonsToStorage();
+    persistSavedSeasons();
 
     renderSavedSeasons();
-
-    renderRelationships();
 
     alert(
         "Season saved successfully!"
     );
 
-    showPage(
-        "home-page"
-    );
+    const savedId =
+        editingSeasonId ||
+        savedSeasons[
+            savedSeasons.length - 1
+        ]?.id;
+
+    editingSeasonId = null;
+
+    const savedSeason =
+        savedSeasons.find(
+            season =>
+                season.id === savedId
+        );
+
+    if (savedSeason) {
+        currentSeason =
+            normalizeSeason(
+                savedSeason
+            );
+    }
+
+    showPage("home-page");
 }
 
-
-function generateSeasonId() {
-
-    return `
-        season-${Date.now()}-${Math.random()
-            .toString(36)
-            .substring(2, 8)}
-    `.replace(/\s+/g, "");
-}
-
-
-function createDefaultSimulation() {
-
-    return {
-
-        started: false,
-
-        completed: false,
-
-        currentWeek: 1,
-
-        currentPhase: "setup",
-
-        currentEventIndex: 0,
-
-        history: [],
-
-        finalPlacements: [],
-
-        winner: null,
-
-        runnerUp: null,
-
-        jury: [],
-
-        finalists: [],
-
-        currentHOH: null,
-
-        currentNominees: [],
-
-        currentPOVPlayers: [],
-
-        currentPOVWinner: null,
-
-        currentSafetyWinner: null,
-
-        currentEviction: null
-
-    };
-}
-
-
-/* =========================================================
-   EDIT SEASON
-   ========================================================= */
 
 function editSeason(id) {
 
     const season =
         savedSeasons.find(
-            item =>
-                item.id === id
+            item => item.id === id
         );
-
 
     if (!season) {
         return;
     }
 
-
-    editingSeasonId =
-        season.id;
-
-
     currentSeason =
-        deepClone(
+        normalizeSeason(
             season
         );
 
+    editingSeasonId = id;
 
-    loadSeasonIntoCreator(
-        currentSeason
-    );
+    const setValue = (
+        elementId,
+        value
+    ) => {
 
+        const element =
+            getElement(elementId);
 
-    showPage(
-        "creator-page"
-    );
-}
-
-
-function loadSeasonIntoCreator(
-    season
-) {
+        if (element) {
+            element.value =
+                value ?? "";
+        }
+    };
 
     setValue(
         "season-name",
-        season.name || ""
+        season.name
     );
 
     setValue(
         "season-theme",
-        season.theme || ""
+        season.theme
     );
 
     setValue(
         "season-description",
-        season.description || ""
+        season.description
     );
 
     setValue(
         "season-logo",
-        season.logo || ""
+        season.logo
     );
 
     setValue(
         "season-background",
-        season.background || ""
+        season.background
     );
 
-
-    loadHouseguests(
-        season.houseguests || []
+    updateSeasonLogoPreview(
+        season.logo
     );
 
-
-    loadSeasonRules(
-        season.rules || {}
+    updateSeasonBackgroundPreview(
+        season.background
     );
-
-
-    resetRelationshipEditor();
-
-    populateRelationshipHouseguestOptions();
-
-    renderRelationships();
-
-
-    updateSeasonLogoPreview();
-
-    updateSeasonBackground();
-}
-
-
-function loadHouseguests(
-    houseguests
-) {
 
     const editor =
-        document.getElementById(
+        getElement(
             "houseguest-editor"
         );
 
-    if (!editor) {
-        return;
+    if (editor) {
+        editor.innerHTML = "";
     }
-
-
-    editor.innerHTML = "";
 
     currentHouseguestId = 0;
 
-
-    houseguests.forEach(
-        houseguest => {
-
-            const numericPart =
-                String(
-                    houseguest.id || ""
-                ).match(
-                    /(\d+)$/
-                );
-
-
-            if (numericPart) {
-
-                currentHouseguestId =
-                    Math.max(
-                        currentHouseguestId,
-                        parseInt(
-                            numericPart[1],
-                            10
-                        )
-                    );
-            }
-
-
+    season.houseguests.forEach(
+        houseguest =>
             addHouseguest(
                 houseguest
-            );
-        }
+            )
     );
 
+    const countInput =
+        getElement(
+            "houseguest-count"
+        );
+
+    if (countInput) {
+        countInput.value =
+            season.houseguests.length;
+    }
 
     updateHouseguestNumbers();
 
-    populateRelationshipHouseguestOptions();
-}
-
-
-/* =========================================================
-   OPEN SEASON
-   ========================================================= */
-
-function openSeason(id) {
-
-    const season =
-        savedSeasons.find(
-            item =>
-                item.id === id
-        );
-
-
-    if (!season) {
-        return;
-    }
-
-
-    currentSeason =
-        deepClone(
-            season
-        );
-
-
-    editingSeasonId =
-        season.id;
-
-
-    initializeSimulator(
-        currentSeason
+    loadSeasonRules(
+        season.rules
     );
 
-
-    showPage(
-        "simulator-page"
+    loadRelationships(
+        season.relationships
     );
+
+    loadAlliances(
+        season.alliances
+    );
+
+    refreshRelationshipHouseguestOptions();
+
+    refreshAllianceHouseguestOptions();
+
+    showPage("creator-page");
 }
 
-
-/* =========================================================
-   DELETE SEASON
-   ========================================================= */
 
 function deleteSeason(id) {
 
     const season =
         savedSeasons.find(
-            item =>
-                item.id === id
+            item => item.id === id
         );
-
 
     if (!season) {
         return;
     }
 
-
     const confirmed =
         confirm(
-            `Delete "${season.name}"?`
+            `Delete "${season.name}"? This cannot be undone.`
         );
-
 
     if (!confirmed) {
         return;
     }
 
-
     savedSeasons =
         savedSeasons.filter(
-            item =>
-                item.id !== id
+            item => item.id !== id
         );
 
-
-    saveSeasonsToStorage();
+    persistSavedSeasons();
 
     renderSavedSeasons();
-
-
-    if (
-        currentSeason &&
-        currentSeason.id === id
-    ) {
-
-        currentSeason = null;
-
-        editingSeasonId = null;
-    }
 }
 
 
-/* =========================================================
-   SIMULATOR
-   ========================================================= */
+function openSeason(id) {
 
-function initializeSimulator(
-    season
-) {
+    const season =
+        savedSeasons.find(
+            item => item.id === id
+        );
 
     if (!season) {
         return;
     }
 
+    currentSeason =
+        normalizeSeason(
+            season
+        );
 
-    if (!season.simulation) {
+    /*
+     * Keep creator collections synchronized as well.
+     * This means if the user returns to editing later,
+     * the relationships and alliances are still available.
+     */
 
-        season.simulation =
-            createDefaultSimulation();
-    }
+    creatorRelationships =
+        currentSeason.relationships.map(
+            normalizeRelationship
+        );
 
+    creatorAlliances =
+        currentSeason.alliances.map(
+            normalizeAlliance
+        );
 
-    const simulation =
-        season.simulation;
-
-
-    setText(
-        "simulator-season-name",
-        season.name ||
-        "Big Brother"
+    loadSimulator(
+        currentSeason
     );
 
-    setText(
-        "simulator-season-theme",
-        season.theme ||
-        "Custom Season"
-    );
-
-    setText(
-        "current-week",
-        simulation.currentWeek || 1
-    );
-
-
-    updateSimulatorStatus(
-        simulation
-    );
-
-
-    resetGameChain(
-        simulation.currentEventIndex || 0
-    );
-
-
-    showEvent(
-        "Simulation Ready",
-        "EVENT",
-        `
-            <p>
-                Your season is ready to begin.
-            </p>
-        `
-    );
+    showPage("simulator-page");
 }
 
 
-function updateSimulatorStatus(
-    simulation
-) {
+/* ============================================================
+   SIMULATOR
+   ============================================================ */
 
-    if (!simulation) {
+function loadSimulator(season) {
+
+    currentSeason =
+        normalizeSeason(
+            season
+        );
+
+    const name =
+        getElement(
+            "simulator-season-name"
+        );
+
+    const theme =
+        getElement(
+            "simulator-season-theme"
+        );
+
+    if (name) {
+        name.textContent =
+            currentSeason.name ||
+            "Big Brother";
+    }
+
+    if (theme) {
+        theme.textContent =
+            currentSeason.theme ||
+            "Season Theme";
+    }
+
+    updateSimulatorStatus();
+
+    updateGameChain();
+
+    displayCurrentEvent();
+}
+
+
+function updateSimulatorStatus() {
+
+    if (!currentSeason) {
         return;
     }
 
+    const simulation =
+        currentSeason.simulation;
 
-    const houseguests =
-        currentSeason?.houseguests ||
-        [];
+    const week =
+        getElement("current-week");
+
+    const hoh =
+        getElement("current-hoh");
+
+    const nominees =
+        getElement(
+            "current-nominees"
+        );
+
+    const veto =
+        getElement(
+            "current-veto"
+        );
+
+    if (week) {
+        week.textContent =
+            simulation.currentWeek;
+    }
+
+    const getName = id => {
+
+        if (!id) {
+            return "—";
+        }
+
+        return currentSeason.houseguests
+            .find(
+                houseguest =>
+                    houseguest.id === id
+            )
+            ?.name || "—";
+    };
+
+    if (hoh) {
+        hoh.textContent =
+            getName(
+                simulation.currentHOH
+            );
+    }
+
+    if (nominees) {
+
+        nominees.textContent =
+            simulation.currentNominees
+                .map(getName)
+                .filter(
+                    name => name !== "—"
+                )
+                .join(", ") || "—";
+    }
+
+    if (veto) {
+
+        veto.textContent =
+            getName(
+                simulation.currentPOVWinner
+            );
+    }
+}
 
 
-    setText(
-        "current-hoh",
-        getHouseguestDisplayName(
-            simulation.currentHOH,
-            houseguests
-        )
-    );
+function updateGameChain() {
 
+    if (!currentSeason) {
+        return;
+    }
 
-    setText(
-        "current-nominees",
-        formatHouseguestList(
-            simulation.currentNominees,
-            houseguests
-        )
-    );
+    const index =
+        currentSeason.simulation
+            .currentEventIndex;
 
+    document.querySelectorAll(
+        ".chain-step"
+    ).forEach(
+        (step, stepIndex) => {
 
-    setText(
-        "current-veto",
-        getHouseguestDisplayName(
-            simulation.currentPOVWinner,
-            houseguests
-        )
+            step.classList.remove(
+                "active"
+            );
+
+            step.classList.remove(
+                "completed"
+            );
+
+            if (stepIndex < index) {
+
+                step.classList.add(
+                    "completed"
+                );
+
+            } else if (stepIndex === index) {
+
+                step.classList.add(
+                    "active"
+                );
+            }
+        }
     );
 }
 
 
-function resetGameChain(
-    activeIndex = 0
+function displayCurrentEvent() {
+
+    if (!currentSeason) {
+        return;
+    }
+
+    const index =
+        currentSeason.simulation
+            .currentEventIndex;
+
+    const event =
+        EVENT_CHAIN[
+            index
+        ];
+
+    if (!event) {
+        return;
+    }
+
+    const type =
+        getElement("event-type");
+
+    const title =
+        getElement("event-title");
+
+    const content =
+        getElement("event-content");
+
+    if (type) {
+        type.textContent =
+            event.type;
+    }
+
+    if (title) {
+        title.textContent =
+            event.title;
+    }
+
+    if (content) {
+
+        content.innerHTML =
+            getEventDescription(
+                event.id
+            );
+    }
+}
+
+
+function getEventDescription(
+    eventId
 ) {
 
-    const steps =
-        document.querySelectorAll(
-            ".chain-step"
-        );
+    if (!currentSeason) {
+        return "";
+    }
+
+    const simulation =
+        currentSeason.simulation;
+
+    const houseguests =
+        currentSeason.houseguests;
+
+    const getName = id =>
+        houseguests.find(
+            houseguest =>
+                houseguest.id === id
+        )?.name || "Unknown";
+
+    switch (eventId) {
+
+        case "hoh":
+
+            return `
+                <p>
+                    The Houseguests are ready to compete
+                    for the Head of Household.
+                </p>
+
+                <p>
+                    <strong>
+                        HOH:
+                    </strong>
+                    ${simulation.currentHOH
+                        ? getName(
+                            simulation.currentHOH
+                        )
+                        : "Not yet determined"}
+                </p>
+            `;
 
 
-    steps.forEach(
-        (step, index) => {
+        case "nominations":
 
-            step.classList.toggle(
-                "active",
-                index === activeIndex
-            );
-        }
-    );
+            return `
+                <p>
+                    The Head of Household will nominate
+                    ${currentSeason.rules.nomineesPerWeek}
+                    houseguest${
+                        currentSeason.rules.nomineesPerWeek === 1
+                            ? ""
+                            : "s"
+                    } for eviction.
+                </p>
+
+                <p>
+                    <strong>
+                        Nominees:
+                    </strong>
+                    ${
+                        simulation.currentNominees
+                            .map(getName)
+                            .join(", ") ||
+                        "Not yet determined"
+                    }
+                </p>
+            `;
+
+
+        case "pov-players":
+
+            return `
+                <p>
+                    The Power of Veto players are selected.
+                </p>
+
+                <p>
+                    <strong>
+                        Players:
+                    </strong>
+                    ${
+                        simulation.currentPOVPlayers
+                            .map(getName)
+                            .join(", ") ||
+                        "Not yet determined"
+                    }
+                </p>
+            `;
+
+
+        case "pov":
+
+            return `
+                <p>
+                    The Power of Veto competition
+                    takes place.
+                </p>
+
+                <p>
+                    <strong>
+                        POV Winner:
+                    </strong>
+                    ${
+                        simulation.currentPOVWinner
+                            ? getName(
+                                simulation.currentPOVWinner
+                            )
+                            : "Not yet determined"
+                    }
+                </p>
+            `;
+
+
+        case "veto-ceremony":
+
+            return `
+                <p>
+                    The Power of Veto ceremony
+                    determines whether the nominations
+                    change.
+                </p>
+            `;
+
+
+        case "eviction":
+
+            return `
+                <p>
+                    The houseguests cast their votes
+                    for eviction.
+                </p>
+
+                <p>
+                    <strong>
+                        Evicted:
+                    </strong>
+                    ${
+                        simulation.currentEviction
+                            ? getName(
+                                simulation.currentEviction
+                            )
+                            : "Not yet determined"
+                    }
+                </p>
+            `;
+
+
+        default:
+            return "";
+    }
 }
 
 
 function runNextEvent() {
 
     if (!currentSeason) {
-
-        alert(
-            "Please open a saved season first."
-        );
-
         return;
     }
-
-
-    if (!currentSeason.simulation) {
-
-        currentSeason.simulation =
-            createDefaultSimulation();
-    }
-
 
     const simulation =
         currentSeason.simulation;
 
+    if (
+        simulation.currentEventIndex >=
+        EVENT_CHAIN.length
+    ) {
 
-    const index =
-        simulation.currentEventIndex || 0;
+        finishSimulationWeek();
 
+        return;
+    }
 
     const event =
-        EVENT_CHAIN[index];
-
-
-    switch (event) {
-
-        case "hoh":
-
-            runHOHEvent();
-
-            break;
-
-
-        case "nominations":
-
-            runNominationEvent();
-
-            break;
-
-
-        case "pov-players":
-
-            runPOVPlayersEvent();
-
-            break;
-
-
-        case "pov":
-
-            runPOVEvent();
-
-            break;
-
-
-        case "veto-ceremony":
-
-            runVetoCeremonyEvent();
-
-            break;
-
-
-        case "eviction":
-
-            runEvictionEvent();
-
-            break;
-
-
-        default:
-
-            simulation.currentEventIndex = 0;
-
-            simulation.currentWeek++;
-
-            setText(
-                "current-week",
-                simulation.currentWeek
-            );
-
-            resetGameChain(0);
-
-            showEvent(
-                "New Week",
-                "WEEK",
-                `
-                    <p>
-                        Week ${simulation.currentWeek}
-                        is beginning.
-                    </p>
-                `
-            );
-
-            break;
-    }
-
-
-    persistCurrentSeason();
-}
-
-
-/* =========================================================
-   SIMULATOR EVENTS
-   ========================================================= */
-
-function runHOHEvent() {
-
-    const simulation =
-        currentSeason.simulation;
-
-
-    const houseguests =
-        getActiveHouseguests();
-
-
-    if (houseguests.length === 0) {
-        return;
-    }
-
+        EVENT_CHAIN[
+            simulation.currentEventIndex
+        ];
 
     /*
-     * This is still the foundation engine.
-     * A real competition system will eventually determine
-     * the winner using custom competition rules and player
-     * ratings.
-     */
-
-    let hoh =
-        null;
-
-
-    if (
-        simulation.currentWeek === 1 &&
-        currentSeason.rules?.startingHOH ===
-            "specific" &&
-        currentSeason.rules?.specificStartingHOH
-    ) {
-
-        hoh =
-            houseguests.find(
-                houseguest =>
-                    houseguest.id ===
-                    currentSeason.rules
-                        .specificStartingHOH
-            );
-    }
-
-
-    if (!hoh) {
-
-        hoh =
-            randomItem(
-                houseguests
-            );
-    }
-
-
-    simulation.currentHOH =
-        hoh.id;
-
-
-    hoh.hohWins =
-        Number(
-            hoh.hohWins || 0
-        ) + 1;
-
-
-    simulation.currentEventIndex = 1;
-
-
-    updateSimulatorStatus(
-        simulation
-    );
-
-    resetGameChain(1);
-
-
-    showEvent(
-        "Head of Household",
-        "HOH",
-        `
-            <p>
-                <strong>
-                    ${escapeHTML(
-                        getHouseguestDisplayName(
-                            hoh.id,
-                            houseguests
-                        )
-                    )}
-                </strong>
-                has won the Head of Household competition.
-            </p>
-        `
-    );
-}
-
-
-function runNominationEvent() {
-
-    const simulation =
-        currentSeason.simulation;
-
-
-    const active =
-        getActiveHouseguests();
-
-
-    const hohId =
-        simulation.currentHOH;
-
-
-    const eligible =
-        active.filter(
-            houseguest =>
-                houseguest.id !== hohId
-        );
-
-
-    const nomineeCount =
-        Math.min(
-            Number(
-                currentSeason.rules
-                    ?.nomineesPerWeek || 2
-            ),
-            eligible.length
-        );
-
-
-    const nominees =
-        chooseRandomPlayers(
-            eligible,
-            nomineeCount
-        );
-
-
-    simulation.currentNominees =
-        nominees.map(
-            houseguest =>
-                houseguest.id
-        );
-
-
-    nominees.forEach(
-        nominee => {
-
-            nominee.nominationCount =
-                Number(
-                    nominee.nominationCount || 0
-                ) + 1;
-        }
-    );
-
-
-    simulation.currentEventIndex = 2;
-
-
-    updateSimulatorStatus(
-        simulation
-    );
-
-    resetGameChain(2);
-
-
-    showEvent(
-        "Nominations",
-        "NOMINATIONS",
-        `
-            <p>
-                The Head of Household has nominated:
-            </p>
-
-            <p>
-                <strong>
-                    ${escapeHTML(
-                        nominees
-                            .map(
-                                nominee =>
-                                    getHouseguestDisplayName(
-                                        nominee.id,
-                                        active
-                                    )
-                            )
-                            .join(" & ")
-                    )}
-                </strong>
-            </p>
-        `
-    );
-}
-
-
-function runPOVPlayersEvent() {
-
-    const simulation =
-        currentSeason.simulation;
-
-
-    if (
-        currentSeason.rules?.vetoEnabled ===
-        false
-    ) {
-
-        simulation.currentPOVPlayers =
-            [];
-
-        simulation.currentEventIndex = 4;
-
-        resetGameChain(4);
-
-        showEvent(
-            "Power of Veto Disabled",
-            "POV PLAYERS",
-            `
-                <p>
-                    The Power of Veto is disabled
-                    for this season.
-                </p>
-            `
-        );
-
-        return;
-    }
-
-
-    const active =
-        getActiveHouseguests();
-
-
-    const requiredPlayers =
-        Math.min(
-            Number(
-                currentSeason.rules
-                    ?.vetoPlayers || 6
-            ),
-            active.length
-        );
-
-
-    const selected =
-        chooseVetoPlayers(
-            active,
-            simulation.currentHOH,
-            simulation.currentNominees,
-            requiredPlayers
-        );
-
-
-    simulation.currentPOVPlayers =
-        selected.map(
-            houseguest =>
-                houseguest.id
-        );
-
-
-    simulation.currentEventIndex = 3;
-
-
-    resetGameChain(3);
-
-
-    showEvent(
-        "Power of Veto Players",
-        "POV PLAYERS",
-        `
-            <p>
-                The following houseguests will compete
-                in the Power of Veto:
-            </p>
-
-            <p>
-                <strong>
-                    ${escapeHTML(
-                        selected
-                            .map(
-                                player =>
-                                    getHouseguestDisplayName(
-                                        player.id,
-                                        active
-                                    )
-                            )
-                            .join(", ")
-                    )}
-                </strong>
-            </p>
-        `
-    );
-}
-
-
-function runPOVEvent() {
-
-    const simulation =
-        currentSeason.simulation;
-
-
-    if (
-        currentSeason.rules?.vetoEnabled ===
-        false
-    ) {
-
-        simulation.currentPOVWinner =
-            null;
-
-        simulation.currentEventIndex = 4;
-
-        resetGameChain(4);
-
-        return;
-    }
-
-
-    const players =
-        simulation.currentPOVPlayers
-            .map(
-                id =>
-                    currentSeason.houseguests.find(
-                        houseguest =>
-                            houseguest.id === id
-                    )
-            )
-            .filter(Boolean);
-
-
-    if (players.length === 0) {
-
-        simulation.currentPOVWinner =
-            null;
-
-    } else {
-
-        const winner =
-            chooseCompetitionWinner(
-                players,
-                "physical",
-                "mental",
-                "general"
-            );
-
-
-        simulation.currentPOVWinner =
-            winner.id;
-
-
-        winner.povWins =
-            Number(
-                winner.povWins || 0
-            ) + 1;
-    }
-
-
-    simulation.currentEventIndex = 4;
-
-
-    updateSimulatorStatus(
-        simulation
-    );
-
-    resetGameChain(4);
-
-
-    showEvent(
-        "Power of Veto",
-        "POV",
-        `
-            <p>
-                <strong>
-                    ${escapeHTML(
-                        getHouseguestDisplayName(
-                            simulation.currentPOVWinner,
-                            currentSeason.houseguests
-                        )
-                    )}
-                </strong>
-                has won the Power of Veto.
-            </p>
-        `
-    );
-}
-
-
-function runVetoCeremonyEvent() {
-
-    const simulation =
-        currentSeason.simulation;
-
-
-    if (
-        currentSeason.rules?.vetoEnabled ===
-        false
-    ) {
-
-        simulation.currentEventIndex = 5;
-
-        resetGameChain(5);
-
-        showEvent(
-            "Veto Ceremony",
-            "VETO CEREMONY",
-            `
-                <p>
-                    The Power of Veto is not enabled
-                    for this season.
-                </p>
-            `
-        );
-
-        return;
-    }
-
-
-    const vetoWinner =
-        simulation.currentPOVWinner;
-
-
-    const nominees =
-        simulation.currentNominees || [];
-
-
-    if (
-        vetoWinner &&
-        nominees.includes(vetoWinner)
-    ) {
-
-        const remaining =
-            getActiveHouseguests().filter(
-                houseguest =>
-                    houseguest.id !==
-                    simulation.currentHOH &&
-                    !nominees.includes(
-                        houseguest.id
-                    )
-            );
-
-
-        if (remaining.length > 0) {
-
-            const replacement =
-                randomItem(
-                    remaining
-                );
-
-
-            const index =
-                nominees.indexOf(
-                    vetoWinner
-                );
-
-
-            if (index >= 0) {
-
-                simulation.currentNominees[
-                    index
-                ] =
-                    replacement.id;
-            }
-        }
-    }
-
-
-    simulation.currentEventIndex = 5;
-
-
-    updateSimulatorStatus(
-        simulation
-    );
-
-    resetGameChain(5);
-
-
-    showEvent(
-        "Veto Ceremony",
-        "VETO CEREMONY",
-        `
-            <p>
-                The Power of Veto ceremony has been held.
-            </p>
-
-            <p>
-                The current nominees are:
-            </p>
-
-            <p>
-                <strong>
-                    ${escapeHTML(
-                        formatHouseguestList(
-                            simulation.currentNominees,
-                            currentSeason.houseguests
-                        )
-                    )}
-                </strong>
-            </p>
-        `
-    );
-}
-
-
-function runEvictionEvent() {
-
-    const simulation =
-        currentSeason.simulation;
-
-
-    const nominees =
-        simulation.currentNominees || [];
-
-
-    const active =
-        getActiveHouseguests();
-
-
-    if (nominees.length === 0) {
-
-        simulation.currentEventIndex = 0;
-
-        simulation.currentWeek++;
-
-        setText(
-            "current-week",
-            simulation.currentWeek
-        );
-
-        resetGameChain(0);
-
-        showEvent(
-            "New Week",
-            "WEEK",
-            `
-                <p>
-                    No eviction can occur because there
-                    are no current nominees.
-                </p>
-            `
-        );
-
-        return;
-    }
-
-
-    /*
-     * Temporary foundation behavior:
-     * randomly select an eviction target.
+     * The full simulation engine will eventually perform
+     * the actual competition, nomination, voting, and
+     * strategic calculations here.
      *
-     * Later, this will use:
-     * - relationships
-     * - alliances
-     * - strategy
-     * - nominations
-     * - veto usage
-     * - threat level
-     * - voting preferences
+     * For now, this maintains the BrantSteele-style
+     * chain progression without pretending that the
+     * unfinished engine has simulated outcomes.
      */
 
-    const nomineesAsPlayers =
-        nominees
-            .map(
-                id =>
-                    active.find(
-                        houseguest =>
-                            houseguest.id === id
-                    )
-            )
-            .filter(Boolean);
+    simulation.currentPhase =
+        event.id;
 
-
-    const evictionTarget =
-        randomItem(
-            nomineesAsPlayers
-        );
-
-
-    if (evictionTarget) {
-
-        evictionTarget.status =
-            "evicted";
-
-        evictionTarget.placement =
-            active.length;
-
-
-        simulation.currentEviction =
-            evictionTarget.id;
-
-
-        simulation.finalPlacements.push(
-            {
-                id:
-                    evictionTarget.id,
-
-                name:
-                    evictionTarget.name,
-
-                placement:
-                    evictionTarget.placement
-            }
-        );
-    }
-
-
-    simulation.currentWeek++;
-
-    simulation.currentEventIndex = 0;
-
-    simulation.currentNominees = [];
-
-    simulation.currentPOVPlayers = [];
-
-    simulation.currentPOVWinner = null;
-
-    simulation.currentEviction = null;
-
-
-    setText(
-        "current-week",
-        simulation.currentWeek
-    );
-
-
-    updateSimulatorStatus(
-        simulation
-    );
-
-    resetGameChain(0);
-
-
-    showEvent(
-        "Eviction",
-        "EVICTION",
-        `
-            <p>
-                <strong>
-                    ${escapeHTML(
-                        evictionTarget?.name ||
-                        "A houseguest"
-                    )}
-                </strong>
-                has been evicted from the Big Brother house.
-            </p>
-
-            <p>
-                Week ${simulation.currentWeek}
-                is now beginning.
-            </p>
-        `
-    );
-}
-
-
-/* =========================================================
-   COMPETITION HELPERS
-   ========================================================= */
-
-function chooseVetoPlayers(
-    active,
-    hohId,
-    nominees,
-    requiredPlayers
-) {
-
-    const selected = [];
-
-
-    const nomineePlayers =
-        nominees
-            .map(
-                id =>
-                    active.find(
-                        houseguest =>
-                            houseguest.id === id
-                    )
-            )
-            .filter(Boolean);
-
-
-    nomineePlayers.forEach(
-        nominee => {
-
-            if (
-                selected.length <
-                requiredPlayers
-            ) {
-
-                selected.push(
-                    nominee
-                );
-            }
-        }
-    );
-
-
-    const hoh =
-        active.find(
-            houseguest =>
-                houseguest.id === hohId
-        );
-
+    simulation.currentEventIndex++;
 
     if (
-        hoh &&
-        selected.length <
-            requiredPlayers
+        simulation.currentEventIndex >=
+        EVENT_CHAIN.length
     ) {
 
-        selected.push(
-            hoh
+        updateGameChain();
+
+        displayCurrentEvent();
+
+        setTimeout(
+            () => {
+                finishSimulationWeek();
+            },
+            250
         );
+
+        return;
     }
 
+    updateGameChain();
 
-    const remaining =
-        active.filter(
-            houseguest =>
-                !selected.includes(
-                    houseguest
-                )
-        );
+    displayCurrentEvent();
 
-
-    while (
-        selected.length <
-            requiredPlayers &&
-        remaining.length > 0
-    ) {
-
-        const index =
-            Math.floor(
-                Math.random() *
-                remaining.length
-            );
-
-
-        const [
-            player
-        ] =
-            remaining.splice(
-                index,
-                1
-            );
-
-
-        selected.push(
-            player
-        );
-    }
-
-
-    return selected;
+    updateSimulatorStatus();
 }
 
 
-function chooseCompetitionWinner(
-    players,
-    primaryStat,
-    secondaryStat,
-    generalStat
-) {
-
-    if (
-        players.length === 1
-    ) {
-
-        return players[0];
-    }
-
-
-    const weighted =
-        players.map(
-            player => {
-
-                const primary =
-                    Number(
-                        player.ratings?.[
-                            primaryStat
-                        ] || 0
-                    );
-
-
-                const secondary =
-                    Number(
-                        player.ratings?.[
-                            secondaryStat
-                        ] || 0
-                    );
-
-
-                const general =
-                    Number(
-                        player.ratings?.[
-                            generalStat
-                        ] || 0
-                    );
-
-
-                return {
-
-                    player,
-
-                    score:
-                        primary * 0.45 +
-                        secondary * 0.30 +
-                        general * 0.25 +
-                        Math.random() * 4
-                };
-            }
-        );
-
-
-    weighted.sort(
-        (
-            a,
-            b
-        ) =>
-            b.score -
-            a.score
-    );
-
-
-    return weighted[0].player;
-}
-
-
-/* =========================================================
-   ACTIVE HOUSEGUEST HELPERS
-   ========================================================= */
-
-function getActiveHouseguests() {
-
-    if (
-        !currentSeason ||
-        !Array.isArray(
-            currentSeason.houseguests
-        )
-    ) {
-
-        return [];
-    }
-
-
-    return currentSeason.houseguests.filter(
-        houseguest =>
-            houseguest.status !==
-            "evicted"
-    );
-}
-
-
-function getHouseguestDisplayName(
-    id,
-    houseguests
-) {
-
-    if (!id) {
-        return "—";
-    }
-
-
-    const houseguest =
-        (
-            houseguests ||
-            []
-        ).find(
-            player =>
-                player.id === id
-        );
-
-
-    if (!houseguest) {
-        return "Unknown";
-    }
-
-
-    return (
-        houseguest.name ||
-        `Houseguest ${
-            getHouseguestNumber(
-                houseguest.id
-            )
-        }`
-    );
-}
-
-
-function getHouseguestNumber(id) {
-
-    const match =
-        String(
-            id || ""
-        ).match(
-            /(\d+)$/
-        );
-
-
-    if (match) {
-
-        return parseInt(
-            match[1],
-            10
-        );
-    }
-
-
-    return "?";
-}
-
-
-function formatHouseguestList(
-    ids,
-    houseguests
-) {
-
-    if (
-        !Array.isArray(ids) ||
-        ids.length === 0
-    ) {
-
-        return "—";
-    }
-
-
-    return ids
-        .map(
-            id =>
-                getHouseguestDisplayName(
-                    id,
-                    houseguests
-                )
-        )
-        .join(", ");
-}
-
-
-/* =========================================================
-   RANDOM HELPERS
-   ========================================================= */
-
-function randomItem(
-    array
-) {
-
-    if (
-        !Array.isArray(array) ||
-        array.length === 0
-    ) {
-
-        return null;
-    }
-
-
-    return array[
-        Math.floor(
-            Math.random() *
-            array.length
-        )
-    ];
-}
-
-
-function chooseRandomPlayers(
-    array,
-    count
-) {
-
-    const copy =
-        [...array];
-
-
-    const selected = [];
-
-
-    while (
-        selected.length <
-            count &&
-        copy.length > 0
-    ) {
-
-        const index =
-            Math.floor(
-                Math.random() *
-                copy.length
-            );
-
-
-        selected.push(
-            copy.splice(
-                index,
-                1
-            )[0]
-        );
-    }
-
-
-    return selected;
-}
-
-
-/* =========================================================
-   RESULTS
-   ========================================================= */
-
-function showResults() {
+function finishSimulationWeek() {
 
     if (!currentSeason) {
         return;
     }
 
+    const simulation =
+        currentSeason.simulation;
 
-    setText(
-        "results-season-name",
-        currentSeason.name ||
-        "Big Brother"
+    simulation.currentWeek++;
+
+    simulation.currentEventIndex = 0;
+
+    simulation.currentPhase =
+        "setup";
+
+    updateSimulatorStatus();
+
+    updateGameChain();
+
+    displayCurrentEvent();
+}
+
+
+/* ============================================================
+   RESULTS
+   ============================================================ */
+
+function displayResults(
+    season
+) {
+
+    const normalized =
+        normalizeSeason(
+            season
+        );
+
+    const name =
+        getElement(
+            "results-season-name"
+        );
+
+    const winner =
+        getElement(
+            "winner-name"
+        );
+
+    if (name) {
+        name.textContent =
+            normalized.name;
+    }
+
+    if (winner) {
+
+        winner.textContent =
+            normalized.simulation.winner
+                ? normalized.houseguests.find(
+                    houseguest =>
+                        houseguest.id ===
+                        normalized.simulation.winner
+                )?.name || "—"
+                : "—";
+    }
+
+    renderFinalPlacements(
+        normalized
     );
 
-
-    setText(
-        "winner-name",
-        currentSeason.simulation
-            ?.winner ||
-        "—"
-    );
-
-
-    renderFinalPlacements();
-
-    renderSeasonStatistics();
-
-    showPage(
-        "results-page"
+    renderSeasonStatistics(
+        normalized
     );
 }
 
 
-function renderFinalPlacements() {
+function renderFinalPlacements(
+    season
+) {
 
     const container =
-        document.getElementById(
+        getElement(
             "final-placements"
         );
-
 
     if (!container) {
         return;
     }
 
-
     const placements =
-        currentSeason?.simulation
-            ?.finalPlacements ||
-        [];
+        season.simulation
+            .finalPlacements || [];
 
-
-    if (placements.length === 0) {
+    if (!placements.length) {
 
         container.innerHTML = `
-
             <div class="empty-state">
 
                 <h3>
@@ -4640,78 +4721,72 @@ function renderFinalPlacements() {
                 </h3>
 
                 <p>
-                    Finish the simulation to see
-                    final placements.
+                    Placements will appear when the
+                    simulation is completed.
                 </p>
 
             </div>
-
         `;
 
         return;
     }
 
+    container.innerHTML =
+        placements.map(
+            (placement, index) => {
 
-    container.innerHTML = `
+                const houseguest =
+                    season.houseguests.find(
+                        item =>
+                            item.id ===
+                            (
+                                typeof placement ===
+                                "string"
+                                    ? placement
+                                    : placement.id
+                            )
+                    );
 
-        <div class="placement-list">
+                return `
+                    <div class="placement-row">
 
-            ${placements
-                .map(
-                    placement => `
+                        <span>
+                            ${index + 1}
+                        </span>
 
-                        <div class="placement-row">
+                        <strong>
+                            ${escapeHtml(
+                                houseguest?.name ||
+                                "Unknown"
+                            )}
+                        </strong>
 
-                            <span class="placement-number">
-                                ${placement.placement}
-                            </span>
-
-                            <span class="placement-name">
-                                ${escapeHTML(
-                                    placement.name ||
-                                    "Unknown"
-                                )}
-                            </span>
-
-                            <span class="placement-status">
-                                Evicted
-                            </span>
-
-                        </div>
-                    `
-                )
-                .join("")}
-
-        </div>
-
-    `;
+                    </div>
+                `;
+            }
+        ).join("");
 }
 
 
-function renderSeasonStatistics() {
+function renderSeasonStatistics(
+    season
+) {
 
     const container =
-        document.getElementById(
+        getElement(
             "season-statistics"
         );
-
 
     if (!container) {
         return;
     }
 
-
     const houseguests =
-        currentSeason?.houseguests ||
-        [];
-
+        season.houseguests;
 
     const totalHOHWins =
         houseguests.reduce(
-            (
-                total,
-                houseguest
-            ) =>
+            (total, houseguest) =>
                 total +
                 Number(
                     houseguest.hohWins || 0
@@ -4719,13 +4794,9 @@ function renderSeasonStatistics() {
             0
         );
 
-
     const totalPOVWins =
         houseguests.reduce(
-            (
-                total,
-                houseguest
-            ) =>
+            (total, houseguest) =>
                 total +
                 Number(
                     houseguest.povWins || 0
@@ -4733,13 +4804,9 @@ function renderSeasonStatistics() {
             0
         );
 
-
     const totalNominations =
         houseguests.reduce(
-            (
-                total,
-                houseguest
-            ) =>
+            (total, houseguest) =>
                 total +
                 Number(
                     houseguest.nominationCount || 0
@@ -4747,160 +4814,118 @@ function renderSeasonStatistics() {
             0
         );
 
-
-    const relationshipCount =
-        currentSeason &&
-        Array.isArray(
-            currentSeason.relationships
-        )
-            ? currentSeason.relationships.length
-            : 0;
-
-
     container.innerHTML = `
 
-        <div class="statistics-grid">
+        <div class="stats-grid">
 
             <div class="stat-card">
 
-                <strong>
+                <span>
                     Houseguests
-                </strong>
+                </span>
 
-                <span>
+                <strong>
                     ${houseguests.length}
-                </span>
-
-            </div>
-
-
-            <div class="stat-card">
-
-                <strong>
-                    HOH Wins
                 </strong>
 
-                <span>
-                    ${totalHOHWins}
-                </span>
-
             </div>
 
 
             <div class="stat-card">
 
+                <span>
+                    Alliances
+                </span>
+
                 <strong>
-                    POV Wins
+                    ${season.alliances.length}
                 </strong>
 
-                <span>
-                    ${totalPOVWins}
-                </span>
-
             </div>
 
 
             <div class="stat-card">
 
-                <strong>
-                    Nominations
-                </strong>
-
                 <span>
-                    ${totalNominations}
-                </span>
-
-            </div>
-
-
-            <div class="stat-card">
-
-                <strong>
                     Relationships
+                </span>
+
+                <strong>
+                    ${season.relationships.length}
                 </strong>
 
+            </div>
+
+
+            <div class="stat-card">
+
                 <span>
-                    ${relationshipCount}
+                    HOH Wins
                 </span>
+
+                <strong>
+                    ${totalHOHWins}
+                </strong>
+
+            </div>
+
+
+            <div class="stat-card">
+
+                <span>
+                    POV Wins
+                </span>
+
+                <strong>
+                    ${totalPOVWins}
+                </strong>
+
+            </div>
+
+
+            <div class="stat-card">
+
+                <span>
+                    Nominations
+                </span>
+
+                <strong>
+                    ${totalNominations}
+                </strong>
 
             </div>
 
         </div>
-
     `;
 }
 
 
-/* =========================================================
-   PERSIST CURRENT SEASON
-   ========================================================= */
-
-function persistCurrentSeason() {
-
-    if (!currentSeason) {
-        return;
-    }
-
-
-    const index =
-        savedSeasons.findIndex(
-            season =>
-                season.id ===
-                currentSeason.id
-        );
-
-
-    if (index < 0) {
-        return;
-    }
-
-
-    currentSeason.updatedAt =
-        new Date().toISOString();
-
-
-    savedSeasons[index] =
-        deepClone(
-            currentSeason
-        );
-
-
-    saveSeasonsToStorage();
-
-    renderSavedSeasons();
-}
-
-
-/* =========================================================
+/* ============================================================
    MODAL
-   ========================================================= */
+   ============================================================ */
 
-function openModal(
-    content
-) {
+function openModal(content) {
 
     const modal =
-        document.getElementById(
-            "modal"
-        );
+        getElement("modal");
 
     const body =
-        document.getElementById(
-            "modal-body"
-        );
-
+        getElement("modal-body");
 
     if (!modal || !body) {
         return;
     }
 
-
     body.innerHTML =
         content;
 
-
     modal.classList.add(
-        "active"
+        "open"
+    );
+
+    modal.setAttribute(
+        "aria-hidden",
+        "false"
     );
 }
 
@@ -4908,204 +4933,57 @@ function openModal(
 function closeModal() {
 
     const modal =
-        document.getElementById(
-            "modal"
-        );
+        getElement("modal");
 
-
-    if (modal) {
-
-        modal.classList.remove(
-            "active"
-        );
-    }
-}
-
-
-/* =========================================================
-   GENERAL HELPERS
-   ========================================================= */
-
-function getValue(id) {
-
-    const element =
-        document.getElementById(id);
-
-
-    if (!element) {
-        return "";
-    }
-
-
-    return element.value;
-}
-
-
-function getInputValue(id) {
-
-    return getValue(id);
-}
-
-
-function setValue(
-    id,
-    value
-) {
-
-    const element =
-        document.getElementById(id);
-
-
-    if (!element) {
+    if (!modal) {
         return;
     }
 
+    modal.classList.remove(
+        "open"
+    );
 
-    element.value =
-        value;
-}
-
-
-function getChecked(id) {
-
-    const element =
-        document.getElementById(id);
-
-
-    if (!element) {
-        return false;
-    }
-
-
-    return element.checked;
-}
-
-
-function setChecked(
-    id,
-    value
-) {
-
-    const element =
-        document.getElementById(id);
-
-
-    if (!element) {
-        return;
-    }
-
-
-    element.checked =
-        Boolean(value);
-}
-
-
-function setText(
-    id,
-    text
-) {
-
-    const element =
-        document.getElementById(id);
-
-
-    if (!element) {
-        return;
-    }
-
-
-    element.textContent =
-        text;
-}
-
-
-function deepClone(
-    object
-) {
-
-    if (
-        object === undefined ||
-        object === null
-    ) {
-
-        return object;
-    }
-
-
-    return JSON.parse(
-        JSON.stringify(object)
+    modal.setAttribute(
+        "aria-hidden",
+        "true"
     );
 }
 
 
-function escapeHTML(
-    value
-) {
+/* ============================================================
+   UTILITY
+   ============================================================ */
 
-    if (
-        value === undefined ||
-        value === null
-    ) {
+function capitalize(value) {
 
+    if (!value) {
         return "";
     }
-
 
     return String(value)
-        .replace(
-            /&/g,
-            "&amp;"
-        )
-        .replace(
-            /</g,
-            "&lt;"
-        )
-        .replace(
-            />/g,
-            "&gt;"
-        )
-        .replace(
-            /"/g,
-            "&quot;"
-        )
-        .replace(
-            /'/g,
-            "&#039;"
-        );
+        .charAt(0)
+        .toUpperCase() +
+        String(value).slice(1);
 }
 
 
-function escapeAttribute(
-    value
-) {
-
-    return escapeHTML(
-        value
-    );
-}
-
-
-/* =========================================================
+/* ============================================================
    GLOBAL EXPORTS
-   =========================================================
-   These make functions available to the onclick handlers
-   in index.html.
-   ========================================================= */
+   ============================================================ */
+
+/*
+ * The HTML uses inline onclick handlers, so explicitly expose
+ * the public functions on window.
+ */
 
 window.showPage =
     showPage;
-
-window.createNewSeason =
-    createNewSeason;
 
 window.addHouseguest =
     addHouseguest;
 
 window.removeHouseguest =
     removeHouseguest;
-
-window.updateHouseguestCount =
-    updateHouseguestCount;
 
 window.updateHouseguestImage =
     updateHouseguestImage;
@@ -5116,26 +4994,29 @@ window.saveSeason =
 window.editSeason =
     editSeason;
 
-window.openSeason =
-    openSeason;
-
 window.deleteSeason =
     deleteSeason;
+
+window.openSeason =
+    openSeason;
 
 window.runNextEvent =
     runNextEvent;
 
-window.showResults =
-    showResults;
+window.openModal =
+    openModal;
 
 window.closeModal =
     closeModal;
 
-window.openModal =
-    openModal;
 
-window.addRelationship =
-    addRelationship;
+/* Relationships */
+
+window.saveRelationship =
+    saveRelationship;
+
+window.resetRelationshipForm =
+    resetRelationshipForm;
 
 window.editRelationship =
     editRelationship;
@@ -5143,5 +5024,17 @@ window.editRelationship =
 window.deleteRelationship =
     deleteRelationship;
 
-window.updateRelationshipDisplay =
-    updateRelationshipDisplay;
+
+/* Alliances */
+
+window.saveAlliance =
+    saveAlliance;
+
+window.resetAllianceForm =
+    resetAllianceForm;
+
+window.editAlliance =
+    editAlliance;
+
+window.deleteAlliance =
+    deleteAlliance;
