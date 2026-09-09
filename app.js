@@ -432,13 +432,36 @@ function addHouseguest(data = null) {
     const houseguest =
         data || createDefaultHouseguest(id);
 
+    // Support both the new first/last-name format and older saved seasons
+    // that only stored a single `name` field.
+    const parsedName = parseHouseguestName(houseguest);
+    houseguest.firstName = parsedName.firstName;
+    houseguest.lastName = parsedName.lastName;
+    houseguest.name = formatHouseguestName(
+        houseguest.firstName,
+        houseguest.lastName
+    );
+
     card.innerHTML = `
 
         <div class="houseguest-card-header">
 
-            <h3 class="houseguest-number">
-                Houseguest
-            </h3>
+            <div>
+                <h3 class="houseguest-number">
+                    Houseguest
+                </h3>
+                <div
+                    class="houseguest-display-name"
+                    id="houseguest-display-name-${id}"
+                >
+                    ${escapeHTML(
+                        formatHouseguestName(
+                            houseguest.firstName,
+                            houseguest.lastName
+                        ) || "Unnamed Houseguest"
+                    )}
+                </div>
+            </div>
 
             <button
                 type="button"
@@ -499,17 +522,37 @@ function addHouseguest(data = null) {
 
             <div class="form-group">
 
-                <label for="houseguest-name-${id}">
-                    Name
+                <label for="houseguest-first-name-${id}">
+                    First Name
                 </label>
 
                 <input
                     type="text"
-                    id="houseguest-name-${id}"
+                    id="houseguest-first-name-${id}"
                     value="${escapeAttribute(
-                        houseguest.name || ""
+                        houseguest.firstName || ""
                     )}"
-                    placeholder="Houseguest Name"
+                    placeholder="First Name"
+                    oninput="updateHouseguestNameDisplay('${id}')"
+                >
+
+            </div>
+
+
+            <div class="form-group">
+
+                <label for="houseguest-last-name-${id}">
+                    Last Name
+                </label>
+
+                <input
+                    type="text"
+                    id="houseguest-last-name-${id}"
+                    value="${escapeAttribute(
+                        houseguest.lastName || ""
+                    )}"
+                    placeholder="Last Name"
+                    oninput="updateHouseguestNameDisplay('${id}')"
                 >
 
             </div>
@@ -610,6 +653,8 @@ function addHouseguest(data = null) {
         id,
         houseguest.image || ""
     );
+
+    updateHouseguestNameDisplay(id);
 
     updateHouseguestNumbers();
 
@@ -948,6 +993,68 @@ function showHouseguestPlaceholder(id) {
 }
 
 
+function parseHouseguestName(houseguest) {
+
+    const firstName =
+        String(houseguest?.firstName || "").trim();
+
+    const lastName =
+        String(houseguest?.lastName || "").trim();
+
+    if (firstName || lastName) {
+        return { firstName, lastName };
+    }
+
+    const legacyName =
+        String(houseguest?.name || "").trim();
+
+    if (!legacyName) {
+        return { firstName: "", lastName: "" };
+    }
+
+    const parts = legacyName.split(/\s+/);
+
+    return {
+        firstName: parts.shift() || "",
+        lastName: parts.join(" ")
+    };
+}
+
+
+function formatHouseguestName(firstName, lastName) {
+
+    return [firstName, lastName]
+        .map(value => String(value || "").trim())
+        .filter(Boolean)
+        .join(" ");
+}
+
+
+function updateHouseguestNameDisplay(id) {
+
+    const firstName = getInputValue(
+        `houseguest-first-name-${id}`
+    );
+
+    const lastName = getInputValue(
+        `houseguest-last-name-${id}`
+    );
+
+    const display =
+        document.getElementById(
+            `houseguest-display-name-${id}`
+        );
+
+    if (!display) {
+        return;
+    }
+
+    display.textContent =
+        formatHouseguestName(firstName, lastName) ||
+        "Unnamed Houseguest";
+}
+
+
 function collectHouseguests() {
 
     const cards =
@@ -966,9 +1073,20 @@ function collectHouseguests() {
 
                 id,
 
-                name:
+                firstName:
                     getInputValue(
-                        `houseguest-name-${id}`
+                        `houseguest-first-name-${id}`
+                    ),
+
+                lastName:
+                    getInputValue(
+                        `houseguest-last-name-${id}`
+                    ),
+
+                name:
+                    formatHouseguestName(
+                        getInputValue(`houseguest-first-name-${id}`),
+                        getInputValue(`houseguest-last-name-${id}`)
                     ),
 
                 image:
@@ -3390,6 +3508,7 @@ function loadHouseguests(
     updateHouseguestNumbers();
 
     populateRelationshipHouseguestOptions();
+    refreshAdvancedHouseguestOptions();
 }
 
 
@@ -5428,3 +5547,4 @@ chooseCompetitionWinner = function(players, primaryStat, secondaryStat, generalS
     if(!custom) return _baseChooseCompetitionWinner(players,primaryStat,secondaryStat,generalStat);
     return _baseChooseCompetitionWinner(players,custom.primary||primaryStat,custom.secondary||secondaryStat,"general");
 };
+
