@@ -5196,6 +5196,8 @@ function setupAdvancedSeasonControls() {
     if (clearC) clearC.onclick = resetCompetitionEditor;
     if (saveT) saveT.onclick = saveTwist;
     if (clearT) clearT.onclick = resetTwistEditor;
+    const memberSelect = document.getElementById("alliance-members");
+    if (memberSelect) memberSelect.addEventListener("change", updateAllianceMemberHint);
     refreshAdvancedHouseguestOptions();
     renderAlliances(); renderCompetitions(); renderTwists();
 }
@@ -5207,13 +5209,34 @@ function refreshAdvancedHouseguestOptions() {
     const guests = collectHouseguests();
     select.innerHTML = guests.map(h => `<option value="${escapeAttribute(h.id)}">${escapeHTML(h.name || "Unnamed Houseguest")}</option>`).join("");
     previous.forEach(id => { const o = [...select.options].find(x => x.value === id); if (o) o.selected = true; });
+    updateAllianceMemberHint();
+}
+
+function updateAllianceMemberHint() {
+    const select = document.getElementById("alliance-members");
+    const hint = document.getElementById("alliance-member-count");
+    if (!select || !hint) return;
+    const count = [...select.selectedOptions].length;
+    hint.textContent = count === 0 ? "Select at least 2 houseguests." : `${count} houseguest${count === 1 ? "" : "s"} selected`;
+    hint.classList.toggle("is-valid", count >= 2);
 }
 
 function getAdvancedArrays() {
-    if (!currentSeason) currentSeason = { alliances: [], competitions: {hoh:[],pov:[],safety:[],luxury:[],finalHoh:[]}, twists: [] };
+    if (!currentSeason) {
+        currentSeason = {
+            alliances: [],
+            relationships: [],
+            competitions: { hoh: [], pov: [], safety: [], luxury: [], finalHoh: [] },
+            twists: [],
+            simulation: createDefaultSimulation()
+        };
+    }
     if (!Array.isArray(currentSeason.alliances)) currentSeason.alliances = [];
+    if (!Array.isArray(currentSeason.relationships)) currentSeason.relationships = [];
     if (!currentSeason.competitions || typeof currentSeason.competitions !== "object") currentSeason.competitions = {};
-    ["hoh","pov","safety","luxury","finalHoh"].forEach(k => { if (!Array.isArray(currentSeason.competitions[k])) currentSeason.competitions[k] = []; });
+    ["hoh", "pov", "safety", "luxury", "finalHoh"].forEach(k => {
+        if (!Array.isArray(currentSeason.competitions[k])) currentSeason.competitions[k] = [];
+    });
     if (!Array.isArray(currentSeason.twists)) currentSeason.twists = [];
     return currentSeason;
 }
@@ -5251,14 +5274,14 @@ function renderAlliances() { const c=document.getElementById("alliances-containe
 
 function saveCompetition() { const season=getAdvancedArrays(); const name=getInputValue("competition-name").trim(); if(!name)return alert("Please enter a competition name."); const type=getValue("competition-type")||"hoh"; const obj={id:editingCompetitionId||uid("competition"),name,type,description:getInputValue("competition-description").trim(),primary:getValue("competition-primary")||"physical",secondary:getValue("competition-secondary")||"mental"}; const arr=season.competitions[type]||(season.competitions[type]=[]); let found=false; Object.keys(season.competitions).forEach(k=>{const i=season.competitions[k].findIndex(x=>x.id===obj.id);if(i>=0){season.competitions[k].splice(i,1);found=true;}}); arr.push(obj); editingCompetitionId=null; resetCompetitionEditor(); renderCompetitions(); }
 function resetCompetitionEditor(){editingCompetitionId=null;setValue("competition-name","");setValue("competition-type","hoh");setValue("competition-description","");setValue("competition-primary","physical");setValue("competition-secondary","mental");setText("competition-form-title","Create Competition");setText("save-competition-btn","Add Competition");}
-function editCompetition(id){const s=getAdvancedArrays();let c=null;Object.values(s.competitions).some(arr=>{const x=arr.find(y=>y.id===id);if(x)c=x;return !!x;});if(!c)return;editingCompetitionId=id;setValue("competition-name",c.name);setValue("competition-type",c.type);setValue("competition-description",c.description||"");setValue("competition-primary",c.primary||"physical");setValue("competition-secondary",c.secondary||"mental");setText("competition-form-title","Edit Competition");setText("save-competition-btn","Save Competition");}
+function editCompetition(id){const s=getAdvancedArrays();let c=null;Object.values(s.competitions).some(arr=>{const x=arr.find(y=>y.id===id);if(x)c=x;return !!x;});if(!c)return;editingCompetitionId=id;setValue("competition-name",c.name);setValue("competition-type",c.type);setValue("competition-description",c.description||"");setValue("competition-primary",c.primary||"physical");setValue("competition-secondary",c.secondary||"mental");setText("competition-form-title","Edit Competition");setText("save-competition-btn","Save Competition");document.getElementById("competition-name")?.scrollIntoView({behavior:"smooth",block:"center"});}
 function deleteCompetition(id){if(!confirm("Delete this competition?"))return;const s=getAdvancedArrays();Object.keys(s.competitions).forEach(k=>s.competitions[k]=s.competitions[k].filter(c=>c.id!==id));renderCompetitions();}
 function renderCompetitions(){const c=document.getElementById("competitions-container");if(!c)return;const s=getAdvancedArrays();const all=Object.values(s.competitions).flat();if(!all.length){c.innerHTML='<div class="empty-state"><p>No custom competitions created yet.</p></div>';return;}const labels={hoh:"HOH",pov:"POV",safety:"Safety",luxury:"Luxury",finalHoh:"Final HOH"};c.innerHTML=all.map(x=>`<div class="advanced-card"><div class="advanced-card-header"><div><h4>${escapeHTML(x.name)}</h4><span class="feature-status">${labels[x.type]||x.type}</span></div><div class="advanced-card-actions"><button type="button" onclick="editCompetition('${escapeAttribute(x.id)}')">Edit</button><button type="button" onclick="deleteCompetition('${escapeAttribute(x.id)}')">Delete</button></div></div><p>${escapeHTML(x.description||"No description.")}</p><small>Primary: ${escapeHTML(x.primary)} · Secondary: ${escapeHTML(x.secondary)}</small></div>`).join("");}
 function loadCompetitions(data){const s=getAdvancedArrays();s.competitions=data&&typeof data==='object'?deepClone(data):{hoh:[],pov:[],safety:[],luxury:[],finalHoh:[]};["hoh","pov","safety","luxury","finalHoh"].forEach(k=>{if(!Array.isArray(s.competitions[k]))s.competitions[k]=[]});resetCompetitionEditor();renderCompetitions();}
 
 function saveTwist(){const s=getAdvancedArrays();const name=getInputValue("twist-name").trim();if(!name)return alert("Please enter a twist name.");const duplicate=s.twists.some(t=>t.id!==editingTwistId&&String(t.name).toLowerCase()===name.toLowerCase());if(duplicate)return alert("A twist with that name already exists.");const obj={id:editingTwistId||uid("twist"),name,description:getInputValue("twist-description").trim(),timing:getValue("twist-timing")||"season",active:getChecked("twist-active")};const i=s.twists.findIndex(t=>t.id===obj.id);if(i>=0)s.twists[i]=obj;else s.twists.push(obj);resetTwistEditor();renderTwists();}
 function resetTwistEditor(){editingTwistId=null;setValue("twist-name","");setValue("twist-description","");setValue("twist-timing","season");setChecked("twist-active",true);setText("twist-form-title","Create Twist");setText("save-twist-btn","Add Twist");}
-function editTwist(id){const t=getAdvancedArrays().twists.find(x=>x.id===id);if(!t)return;editingTwistId=id;setValue("twist-name",t.name);setValue("twist-description",t.description||"");setValue("twist-timing",t.timing||"season");setChecked("twist-active",t.active!==false);setText("twist-form-title","Edit Twist");setText("save-twist-btn","Save Twist");}
+function editTwist(id){const t=getAdvancedArrays().twists.find(x=>x.id===id);if(!t)return;editingTwistId=id;setValue("twist-name",t.name);setValue("twist-description",t.description||"");setValue("twist-timing",t.timing||"season");setChecked("twist-active",t.active!==false);setText("twist-form-title","Edit Twist");setText("save-twist-btn","Save Twist");document.getElementById("twist-name")?.scrollIntoView({behavior:"smooth",block:"center"});}
 function deleteTwist(id){if(!confirm("Delete this twist?"))return;getAdvancedArrays().twists=getAdvancedArrays().twists.filter(t=>t.id!==id);renderTwists();}
 function renderTwists(){const c=document.getElementById("twists-container");if(!c)return;const ts=getAdvancedArrays().twists;if(!ts.length){c.innerHTML='<div class="empty-state"><p>No twists created yet.</p></div>';return;}c.innerHTML=ts.map(t=>`<div class="advanced-card"><div class="advanced-card-header"><div><h4>${escapeHTML(t.name)}</h4><span class="feature-status">${t.active===false?"Inactive":"Active"}</span></div><div class="advanced-card-actions"><button type="button" onclick="editTwist('${escapeAttribute(t.id)}')">Edit</button><button type="button" onclick="deleteTwist('${escapeAttribute(t.id)}')">Delete</button></div></div><p>${escapeHTML(t.description||"No description.")}</p><small>Timing: ${escapeHTML(t.timing||"season")}</small></div>`).join("");}
 function loadTwists(data){getAdvancedArrays().twists=deepClone(Array.isArray(data)?data:[]);resetTwistEditor();renderTwists();}
@@ -5291,3 +5314,5 @@ chooseCompetitionWinner = function(players, primaryStat, secondaryStat, generalS
     if(!custom) return _baseChooseCompetitionWinner(players,primaryStat,secondaryStat,generalStat);
     return _baseChooseCompetitionWinner(players,custom.primary||primaryStat,custom.secondary||secondaryStat,"general");
 };
+
+
