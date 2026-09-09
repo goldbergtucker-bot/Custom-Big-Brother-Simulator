@@ -1950,6 +1950,22 @@ select {
 .empty-state { border:1px dashed #303642; border-radius:12px; padding:28px 18px; text-align:center; color:#7f8897; background:#0c1016; }
 .empty-state p { margin:0; }
 @media (max-width: 950px) { .advanced-editor-grid { grid-template-columns:1fr; } .advanced-list { max-height:none; } }
+
+/* Weekly competition/twist schedule */
+.panel-hint { margin:-8px 0 14px; color:#8e97a6; font-size:13px; line-height:1.5; }
+.week-editor-card { border:1px solid #2b303b; border-radius:14px; padding:16px; background:#0d1118; }
+.week-editor-card + .week-editor-card { margin-top:12px; }
+.week-editor-header { display:flex; justify-content:space-between; gap:14px; align-items:center; padding-bottom:12px; border-bottom:1px solid #252a34; }
+.week-editor-header h4 { margin:3px 0 0; font-size:19px; color:#fff; }
+.week-editor-header .section-label { color:#8e97a6; font-size:10px; letter-spacing:.08em; }
+.week-item-list { display:grid; gap:10px; margin-top:12px; }
+.week-item { display:flex; justify-content:space-between; gap:14px; align-items:flex-start; padding:13px; border:1px solid #252b35; border-radius:11px; background:#11161f; }
+.week-item strong { color:#f4f6fa; font-size:14px; margin-right:8px; }
+.week-item p { margin:8px 0 6px; color:#b5bcc8; font-size:13px; line-height:1.45; }
+.week-item small { color:#8e97a6; }
+.week-item .feature-status { margin-left:4px; }
+@media (max-width: 650px) { .week-item { flex-direction:column; } .week-item .advanced-card-actions { width:100%; } .week-item .advanced-card-actions button { flex:1; } }
+
 @media (max-width: 520px) { .advanced-card-header { flex-direction:column; } .advanced-card-actions { width:100%; } .advanced-card-actions button { flex:1; } .editor-panel { padding:17px; } }
 
 
