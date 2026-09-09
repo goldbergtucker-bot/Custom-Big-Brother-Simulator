@@ -1416,37 +1416,38 @@
             </section>
 
             <section class="creator-section advanced-systems-section">
-                <div class="section-heading"><div><span class="section-label">STEP 6</span><h2>Competitions</h2><p>Define custom HOH, POV, Safety, Luxury, and Final HOH competitions.</p></div></div>
+                <div class="section-heading"><div><span class="section-label">STEP 6</span><h2>Weekly Competitions</h2><p>Build your season week by week. Each week can have an HOH, POV, and any special, safety, luxury, or Final HOH competitions that apply.</p></div></div>
                 <div class="advanced-editor-grid">
                     <div class="editor-panel">
                         <h3 id="competition-form-title">Create Competition</h3>
                         <div class="form-grid">
-                            <div class="form-group"><label for="competition-name">Competition Name</label><input id="competition-name" type="text" placeholder="Example: Wall Endurance"></div>
-                            <div class="form-group"><label for="competition-type">Competition Type</label><select id="competition-type"><option value="hoh">HOH</option><option value="pov">POV</option><option value="safety">Safety</option><option value="luxury">Luxury</option><option value="finalHoh">Final HOH</option></select></div>
+                            <div class="form-group"><label for="competition-week">Week</label><select id="competition-week"></select></div>
+                            <div class="form-group"><label for="competition-type">Competition Type</label><select id="competition-type"><option value="hoh">HOH</option><option value="pov">POV</option><option value="special">Special Competition</option><option value="safety">Safety</option><option value="luxury">Luxury</option><option value="finalHoh">Final HOH</option></select></div>
+                            <div class="form-group form-group-full"><label for="competition-name">Competition Name</label><input id="competition-name" type="text" placeholder="Example: Hotel Wall Endurance"></div>
                             <div class="form-group"><label for="competition-primary">Primary Skill</label><select id="competition-primary"><option>physical</option><option>mental</option><option>social</option><option>strategic</option><option>general</option></select></div>
                             <div class="form-group"><label for="competition-secondary">Secondary Skill</label><select id="competition-secondary"><option>mental</option><option>physical</option><option>social</option><option>strategic</option><option>general</option></select></div>
-                            <div class="form-group form-group-full"><label for="competition-description">Description</label><textarea id="competition-description" rows="3" placeholder="How does this competition work?"></textarea></div>
+                            <div class="form-group form-group-full"><label for="competition-description">Description</label><textarea id="competition-description" rows="4" placeholder="How does this competition work?"></textarea></div>
                         </div>
                         <div class="editor-actions"><button id="save-competition-btn" class="primary-button" type="button">Add Competition</button><button id="cancel-competition-btn" class="secondary-button" type="button">Clear</button></div>
                     </div>
-                    <div class="editor-panel"><h3>Competition Library</h3><div id="competitions-container" class="advanced-list"></div></div>
+                    <div class="editor-panel"><h3>Season Competition Schedule</h3><p class="panel-hint">Competitions are grouped by week so you can see exactly what happens each week.</p><div id="competitions-container" class="advanced-list"></div></div>
                 </div>
             </section>
 
             <section class="creator-section advanced-systems-section">
-                <div class="section-heading"><div><span class="section-label">STEP 7</span><h2>Twists</h2><p>Add custom twists and choose when they affect the season.</p></div></div>
+                <div class="section-heading"><div><span class="section-label">STEP 7</span><h2>Weekly Twists</h2><p>Add twists to specific weeks. A week can have multiple twists, or none at all.</p></div></div>
                 <div class="advanced-editor-grid">
                     <div class="editor-panel">
                         <h3 id="twist-form-title">Create Twist</h3>
                         <div class="form-grid">
-                            <div class="form-group"><label for="twist-name">Twist Name</label><input id="twist-name" type="text" placeholder="Example: Safety Suite"></div>
-                            <div class="form-group"><label for="twist-timing">Timing</label><select id="twist-timing"><option value="season">Season Long</option><option value="week1">Week 1</option><option value="weekly">Weekly</option><option value="midseason">Midseason</option><option value="endgame">Endgame</option></select></div>
-                            <div class="form-group form-group-full"><label for="twist-description">Description</label><textarea id="twist-description" rows="4" placeholder="Explain the twist..."></textarea></div>
+                            <div class="form-group"><label for="twist-week">Week</label><select id="twist-week"></select></div>
                             <div class="form-group"><label><input id="twist-active" type="checkbox" checked> Active</label></div>
+                            <div class="form-group form-group-full"><label for="twist-name">Twist Name</label><input id="twist-name" type="text" placeholder="Example: Nomination Void"></div>
+                            <div class="form-group form-group-full"><label for="twist-description">Description</label><textarea id="twist-description" rows="5" placeholder="Explain exactly what the twist does and when it takes effect..."></textarea></div>
                         </div>
                         <div class="editor-actions"><button id="save-twist-btn" class="primary-button" type="button">Add Twist</button><button id="cancel-twist-btn" class="secondary-button" type="button">Clear</button></div>
                     </div>
-                    <div class="editor-panel"><h3>Twist Library</h3><div id="twists-container" class="advanced-list"></div></div>
+                    <div class="editor-panel"><h3>Season Twist Schedule</h3><p class="panel-hint">Twists are grouped by week just like the competition schedule.</p><div id="twists-container" class="advanced-list"></div></div>
                 </div>
             </section>
             <!-- =================================================
