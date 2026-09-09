@@ -2002,6 +2002,33 @@ select {
 .member-picker-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .member-picker-empty { grid-column: 1 / -1; padding: 18px; text-align: center; color: #7f8897; }
 
+
+/* =========================================================
+   DOUBLE EVICTION WEEK PICKER
+   Keep every week label fully visible and make the picker
+   easier to scan for longer seasons.
+   ========================================================= */
+#double-eviction-weeks-picker {
+    grid-template-columns: repeat(4, minmax(110px, 1fr));
+    align-items: stretch;
+    overflow-x: hidden;
+}
+#double-eviction-weeks-picker .member-picker-item {
+    min-width: 0;
+    white-space: nowrap;
+}
+#double-eviction-weeks-picker .member-picker-item span {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+    #double-eviction-weeks-picker {
+        grid-template-columns: repeat(2, minmax(100px, 1fr));
+    }
+}
+
 /* =========================================================
    QUICK RELATIONSHIP MATRIX
    ========================================================= */
