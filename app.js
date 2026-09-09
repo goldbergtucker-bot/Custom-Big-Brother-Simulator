@@ -83,6 +83,7 @@ document.addEventListener("DOMContentLoaded", () => {
     setupImagePreviews();
 
     setupRuleControls();
+    setupSeasonLengthControls();
 
     setupRelationshipControls();
 
