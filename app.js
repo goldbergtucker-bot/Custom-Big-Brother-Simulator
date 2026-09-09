@@ -84,9 +84,12 @@ document.addEventListener("DOMContentLoaded", () => {
     setupRuleControls();
 
     setupRelationshipControls();
-    setupAdvancedSeasonControls();
 
+    // Build the houseguest editor before initializing the advanced
+    // alliance/competition/twist controls so their player lists are
+    // populated from the actual houseguest cards.
     initializeHouseguestCount();
+    setupAdvancedSeasonControls();
 
     renderSavedSeasons();
 
@@ -284,7 +287,23 @@ function resetSeasonCreator() {
 
     editingSeasonId = null;
 
-    currentSeason = null;
+    // Keep one complete creator-state object available while the season
+    // is being built.  The previous implementation set this to null and
+    // the advanced editors could create a partial season object, which
+    // caused houseguest/advanced data to fall out of sync.
+    currentSeason = {
+        alliances: [],
+        relationships: [],
+        competitions: {
+            hoh: [],
+            pov: [],
+            safety: [],
+            luxury: [],
+            finalHoh: []
+        },
+        twists: [],
+        simulation: createDefaultSimulation()
+    };
 
     currentHouseguestId = 0;
 
@@ -594,6 +613,7 @@ function addHouseguest(data = null) {
     updateHouseguestNumbers();
 
     populateRelationshipHouseguestOptions();
+    refreshAdvancedHouseguestOptions();
 }
 
 
@@ -711,6 +731,7 @@ function removeHouseguest(id) {
     updateHouseguestNumbers();
 
     populateRelationshipHouseguestOptions();
+    refreshAdvancedHouseguestOptions();
 
     renderRelationships();
 }
@@ -5270,4 +5291,3 @@ chooseCompetitionWinner = function(players, primaryStat, secondaryStat, generalS
     if(!custom) return _baseChooseCompetitionWinner(players,primaryStat,secondaryStat,generalStat);
     return _baseChooseCompetitionWinner(players,custom.primary||primaryStat,custom.secondary||secondaryStat,"general");
 };
-
