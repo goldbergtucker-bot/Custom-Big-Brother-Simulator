@@ -7116,3 +7116,374 @@ function resimulateSeason() {
 // handlers in index.html, and this guarantees the function is available there.
 window.resimulateSeason = resimulateSeason;
 window.showResults = showResults;
+
+/* =========================================================
+   CLEAN SIMULATION ENGINE v1
+   Single authoritative state machine.  This intentionally overrides the
+   older event functions above so the editor/configuration code can remain
+   backward-compatible while simulation state has one owner.
+   ========================================================= */
+(function installCleanSimulationEngine(){
+    function sim(){
+        if (!currentSeason) return null;
+        currentSeason.simulation = ensureFinaleState(currentSeason.simulation || createDefaultSimulation());
+        return currentSeason.simulation;
+    }
+
+    function active(){ return getActiveHouseguests(); }
+    function name(id){ return getHouseguestDisplayName(id, currentSeason?.houseguests || []); }
+    function player(id){ return getHouseguestForSimulation(id); }
+    function isDoubleWeek(week){
+        return currentSeason?.rules?.doubleEvictionEnabled === true &&
+            (currentSeason.rules.doubleEvictionWeeks || []).map(Number).includes(Number(week));
+    }
+
+    function resetCycle(s, week, cycle){
+        if (week != null) s.currentWeek = Number(week);
+        s.cycle = Number(cycle || 1);
+        s.evictionsThisWeek = Number(s.evictionsThisWeek || 0);
+        s.currentEventIndex = 0;
+        s.currentHOH = null;
+        s.currentNominees = [];
+        s.currentPOVPlayers = [];
+        s.currentPOVWinner = null;
+        s.currentSafetyWinner = null;
+        s.currentEviction = null;
+        s.pendingEvictionId = null;
+        s.evictionVoteResult = null;
+        s.pendingCycle = null;
+        s.pendingWeekAdvance = false;
+        s.viewingWeek = Number(s.currentWeek || 1);
+        s.isViewingHistory = false;
+        s.currentPhase = "week";
+    }
+
+    function cycleChain(s){
+        const week = Number(s.currentWeek || 1);
+        const chain = [];
+        // Twists are awarded once at the beginning of the week's first cycle.
+        if (Number(s.cycle || 1) === 1) {
+            getScheduledTwistsForWeek(week).forEach(t => chain.push({key:"twist", label:t.name || "Twist", twistId:t.id}));
+        }
+        const hoh = getCompetitionForWeekType(week, "hoh");
+        const pov = getCompetitionForWeekType(week, "pov");
+        chain.push({key:"hoh", label:hoh?.name || "HOH Competition"});
+        chain.push({key:"nominations", label:"Nomination Ceremony"});
+        chain.push({key:"pov-players", label:"Veto Selections"});
+        chain.push({key:"pov", label:pov?.name || "Power of Veto"});
+        chain.push({key:"veto-ceremony", label:"Veto Ceremony"});
+
+        // Special/safety/luxury competitions run once per week, before voting.
+        if (Number(s.cycle || 1) === 1) {
+            getWeekCompetitions(week)
+                .filter(c => ["special","safety","luxury"].includes(String(c.type || "").toLowerCase()))
+                .forEach(c => chain.push({key:"custom-competition", label:c.name || "Special Competition", competitionId:c.id}));
+        }
+        chain.push({key:"eviction-voting", label:"Eviction Voting"});
+        chain.push({key:"eviction", label:"Eviction"});
+        return chain;
+    }
+
+    function finalChain(){
+        const s=sim();
+        const finalists=(s?.finalists||[]).map(player).filter(Boolean);
+        const chain=[];
+        if (finalists.length >= 3) chain.push({key:"final-hoh",label:"Final HOH"});
+        chain.push({key:"jury-voting",label:"Jury Voting"},{key:"finale-results",label:"Final Results"});
+        return chain;
+    }
+
+    function record(s, event, title, type, content, week){
+        if (!Array.isArray(s.history)) s.history=[];
+        const w=Number(week ?? s.currentWeek ?? 1);
+        const cycle=Number(s.cycle || 1);
+        const sequence=s.history.length;
+        s.history.push({
+            week:w, cycle, event, label:eventLabel(event,title), title, type,
+            content, sequence, timestamp:Date.now()
+        });
+        s.weekHistory=s.history;
+    }
+    function eventLabel(event,title){
+        const map={"twist":"Twist","hoh":"HOH Competition","nominations":"Nomination Ceremony","pov-players":"Veto Selections","pov":"POV Competition","veto-ceremony":"Veto Ceremony","custom-competition":"Special Competition","eviction-voting":"Eviction Voting","eviction":"Eviction","final-hoh":"Final HOH","jury-voting":"Jury Voting","finale-results":"Final Results"};
+        return map[event] || title || "Event";
+    }
+    function display(s,title,type,content,event,opts={}){
+        showEvent(title,type,content,{skipHistory:true,skipLiveView:false,week:Number(opts.week ?? s.currentWeek ?? 1)});
+        record(s,event,title,type,content,Number(opts.week ?? s.currentWeek ?? 1));
+        s.liveView={title,type,content,week:Number(opts.week ?? s.currentWeek ?? 1)};
+        s.currentEventIndex=Number(s.currentEventIndex || 0)+1;
+        updateSimulatorStatus(s);
+        renderSimulationWeekNavigation();
+        renderMemoryWallMini();
+        persistCurrentSeason();
+    }
+
+    function chooseWinner(players, comp, fallbackPrimary, fallbackSecondary){
+        if (!players.length) return null;
+        if (comp) return chooseCompetitionWinnerByCustom(players,comp);
+        return chooseCompetitionWinner(players,fallbackPrimary,fallbackSecondary,"general");
+    }
+
+    function runCleanTwist(twistId){
+        const s=sim(), t=(currentSeason.twists||[]).find(x=>x.id===twistId);
+        if(!t){ display(s,"Twist","TWIST","<p>No twist information is available.</p>","twist"); return; }
+        const effect=t.effectType||"display";
+        let holder=null;
+        if(effect!=="display"){
+            const pool=active(); holder=pool[Math.floor(Math.random()*pool.length)]||null;
+            if(holder) s.twistState[t.id]={holderId:holder.id,used:false,awardedWeek:s.currentWeek};
+        }
+        const content=`<div class="twist-event-card"><h3>${escapeHTML(t.name||"Twist")}</h3>${t.power?`<p><strong>Power:</strong> ${escapeHTML(t.power)}${t.powerUntil?` (usable through Week ${t.powerUntil})`:""}</p>`:""}${holder?`${simulationPortrait(holder,"large")}<p><strong>${escapeHTML(name(holder.id))}</strong> received the power.</p>`:""}<p>${escapeHTML(t.description||"")}</p></div>`;
+        display(s,t.name||"Twist","TWIST",content,"twist");
+    }
+
+    function runCleanHOH(){
+        const s=sim(), pool=active();
+        if(!pool.length) return;
+        let winner=null;
+        if(Number(s.currentWeek)===1 && currentSeason.rules?.startingHOH==="specific" && currentSeason.rules?.specificStartingHOH)
+            winner=pool.find(p=>p.id===currentSeason.rules.specificStartingHOH)||null;
+        const comp=getCompetitionForWeekType(s.currentWeek,"hoh");
+        winner=winner||chooseWinner(pool,comp,"physical","mental");
+        if(!winner) return;
+        s.currentHOH=winner.id; winner.hohWins=Number(winner.hohWins||0)+1;
+        const content=`${simulationPortrait(winner,"large")}<p><strong>${escapeHTML(name(winner.id))}</strong> has won <strong>${escapeHTML(comp?.name||"Head of Household")}</strong>.</p>${comp?.description?`<p class="event-description">${escapeHTML(comp.description)}</p>`:""}`;
+        display(s,comp?.name||"Head of Household","HOH COMPETITION",content,"hoh");
+    }
+
+    function runCleanNominations(){
+        const s=sim(), pool=active().filter(p=>p.id!==s.currentHOH);
+        let protectedIds=new Set();
+        getUsableTwistStates(s.currentWeek,"immunity").forEach(x=>protectedIds.add(x.state.holderId));
+        const eligible=pool.filter(p=>!protectedIds.has(p.id));
+        let noms=[];
+        const hoh=player(s.currentHOH);
+        const ordered=eligible.slice().sort((a,b)=>allianceBond(s.currentHOH,b.id)-allianceBond(s.currentHOH,a.id));
+        // Lower bond = more likely target, with a small random component.
+        const ranked=ordered.sort((a,b)=>(allianceBond(s.currentHOH,a.id)+Math.random()*12)-(allianceBond(s.currentHOH,b.id)+Math.random()*12));
+        noms=ranked.slice(0,Math.min(2,ranked.length)).map(p=>p.id);
+        // Nomination Void cancels the initial pair and forces replacements.
+        const voidPower=getUsableTwistStates(s.currentWeek,"nominationVoid").find(x=>noms.includes(x.state.holderId));
+        if(voidPower){
+            voidPower.state.used=true;
+            const replacementPool=eligible.filter(p=>!noms.includes(p.id));
+            noms=replacementPool.sort((a,b)=>Math.random()-.5).slice(0,2).map(p=>p.id);
+        }
+        s.currentNominees=noms;
+        const nomineeText=noms.map(id=>`<div class="nominee-card">${simulationPortrait(player(id),"large")}<strong>${escapeHTML(name(id))}</strong></div>`).join("");
+        const note=voidPower?`<p><strong>${escapeHTML(voidPower.twist.name)}</strong> was activated, so the original nominations were voided and replacement nominees were selected.</p>`:"";
+        display(s,"Nomination Ceremony","NOMINATION CEREMONY",`<div class="nomination-result">${simulationPortrait(hoh,"large")}<p><strong>${escapeHTML(name(s.currentHOH))}</strong> has nominated:</p><div class="nominee-grid">${nomineeText}</div>${note}</div>`,"nominations");
+    }
+
+    function runCleanPOVPlayers(){
+        const s=sim();
+        if(currentSeason.rules?.vetoEnabled===false){s.currentPOVPlayers=[];display(s,"Power of Veto Disabled","VETO SELECTIONS","<p>The Power of Veto is disabled for this season.</p>","pov-players");return;}
+        const pool=active(), count=Math.min(Number(currentSeason.rules?.vetoPlayers||6),pool.length);
+        const selected=chooseVetoPlayers(pool,s.currentHOH,s.currentNominees,count);
+        s.currentPOVPlayers=selected.map(p=>p.id);
+        display(s,"Power of Veto Players","VETO SELECTIONS",`<p>The following houseguests will compete:</p>${simulationPortraits(s.currentPOVPlayers,"medium")}<p><strong>${escapeHTML(selected.map(p=>name(p.id)).join(", "))}</strong></p>`,"pov-players");
+    }
+
+    function runCleanPOV(){
+        const s=sim();
+        if(currentSeason.rules?.vetoEnabled===false){s.currentPOVWinner=null;display(s,"Power of Veto Disabled","POV RESULTS","<p>The Power of Veto is disabled for this season.</p>","pov");return;}
+        const players=s.currentPOVPlayers.map(player).filter(Boolean);
+        const comp=chooseCustomCompetition("pov") || getCompetitionForWeekType(s.currentWeek,"pov");
+        const winner=chooseWinner(players,comp,"physical","mental");
+        s.currentPOVWinner=winner?.id||null;
+        if(winner) winner.povWins=Number(winner.povWins||0)+1;
+        display(s,comp?.name||"Power of Veto","POV RESULTS",winner?`${simulationPortrait(winner,"large")}<p><strong>${escapeHTML(name(winner.id))}</strong> has won <strong>${escapeHTML(comp?.name||"the Power of Veto")}</strong>.</p>${comp?.description?`<p class="event-description">${escapeHTML(comp.description)}</p>`:""}`:"<p>No eligible Power of Veto winner was available.</p>","pov");
+    }
+
+    function runCleanVeto(){
+        const s=sim(), veto=s.currentPOVWinner, original=[...(s.currentNominees||[])];
+        if(currentSeason.rules?.vetoEnabled===false){display(s,"Veto Ceremony","VETO CEREMONY","<p>The Power of Veto is disabled for this season.</p>","veto-ceremony");return;}
+        let used=false,replacement=null,note="";
+        if(veto && original.includes(veto)){
+            const pool=active().filter(p=>p.id!==s.currentHOH&&!original.includes(p.id));
+            if(pool.length){
+                const diamond=getUsableTwistStates(s.currentWeek,"diamondPOV").find(x=>x.state.holderId===veto);
+                replacement=diamond?pool.slice().sort((a,b)=>allianceBond(veto,a.id)-allianceBond(veto,b.id))[0]:randomItem(pool);
+                if(diamond){diamond.state.used=true;note=`<p><strong>${escapeHTML(diamond.twist.name)}</strong> upgraded the veto to a Diamond Power of Veto, allowing the veto holder to choose the replacement.</p>`;}
+                const idx=s.currentNominees.indexOf(veto); if(idx>=0&&replacement){s.currentNominees[idx]=replacement.id;used=true;}
+            }
+        }
+        const nominees=s.currentNominees.map(player).filter(Boolean);
+        let statement="No Power of Veto holder was available.";
+        if(veto){
+            statement=used ? `<strong>${escapeHTML(name(veto))}</strong> used the Power of Veto.${replacement ? ` <strong>${escapeHTML(name(replacement.id))}</strong> is the replacement nominee.` : ""}` : `<strong>${escapeHTML(name(veto))}</strong> did not use the Power of Veto.`;
+        }
+        const content=`<div class="ceremony-leaders"><div class="ceremony-role-section"><h3>Head of Household</h3>${simulationPortrait(player(s.currentHOH),"large")}</div><div class="ceremony-role-section"><h3>Power of Veto Holder</h3>${simulationPortrait(player(veto),"large")}</div></div>${note}<p class="ceremony-statement">${statement}</p><div class="ceremony-role-section"><h3>Final Nominees</h3>${simulationPortraits(nominees.map(p=>p.id),"large")}</div>`;
+        display(s,"Veto Ceremony","VETO CEREMONY",content,"veto-ceremony");
+    }
+
+    function runCleanSpecial(compId){
+        const s=sim(), players=active(), comp=getWeekCompetitions(s.currentWeek).find(c=>c.id===compId);
+        if(!comp||!players.length){display(s,"Special Competition","SPECIAL COMPETITION","<p>No eligible players were available.</p>","custom-competition");return;}
+        const winner=chooseWinner(players,comp,"physical","mental");
+        if(winner && String(comp.type).toLowerCase()==="safety") {winner.safetyWins=Number(winner.safetyWins||0)+1;s.currentSafetyWinner=winner.id;}
+        display(s,comp.name||"Special Competition","SPECIAL COMPETITION",`${winner?simulationPortrait(winner,"large"):""}<p>${winner?`<strong>${escapeHTML(name(winner.id))}</strong> has won <strong>${escapeHTML(comp.name||"the competition")}</strong>.`:"No winner was available."}</p>${comp.description?`<p>${escapeHTML(comp.description)}</p>`:""}`,"custom-competition");
+    }
+
+    function runCleanEvictionVoting(){
+        const s=sim(), pool=active(), nominees=s.currentNominees.map(player).filter(Boolean);
+        if(nominees.length<2){s.pendingEvictionId=nominees[0]?.id||null;display(s,"Eviction Voting","EVICTION VOTING","<p>There are not enough nominees for a standard eviction vote.</p>","eviction-voting");return;}
+        const voters=pool.filter(p=>p.id!==s.currentHOH&&!s.currentNominees.includes(p.id));
+        const votes=[];
+        voters.forEach(v=>{
+            const ranked=nominees.map(t=>({t,score:(10-allianceBond(v.id,t.id))+Math.random()*5})).sort((a,b)=>b.score-a.score);
+            votes.push({voter:v.id,target:ranked[0].t.id});
+        });
+        const counts={};nominees.forEach(n=>counts[n.id]=0);votes.forEach(v=>counts[v.target]=(counts[v.target]||0)+1);
+        let target=nominees.slice().sort((a,b)=>(counts[b.id]||0)-(counts[a.id]||0))[0];
+        s.pendingEvictionId=target.id;s.evictionVoteResult={target:target.id,targetVotes:counts[target.id]||0,counts,votes,totalVotes:votes.length};
+        const rows=votes.map(v=>`<div class="vote-row"><span>${escapeHTML(name(v.voter))}</span><strong>votes to evict</strong><span>${escapeHTML(name(v.target))}</span></div>`).join("");
+        display(s,"Eviction Voting","EVICTION VOTING",`<div class="eviction-vote-result">${simulationPortrait(target,"large")}<h3>${escapeHTML(name(target.id))} is currently set to be evicted.</h3><p>${escapeHTML(name(target.id))}: <strong>${counts[target.id]||0}</strong> votes</p>${nominees.filter(n=>n.id!==target.id).map(n=>`<p>${escapeHTML(name(n.id))}: <strong>${counts[n.id]||0}</strong> votes</p>`).join("")}</div><div class="live-vote-list"><h3>Live Vote</h3>${rows||"<p>No eligible voters.</p>"}</div>` ,"eviction-voting");
+    }
+
+    function runCleanEviction(){
+        const s=sim(), week=Number(s.currentWeek), nominees=s.currentNominees||[], hex=getUsableTwistStates(week,"haltingHex").find(x=>nominees.includes(x.state.holderId));
+        if(hex){
+            hex.state.used=true;s.pendingEvictionId=null;s.evictionVoteResult=null;
+            const content=`${simulationPortrait(player(hex.state.holderId),"large")}<p><strong>${escapeHTML(hex.twist.name)}</strong> has been used. The Week ${week} eviction is cancelled.</p>`;
+            display(s,"Halting Hex","EVICTION HALTED",content,"eviction");
+            finishCycleAfterEviction(false);
+            return;
+        }
+        const before=active().length;
+        const target=player(s.pendingEvictionId) || nominees.map(player).filter(Boolean)[0];
+        if(!target){display(s,"Eviction","EVICTION","<p>No houseguest could be evicted.</p>","eviction");finishCycleAfterEviction(false);return;}
+        target.status="evicted";target.placement=before;s.currentEviction=target.id;
+        s.evictionsThisWeek=Number(s.evictionsThisWeek||0)+1;
+        const votes=s.evictionVoteResult?.targetVotes ?? 0;
+        display(s,"Eviction","EVICTION",`${simulationPortrait(target,"large")}<p><strong>${escapeHTML(name(target.id))}</strong> has been evicted from the Big Brother house.</p>${s.evictionVoteResult?`<p>Final vote: <strong>${votes}</strong> vote(s) to evict.</p>`:""}`,"eviction");
+        finishCycleAfterEviction(true);
+    }
+
+    function finishCycleAfterEviction(evicted){
+        const s=sim(), week=Number(s.currentWeek), remaining=active();
+        s.currentNominees=[];s.currentPOVPlayers=[];s.currentPOVWinner=null;s.pendingEvictionId=null;s.evictionVoteResult=null;
+        if(remaining.length<=2){beginCleanFinale();return;}
+        if(isDoubleWeek(week) && Number(s.evictionsThisWeek)<2 && remaining.length>2){
+            s.pendingCycle="double";s.cycle=2;s.currentEventIndex=0;s.currentHOH=null;s.currentNominees=[];s.currentPOVPlayers=[];s.currentPOVWinner=null;
+            showEvent("Double Eviction","DOUBLE EVICTION",`<p>${evicted?"The first eviction is complete.":"The eviction was halted."}</p><p>There will be an <strong>immediate Head of Household competition</strong>. This is still <strong>Week ${week}</strong>.</p>`,{skipHistory:true,week});
+            record(s,"double-transition","Double Eviction","DOUBLE EVICTION",document.getElementById("event-content")?.innerHTML||"",week);
+            s.liveView={title:"Double Eviction",type:"DOUBLE EVICTION",content:document.getElementById("event-content")?.innerHTML||"",week};
+            persistCurrentSeason();renderSimulationWeekNavigation();return;
+        }
+        if(week>=getSeasonLength(currentSeason)){beginCleanFinale();return;}
+        s.pendingWeekAdvance=true;s.pendingCycle="nextWeek";
+        showEvent("Week Complete","WEEK",`<p>Week ${week} is complete.</p><p>Press <strong>Proceed</strong> to begin Week ${week+1}.</p>`,{skipHistory:true,week});
+        record(s,"week-complete","Week Complete","WEEK",document.getElementById("event-content")?.innerHTML||"",week);
+        s.liveView={title:"Week Complete",type:"WEEK",content:document.getElementById("event-content")?.innerHTML||"",week};
+        persistCurrentSeason();renderSimulationWeekNavigation();
+    }
+
+    function beginCleanFinale(){
+        const s=sim();if(s.completed)return;
+        s.finalists=active().map(p=>p.id);s.jury=getJuryMembers();s.finaleStarted=true;s.currentPhase="finale";s.currentEventIndex=0;s.viewingWeek=getSeasonLength(currentSeason);s.isViewingHistory=false;
+        showEvent("Finale","FINALE",`<p>The regular season is complete.</p>${simulationPortraits(s.finalists,"large")}<p><strong>${s.finalists.length} finalists remain.</strong> Press <strong>Proceed</strong> to continue.</p>`,{skipHistory:true,week:getSeasonLength(currentSeason)});
+        persistCurrentSeason();renderSimulationWeekNavigation();
+    }
+
+    function runCleanFinalHOH(){
+        const s=sim(), finalists=s.finalists.map(player).filter(Boolean);
+        if(finalists.length<3){s.currentEventIndex++;runCleanJuryVoting();return;}
+        const comp=(currentSeason.competitions?.finalHoh||[])[0]||getWeekCompetitions(s.currentWeek).find(c=>String(c.type).toLowerCase()==="final hoh");
+        const winner=chooseWinner(finalists,comp,"mental","physical");s.finalHOH=winner.id;winner.finalHohWins=Number(winner.finalHohWins||0)+1;
+        display(s,comp?.name||"Final HOH","FINAL HOH",`${simulationPortrait(winner,"large")}<p><strong>${escapeHTML(name(winner.id))}</strong> has won <strong>${escapeHTML(comp?.name||"the Final HOH")}</strong>.</p><p>The Final HOH will choose the second finalist.</p>`,"final-hoh",{week:getSeasonLength(currentSeason)});
+    }
+
+    function runCleanJuryVoting(){
+        const s=sim();let finalists=s.finalists.map(player).filter(Boolean);
+        if(finalists.length>2){
+            const hoh=player(s.finalHOH)||finalists[0], choices=finalists.filter(p=>p.id!==hoh.id);
+            const chosen=choices.slice().sort((a,b)=>allianceBond(hoh.id,b.id)-allianceBond(hoh.id,a.id))[0]||choices[0];
+            choices.filter(p=>p.id!==chosen.id).forEach(p=>{p.status="evicted";p.placement=3;});
+            finalists=[hoh,chosen];s.finalists=finalists.map(p=>p.id);
+        }
+        if(!Array.isArray(s.jury)||!s.jury.length)s.jury=getJuryMembers();
+        const votes=[];s.jury.forEach(jid=>{const juror=player(jid);if(!juror)return;const ranked=finalists.map(f=>({f,score:Number(f.ratings?.social||0)*.4+Number(f.ratings?.strategic||0)*.35+Number(f.ratings?.general||0)*.15+Number(f.ratings?.mental||0)*.1+allianceBond(jid,f.id)*.15+Math.random()*3})).sort((a,b)=>b.score-a.score);votes.push({juror:jid,vote:ranked[0].f.id});});
+        const counts={};finalists.forEach(f=>counts[f.id]=0);votes.forEach(v=>counts[v.vote]=(counts[v.vote]||0)+1);s.juryVotes=votes;s.finaleVoteResults={votes,counts};
+        const rows=votes.map(v=>`<div class="jury-vote-row">${simulationPortrait(player(v.juror),"small")}<strong>${escapeHTML(name(v.juror))}</strong><span>votes for</span><strong>${escapeHTML(name(v.vote))}</strong></div>`).join("");
+        display(s,"Jury Voting","JURY VOTING",`${simulationPortraits(finalists.map(p=>p.id),"large")}<h3>The Jury Votes</h3><div class="jury-vote-list">${rows||"<p>No jury members were eligible to vote.</p>"}</div>` ,"jury-voting",{week:getSeasonLength(currentSeason)});
+    }
+
+    function runCleanFinalResults(){
+        const s=sim(), finalists=s.finalists.map(player).filter(Boolean), counts=s.finaleVoteResults?.counts||{};
+        const ranked=finalists.slice().sort((a,b)=>(counts[b.id]||0)-(counts[a.id]||0));const winner=ranked[0],runner=ranked[1];
+        s.winner=winner?.id||null;s.runnerUp=runner?.id||null;s.completed=true;s.currentPhase="complete";s.currentEventIndex=0;
+        if(winner){winner.status="winner";winner.placement=1;}if(runner){runner.status="runner-up";runner.placement=2;}
+        const others=currentSeason.houseguests.filter(p=>p.status==="evicted").map(p=>({id:p.id,name:name(p.id),placement:Number(p.placement||0)})).filter(x=>x.placement>2).sort((a,b)=>a.placement-b.placement);
+        s.finalPlacements=[...(winner?[{id:winner.id,name:name(winner.id),placement:1}]:[]),...(runner?[{id:runner.id,name:name(runner.id),placement:2}]:[]),...others];
+        display(s,"Final Results","FINAL RESULTS",`${winner?`${simulationPortrait(winner,"large")}<h2>${escapeHTML(name(winner.id))}</h2><p class="final-winner-label">WINNER — ${counts[winner.id]||0} JURY VOTES</p>`:""}${runner?`${simulationPortrait(runner,"large")}<p class="final-runner-label">RUNNER-UP — ${counts[runner.id]||0} JURY VOTES</p>`:""}<div class="final-jury-tally">${finalists.map(f=>`<div><strong>${escapeHTML(name(f.id))}</strong><span>${counts[f.id]||0} vote${(counts[f.id]||0)===1?"":"s"}</span></div>`).join("")}</div><button type="button" class="primary-button" onclick="showResults()">View Full Results</button>`,"finale-results",{week:getSeasonLength(currentSeason)});
+        // display() increments the index; completed seasons must be idle at 0.
+        s.currentEventIndex=0;persistCurrentSeason();
+    }
+
+    function cleanRunNextEvent(){
+        if(!currentSeason){alert("Please open a saved season first.");return;}
+        const s=sim();
+        if(s.isViewingHistory){returnToCurrentSimulation();return;}
+        if(s.completed){showResults();return;}
+
+        if(s.pendingWeekAdvance){
+            const next=Number(s.currentWeek)+1;
+            if(next>getSeasonLength(currentSeason)){beginCleanFinale();return;}
+            resetCycle(s,next,1);setText("current-week",next);updateSimulatorStatus(s);resetGameChain(0);
+            showEvent(`Week ${next}`,"WEEK",`<p>Week ${next} is now beginning.</p>`,{skipHistory:true,week:next});
+            s.liveView={title:`Week ${next}`,type:"WEEK",content:document.getElementById("event-content")?.innerHTML||"",week:next};
+            persistCurrentSeason();renderSimulationWeekNavigation();return;
+        }
+        if(s.pendingCycle==="double"){s.pendingCycle=null;s.currentEventIndex=0;s.currentPhase="week";}
+        if(s.currentPhase==="finale"||s.finaleStarted){
+            const chain=finalChain(),event=chain[Number(s.currentEventIndex||0)];
+            if(!event){runCleanFinalResults();return;}
+            if(event.key==="final-hoh")runCleanFinalHOH();else if(event.key==="jury-voting")runCleanJuryVoting();else runCleanFinalResults();
+            return;
+        }
+        const chain=cycleChain(s), event=chain[Number(s.currentEventIndex||0)];
+        if(!event){finishCycleAfterEviction(false);return;}
+        switch(event.key){
+            case "twist":runCleanTwist(event.twistId);break;
+            case "hoh":runCleanHOH();break;
+            case "nominations":runCleanNominations();break;
+            case "pov-players":runCleanPOVPlayers();break;
+            case "pov":runCleanPOV();break;
+            case "veto-ceremony":runCleanVeto();break;
+            case "custom-competition":runCleanSpecial(event.competitionId);break;
+            case "eviction-voting":runCleanEvictionVoting();break;
+            case "eviction":runCleanEviction();break;
+        }
+    }
+
+    function cleanResimulateSeason(){
+        if(!currentSeason){alert("There is no season loaded to re-simulate.");return false;}
+        const season=currentSeason;
+        if(!Array.isArray(season.houseguests)||season.houseguests.length<2){alert("At least two houseguests are required.");return false;}
+        season.houseguests=season.houseguests.map(p=>{
+            const q=deepClone(p);q.status="active";q.placement=null;q.hohWins=0;q.povWins=0;q.safetyWins=0;q.luxuryWins=0;q.finalHohWins=0;q.evictionVotes=0;q.nominationCount=0;q.vetoCount=0;q.juryVotes=0;
+            ["isJury","juryStatus","eliminated","evicted","winner","runnerUp"].forEach(k=>delete q[k]);return q;
+        });
+        season.simulation=createDefaultSimulation();const s=season.simulation;s.started=true;s.currentPhase="week";s.currentWeek=1;s.viewingWeek=1;s.history=[];s.weekHistory=[];s.twistState={};s.isViewingHistory=false;s.liveView=null;
+        currentSeason=season;persistCurrentSeason();setText("current-week",1);setText("simulator-season-name",season.name||"Big Brother");setText("simulator-season-theme",season.theme||"Custom Season");setText("sim-season-length",getSeasonLength(season));setText("sim-jury-size",season.rules?.jurySize??7);updateSimulatorStatus(s);resetGameChain(0);renderMemoryWallMini();renderSimulationWeekNavigation();showPage("simulator-page");showEvent("Week 1","NEW SIMULATION","<p>Your season configuration has been preserved.</p><p>Press <strong>Proceed</strong> to begin a completely new randomized simulation.</p>",{skipHistory:true,week:1});return true;
+    }
+
+    // One authoritative set of public simulation functions.
+    window.runNextEvent=cleanRunNextEvent;
+    window.resimulateSeason=cleanResimulateSeason;
+    window.runHOHEvent=runCleanHOH;
+    window.runNominationEvent=runCleanNominations;
+    window.runPOVPlayersEvent=runCleanPOVPlayers;
+    window.runPOVEvent=runCleanPOV;
+    window.runVetoCeremonyEvent=runCleanVeto;
+    window.runCustomCompetitionEvent=runCleanSpecial;
+    window.runEvictionVotingEvent=runCleanEvictionVoting;
+    window.runEvictionEvent=runCleanEviction;
+    window.beginFinale=beginCleanFinale;
+    window.runFinalHOHEvent=runCleanFinalHOH;
+    window.runJuryVotingEvent=runCleanJuryVoting;
+    window.runFinaleResultsEvent=runCleanFinalResults;
+    window.finalizeSeason=beginCleanFinale;
+})();
