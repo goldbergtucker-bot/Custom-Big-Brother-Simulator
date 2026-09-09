@@ -90,6 +90,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // populated from the actual houseguest cards.
     initializeHouseguestCount();
     setupAdvancedSeasonControls();
+    renderRelationshipMatrix();
 
     renderSavedSeasons();
 
@@ -852,6 +853,8 @@ function updateHouseguestCount() {
     updateHouseguestNumbers();
 
     populateRelationshipHouseguestOptions();
+    refreshAdvancedHouseguestOptions();
+    renderRelationshipMatrix();
 
     renderRelationships();
 }
@@ -2594,6 +2597,114 @@ function cleanupRelationshipsForHouseguest(
 }
 
 
+function relationshipPresetValues(preset) {
+    const presets = {
+        enemy:       { friendship:1, trust:0, loyalty:0, rivalry:9, respect:2, attraction:0 },
+        dislike:     { friendship:2, trust:2, loyalty:2, rivalry:6, respect:3, attraction:0 },
+        neutral:     { friendship:5, trust:5, loyalty:5, rivalry:0, respect:5, attraction:0 },
+        good:        { friendship:7, trust:6, loyalty:6, rivalry:0, respect:7, attraction:0 },
+        close:       { friendship:8, trust:8, loyalty:8, rivalry:0, respect:8, attraction:0 },
+        bestfriends: { friendship:10, trust:9, loyalty:10, rivalry:0, respect:9, attraction:0 },
+        showmance:   { friendship:9, trust:8, loyalty:8, rivalry:0, respect:8, attraction:10 },
+        rivalry:     { friendship:2, trust:1, loyalty:1, rivalry:10, respect:4, attraction:0 }
+    };
+    return presets[preset] || presets.neutral;
+}
+
+function relationshipPresetLabel(preset) {
+    return ({enemy:"Enemy",dislike:"Dislike",neutral:"Neutral",good:"Good",close:"Close",bestfriends:"Best Friends",showmance:"Showmance",rivalry:"Rivals"})[preset] || "Neutral";
+}
+
+function findRelationship(from, to) {
+    return (currentSeason?.relationships || []).find(r => r.from === from && r.to === to);
+}
+
+function upsertRelationshipPreset(from, to, preset) {
+    if (!from || !to || from === to) return;
+    if (!currentSeason) getAdvancedArrays();
+    if (!Array.isArray(currentSeason.relationships)) currentSeason.relationships = [];
+    const values = relationshipPresetValues(preset);
+    let r = findRelationship(from, to);
+    if (!r) {
+        r = { id: generateRelationshipId(), from, to, ...values };
+        currentSeason.relationships.push(r);
+    } else {
+        Object.assign(r, values);
+    }
+}
+
+function renderRelationshipMatrix() {
+    const container = document.getElementById("relationship-matrix-container");
+    if (!container) return;
+    const guests = collectHouseguests();
+    if (guests.length < 2) {
+        container.innerHTML = '<div class="empty-state"><p>Add at least two houseguests to use the quick relationship matrix.</p></div>';
+        return;
+    }
+    const options = `<option value="">—</option><option value="enemy">Enemy</option><option value="dislike">Dislike</option><option value="neutral">Neutral</option><option value="good">Good</option><option value="close">Close</option><option value="bestfriends">Best Friends</option><option value="showmance">Showmance</option><option value="rivalry">Rivals</option>`;
+    let html = '<div class="relationship-matrix-scroll"><table class="relationship-matrix"><thead><tr><th class="matrix-corner">FEELS ABOUT →</th>';
+    guests.forEach(g => html += `<th title="${escapeAttribute(g.name || "Houseguest")}">${escapeHTML(g.name || "HG")}</th>`);
+    html += '</tr></thead><tbody>';
+    guests.forEach(from => {
+        html += `<tr><th title="${escapeAttribute(from.name || "Houseguest")}">${escapeHTML(from.name || "Houseguest")}</th>`;
+        guests.forEach(to => {
+            if (from.id === to.id) { html += '<td class="matrix-self">—</td>'; return; }
+            const r = findRelationship(from.id, to.id);
+            const overall = r ? calculateOverallRelationship(r) : null;
+            html += `<td><select class="matrix-select" data-from="${escapeAttribute(from.id)}" data-to="${escapeAttribute(to.id)}" aria-label="${escapeAttribute((from.name||"Houseguest")+" feelings toward "+(to.name||"Houseguest"))}">${options}</select>${overall !== null ? `<span class="matrix-score">${overall.toFixed(1)}</span>` : ''}</td>`;
+        });
+        html += '</tr>';
+    });
+    html += '</tbody></table></div><div class="matrix-legend"><span><b>Quick set:</b> choose a relationship type in any cell.</span><span>Click Edit below for individual ratings.</span></div>';
+    container.innerHTML = html;
+    container.querySelectorAll('.matrix-select').forEach(select => {
+        const r = findRelationship(select.dataset.from, select.dataset.to);
+        if (r) select.value = inferRelationshipPreset(r);
+        select.addEventListener('change', () => {
+            if (!select.value) return;
+            upsertRelationshipPreset(select.dataset.from, select.dataset.to, select.value);
+            renderRelationshipMatrix();
+            renderRelationships();
+            persistCurrentSeasonIfSaved();
+        });
+    });
+}
+
+function inferRelationshipPreset(r) {
+    const v = Number(r?.friendship||0), t=Number(r?.trust||0), l=Number(r?.loyalty||0), rv=Number(r?.rivalry||0), a=Number(r?.attraction||0);
+    if (a >= 9 && v >= 8) return 'showmance';
+    if (rv >= 8 && v <= 3) return 'rivalry';
+    if (rv >= 7) return 'enemy';
+    if (v >= 9 && t >= 8 && l >= 9) return 'bestfriends';
+    if (v >= 8 && t >= 7 && l >= 7) return 'close';
+    if (v >= 7 && t >= 6) return 'good';
+    if (v <= 2 && t <= 2) return 'dislike';
+    return 'neutral';
+}
+
+function resetRelationshipMatrix() {
+    if (!currentSeason || !Array.isArray(currentSeason.relationships)) return;
+    if (!confirm("Clear all relationships? This removes every saved directional relationship.")) return;
+    currentSeason.relationships = [];
+    resetRelationshipEditor();
+    renderRelationshipMatrix();
+    renderRelationships();
+    persistCurrentSeasonIfSaved();
+}
+
+function persistCurrentSeasonIfSaved() {
+    if (!currentSeason?.id || !savedSeasons.some(s => s.id === currentSeason.id)) return;
+    const i = savedSeasons.findIndex(s => s.id === currentSeason.id);
+    if (i < 0) return;
+    savedSeasons[i].relationships = deepClone(currentSeason.relationships || []);
+    savedSeasons[i].alliances = deepClone(currentSeason.alliances || []);
+    savedSeasons[i].competitions = deepClone(currentSeason.competitions || {});
+    savedSeasons[i].twists = deepClone(currentSeason.twists || []);
+    savedSeasons[i].updatedAt = new Date().toISOString();
+    saveSeasonsToStorage();
+    renderSavedSeasons();
+}
+
 function renderRelationships() {
 
     const container =
@@ -2605,6 +2716,7 @@ function renderRelationships() {
         return;
     }
 
+    renderRelationshipMatrix();
 
     const relationships =
         currentSeason &&
@@ -5196,27 +5308,29 @@ function setupAdvancedSeasonControls() {
     if (clearC) clearC.onclick = resetCompetitionEditor;
     if (saveT) saveT.onclick = saveTwist;
     if (clearT) clearT.onclick = resetTwistEditor;
-    const memberSelect = document.getElementById("alliance-members");
-    if (memberSelect) memberSelect.addEventListener("change", updateAllianceMemberHint);
+    
     refreshAdvancedHouseguestOptions();
     renderAlliances(); renderCompetitions(); renderTwists();
 }
 
 function refreshAdvancedHouseguestOptions() {
-    const select = document.getElementById("alliance-members");
-    if (!select) return;
-    const previous = [...select.selectedOptions].map(o => o.value);
+    const picker = document.getElementById("alliance-member-picker");
+    if (!picker) return;
+    const previous = new Set([...picker.querySelectorAll('input[type="checkbox"]:checked')].map(x => x.value));
     const guests = collectHouseguests();
-    select.innerHTML = guests.map(h => `<option value="${escapeAttribute(h.id)}">${escapeHTML(h.name || "Unnamed Houseguest")}</option>`).join("");
-    previous.forEach(id => { const o = [...select.options].find(x => x.value === id); if (o) o.selected = true; });
+    picker.innerHTML = guests.length ? guests.map(h => {
+        const name = h.name || "Unnamed Houseguest";
+        return `<label class="member-picker-item"><input type="checkbox" value="${escapeAttribute(h.id)}" ${previous.has(h.id) ? "checked" : ""}><span>${escapeHTML(name)}</span></label>`;
+    }).join("") : '<div class="member-picker-empty">Add houseguests above to choose alliance members.</div>';
+    picker.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.addEventListener("change", updateAllianceMemberHint));
     updateAllianceMemberHint();
 }
 
 function updateAllianceMemberHint() {
-    const select = document.getElementById("alliance-members");
+    const picker = document.getElementById("alliance-member-picker");
     const hint = document.getElementById("alliance-member-count");
-    if (!select || !hint) return;
-    const count = [...select.selectedOptions].length;
+    if (!picker || !hint) return;
+    const count = picker.querySelectorAll('input[type="checkbox"]:checked').length;
     hint.textContent = count === 0 ? "Select at least 2 houseguests." : `${count} houseguest${count === 1 ? "" : "s"} selected`;
     hint.classList.toggle("is-valid", count >= 2);
 }
@@ -5250,7 +5364,7 @@ function saveAlliance() {
     const name = getInputValue("alliance-name").trim();
     const description = getInputValue("alliance-description").trim();
     const status = getValue("alliance-status") || "active";
-    const members = [...(document.getElementById("alliance-members")?.selectedOptions || [])].map(o => o.value);
+    const members = [...(document.querySelectorAll("#alliance-member-picker input[type=\"checkbox\"]:checked") || [])].map(o => o.value);
     if (!name) return alert("Please enter an alliance name.");
     if (members.length < 2) return alert("An alliance must have at least two members.");
     const duplicate = season.alliances.some(a => a.id !== editingAllianceId && String(a.name).trim().toLowerCase() === name.toLowerCase());
@@ -5258,31 +5372,31 @@ function saveAlliance() {
     const obj = { id: editingAllianceId || uid("alliance"), name, description, members, status };
     const index = season.alliances.findIndex(a => a.id === obj.id);
     if (index >= 0) season.alliances[index] = obj; else season.alliances.push(obj);
-    editingAllianceId = null; resetAllianceEditor(); renderAlliances();
+    editingAllianceId = null; resetAllianceEditor(); renderAlliances(); persistCurrentSeasonIfSaved();
 }
 
 function resetAllianceEditor() {
     editingAllianceId = null;
     setValue("alliance-name", ""); setValue("alliance-description", ""); setValue("alliance-status", "active");
-    const s=document.getElementById("alliance-members"); if(s) [...s.options].forEach(o=>o.selected=false);
+    const picker=document.getElementById("alliance-member-picker"); if(picker) picker.querySelectorAll("input[type=\"checkbox\"]").forEach(o=>o.checked=false);
     setText("alliance-form-title", "Create Alliance"); setText("save-alliance-btn", "Add Alliance");
 }
-function editAlliance(id) { const a=getAdvancedArrays().alliances.find(x=>x.id===id); if(!a)return; editingAllianceId=id; setValue("alliance-name",a.name);setValue("alliance-description",a.description||"");setValue("alliance-status",a.status||"active");refreshAdvancedHouseguestOptions();const s=document.getElementById("alliance-members");if(s)[...s.options].forEach(o=>o.selected=a.members.includes(o.value));setText("alliance-form-title","Edit Alliance");setText("save-alliance-btn","Save Alliance");document.getElementById("alliance-name")?.scrollIntoView({behavior:"smooth",block:"center"}); }
-function deleteAlliance(id) { if(!confirm("Delete this alliance?"))return; getAdvancedArrays().alliances=getAdvancedArrays().alliances.filter(a=>a.id!==id); renderAlliances(); }
+function editAlliance(id) { const a=getAdvancedArrays().alliances.find(x=>x.id===id); if(!a)return; editingAllianceId=id; setValue("alliance-name",a.name);setValue("alliance-description",a.description||"");setValue("alliance-status",a.status||"active");refreshAdvancedHouseguestOptions();const picker=document.getElementById("alliance-member-picker");if(picker)picker.querySelectorAll("input[type=\"checkbox\"]").forEach(o=>o.checked=a.members.includes(o.value));updateAllianceMemberHint();setText("alliance-form-title","Edit Alliance");setText("save-alliance-btn","Save Alliance");document.getElementById("alliance-name")?.scrollIntoView({behavior:"smooth",block:"center"}); }
+function deleteAlliance(id) { if(!confirm("Delete this alliance?"))return; getAdvancedArrays().alliances=getAdvancedArrays().alliances.filter(a=>a.id!==id); renderAlliances(); persistCurrentSeasonIfSaved(); }
 function cleanupAlliancesForHouseguest(id) { getAdvancedArrays().alliances.forEach(a=>a.members=(a.members||[]).filter(x=>x!==id)); getAdvancedArrays().alliances=getAdvancedArrays().alliances.filter(a=>(a.members||[]).length>=2); renderAlliances(); }
 function renderAlliances() { const c=document.getElementById("alliances-container"); if(!c)return; refreshAdvancedHouseguestOptions(); const gs=collectHouseguests(); const as=getAdvancedArrays().alliances; if(!as.length){c.innerHTML='<div class="empty-state"><p>No alliances created yet.</p></div>';return;} c.innerHTML=as.map(a=>`<div class="advanced-card"><div class="advanced-card-header"><div><h4>${escapeHTML(a.name)}</h4><span class="feature-status">${escapeHTML(a.status||"active")}</span></div><div class="advanced-card-actions"><button type="button" onclick="editAlliance('${escapeAttribute(a.id)}')">Edit</button><button type="button" onclick="deleteAlliance('${escapeAttribute(a.id)}')">Delete</button></div></div><p>${escapeHTML(a.description||"No description.")}</p><strong>Members (${a.members.length})</strong><p>${escapeHTML(a.members.map(id=>getHouseguestDisplayName(id,gs)).join(", "))}</p></div>`).join(""); }
 
-function saveCompetition() { const season=getAdvancedArrays(); const name=getInputValue("competition-name").trim(); if(!name)return alert("Please enter a competition name."); const type=getValue("competition-type")||"hoh"; const obj={id:editingCompetitionId||uid("competition"),name,type,description:getInputValue("competition-description").trim(),primary:getValue("competition-primary")||"physical",secondary:getValue("competition-secondary")||"mental"}; const arr=season.competitions[type]||(season.competitions[type]=[]); let found=false; Object.keys(season.competitions).forEach(k=>{const i=season.competitions[k].findIndex(x=>x.id===obj.id);if(i>=0){season.competitions[k].splice(i,1);found=true;}}); arr.push(obj); editingCompetitionId=null; resetCompetitionEditor(); renderCompetitions(); }
+function saveCompetition() { const season=getAdvancedArrays(); const name=getInputValue("competition-name").trim(); if(!name)return alert("Please enter a competition name."); const type=getValue("competition-type")||"hoh"; const obj={id:editingCompetitionId||uid("competition"),name,type,description:getInputValue("competition-description").trim(),primary:getValue("competition-primary")||"physical",secondary:getValue("competition-secondary")||"mental"}; const arr=season.competitions[type]||(season.competitions[type]=[]); let found=false; Object.keys(season.competitions).forEach(k=>{const i=season.competitions[k].findIndex(x=>x.id===obj.id);if(i>=0){season.competitions[k].splice(i,1);found=true;}}); arr.push(obj); editingCompetitionId=null; resetCompetitionEditor(); renderCompetitions(); persistCurrentSeasonIfSaved(); }
 function resetCompetitionEditor(){editingCompetitionId=null;setValue("competition-name","");setValue("competition-type","hoh");setValue("competition-description","");setValue("competition-primary","physical");setValue("competition-secondary","mental");setText("competition-form-title","Create Competition");setText("save-competition-btn","Add Competition");}
 function editCompetition(id){const s=getAdvancedArrays();let c=null;Object.values(s.competitions).some(arr=>{const x=arr.find(y=>y.id===id);if(x)c=x;return !!x;});if(!c)return;editingCompetitionId=id;setValue("competition-name",c.name);setValue("competition-type",c.type);setValue("competition-description",c.description||"");setValue("competition-primary",c.primary||"physical");setValue("competition-secondary",c.secondary||"mental");setText("competition-form-title","Edit Competition");setText("save-competition-btn","Save Competition");document.getElementById("competition-name")?.scrollIntoView({behavior:"smooth",block:"center"});}
-function deleteCompetition(id){if(!confirm("Delete this competition?"))return;const s=getAdvancedArrays();Object.keys(s.competitions).forEach(k=>s.competitions[k]=s.competitions[k].filter(c=>c.id!==id));renderCompetitions();}
+function deleteCompetition(id){if(!confirm("Delete this competition?"))return;const s=getAdvancedArrays();Object.keys(s.competitions).forEach(k=>s.competitions[k]=s.competitions[k].filter(c=>c.id!==id));renderCompetitions();persistCurrentSeasonIfSaved();}
 function renderCompetitions(){const c=document.getElementById("competitions-container");if(!c)return;const s=getAdvancedArrays();const all=Object.values(s.competitions).flat();if(!all.length){c.innerHTML='<div class="empty-state"><p>No custom competitions created yet.</p></div>';return;}const labels={hoh:"HOH",pov:"POV",safety:"Safety",luxury:"Luxury",finalHoh:"Final HOH"};c.innerHTML=all.map(x=>`<div class="advanced-card"><div class="advanced-card-header"><div><h4>${escapeHTML(x.name)}</h4><span class="feature-status">${labels[x.type]||x.type}</span></div><div class="advanced-card-actions"><button type="button" onclick="editCompetition('${escapeAttribute(x.id)}')">Edit</button><button type="button" onclick="deleteCompetition('${escapeAttribute(x.id)}')">Delete</button></div></div><p>${escapeHTML(x.description||"No description.")}</p><small>Primary: ${escapeHTML(x.primary)} · Secondary: ${escapeHTML(x.secondary)}</small></div>`).join("");}
 function loadCompetitions(data){const s=getAdvancedArrays();s.competitions=data&&typeof data==='object'?deepClone(data):{hoh:[],pov:[],safety:[],luxury:[],finalHoh:[]};["hoh","pov","safety","luxury","finalHoh"].forEach(k=>{if(!Array.isArray(s.competitions[k]))s.competitions[k]=[]});resetCompetitionEditor();renderCompetitions();}
 
-function saveTwist(){const s=getAdvancedArrays();const name=getInputValue("twist-name").trim();if(!name)return alert("Please enter a twist name.");const duplicate=s.twists.some(t=>t.id!==editingTwistId&&String(t.name).toLowerCase()===name.toLowerCase());if(duplicate)return alert("A twist with that name already exists.");const obj={id:editingTwistId||uid("twist"),name,description:getInputValue("twist-description").trim(),timing:getValue("twist-timing")||"season",active:getChecked("twist-active")};const i=s.twists.findIndex(t=>t.id===obj.id);if(i>=0)s.twists[i]=obj;else s.twists.push(obj);resetTwistEditor();renderTwists();}
+function saveTwist(){const s=getAdvancedArrays();const name=getInputValue("twist-name").trim();if(!name)return alert("Please enter a twist name.");const duplicate=s.twists.some(t=>t.id!==editingTwistId&&String(t.name).toLowerCase()===name.toLowerCase());if(duplicate)return alert("A twist with that name already exists.");const obj={id:editingTwistId||uid("twist"),name,description:getInputValue("twist-description").trim(),timing:getValue("twist-timing")||"season",active:getChecked("twist-active")};const i=s.twists.findIndex(t=>t.id===obj.id);if(i>=0)s.twists[i]=obj;else s.twists.push(obj);resetTwistEditor();renderTwists();persistCurrentSeasonIfSaved();}
 function resetTwistEditor(){editingTwistId=null;setValue("twist-name","");setValue("twist-description","");setValue("twist-timing","season");setChecked("twist-active",true);setText("twist-form-title","Create Twist");setText("save-twist-btn","Add Twist");}
 function editTwist(id){const t=getAdvancedArrays().twists.find(x=>x.id===id);if(!t)return;editingTwistId=id;setValue("twist-name",t.name);setValue("twist-description",t.description||"");setValue("twist-timing",t.timing||"season");setChecked("twist-active",t.active!==false);setText("twist-form-title","Edit Twist");setText("save-twist-btn","Save Twist");document.getElementById("twist-name")?.scrollIntoView({behavior:"smooth",block:"center"});}
-function deleteTwist(id){if(!confirm("Delete this twist?"))return;getAdvancedArrays().twists=getAdvancedArrays().twists.filter(t=>t.id!==id);renderTwists();}
+function deleteTwist(id){if(!confirm("Delete this twist?"))return;getAdvancedArrays().twists=getAdvancedArrays().twists.filter(t=>t.id!==id);renderTwists();persistCurrentSeasonIfSaved();}
 function renderTwists(){const c=document.getElementById("twists-container");if(!c)return;const ts=getAdvancedArrays().twists;if(!ts.length){c.innerHTML='<div class="empty-state"><p>No twists created yet.</p></div>';return;}c.innerHTML=ts.map(t=>`<div class="advanced-card"><div class="advanced-card-header"><div><h4>${escapeHTML(t.name)}</h4><span class="feature-status">${t.active===false?"Inactive":"Active"}</span></div><div class="advanced-card-actions"><button type="button" onclick="editTwist('${escapeAttribute(t.id)}')">Edit</button><button type="button" onclick="deleteTwist('${escapeAttribute(t.id)}')">Delete</button></div></div><p>${escapeHTML(t.description||"No description.")}</p><small>Timing: ${escapeHTML(t.timing||"season")}</small></div>`).join("");}
 function loadTwists(data){getAdvancedArrays().twists=deepClone(Array.isArray(data)?data:[]);resetTwistEditor();renderTwists();}
 function loadAlliances(data){getAdvancedArrays().alliances=deepClone(Array.isArray(data)?data:[]);refreshAdvancedHouseguestOptions();resetAllianceEditor();renderAlliances();}
@@ -5314,5 +5428,3 @@ chooseCompetitionWinner = function(players, primaryStat, secondaryStat, generalS
     if(!custom) return _baseChooseCompetitionWinner(players,primaryStat,secondaryStat,generalStat);
     return _baseChooseCompetitionWinner(players,custom.primary||primaryStat,custom.secondary||secondaryStat,"general");
 };
-
-
