@@ -3732,6 +3732,77 @@ function deleteSeason(id) {
    SIMULATOR
    ========================================================= */
 
+
+function getHouseguestForSimulation(id) {
+    return (currentSeason?.houseguests || []).find(p => p.id === id) || null;
+}
+
+function simulationPortrait(player, size = "medium") {
+    if (!player) return "";
+    const name = getHouseguestDisplayName(player.id, currentSeason?.houseguests || []);
+    const image = String(player.image || "").trim();
+    const cls = `sim-portrait sim-portrait-${size}`;
+    if (image) {
+        return `<div class="${cls}"><img src="${escapeAttribute(image)}" alt="${escapeAttribute(name)}" onerror="this.style.display='none';this.parentElement.classList.add('no-image');"><span>${escapeHTML(name)}</span></div>`;
+    }
+    const initials = name.split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join("").toUpperCase() || "?";
+    return `<div class="${cls} no-image"><div class="sim-portrait-placeholder">${escapeHTML(initials)}</div><span>${escapeHTML(name)}</span></div>`;
+}
+
+function simulationPortraits(ids = [], size = "medium") {
+    const players = (ids || []).map(getHouseguestForSimulation).filter(Boolean);
+    return `<div class="sim-portrait-grid">${players.map(p => simulationPortrait(p, size)).join("")}</div>`;
+}
+
+function getCompetitionForWeekType(week, type) {
+    return getWeekCompetitions(week).find(c => c.type === type) || null;
+}
+
+function showEvent(title, type, content) {
+    const titleEl = document.getElementById("event-title");
+    const typeEl = document.getElementById("event-type");
+    const contentEl = document.getElementById("event-content");
+    if (titleEl) titleEl.textContent = title || "Event";
+    if (typeEl) typeEl.textContent = type || "EVENT";
+    if (contentEl) contentEl.innerHTML = content || "";
+    const weekTitle = document.getElementById("simulator-event-week-title");
+    if (weekTitle) weekTitle.textContent = `Week ${currentSeason?.simulation?.currentWeek || 1}`;
+    renderSimulationWeekNavigation();
+}
+
+function renderSimulationWeekNavigation() {
+    const container = document.getElementById("sim-week-navigation");
+    if (!container || !currentSeason) return;
+    const maxWeeks = getSeasonLength(currentSeason);
+    const sim = currentSeason.simulation || createDefaultSimulation();
+    const currentWeek = Number(sim.currentWeek || 1);
+    const chain = getWeekEventChain(currentWeek);
+    const active = Number(sim.currentEventIndex || 0);
+    const html = [];
+    for (let w = 1; w <= maxWeeks; w++) {
+        const isCurrent = w === currentWeek;
+        html.push(`<div class="sim-week-block ${isCurrent ? "current" : ""}">`);
+        html.push(`<div class="sim-week-label">Week ${w}</div>`);
+        if (isCurrent) {
+            html.push(`<div class="sim-event-list">`);
+            chain.forEach((item, i) => {
+                const state = i < active ? "completed" : (i === active ? "active" : "pending");
+                html.push(`<div class="sim-event-nav ${state}"><span>${escapeHTML(item.label)}</span></div>`);
+            });
+            html.push(`</div>`);
+        }
+        html.push(`</div>`);
+    }
+    container.innerHTML = html.join("");
+}
+
+function recordSimulationEvent(key, title) {
+    const sim = currentSeason?.simulation;
+    if (!sim) return;
+    if (!Array.isArray(sim.history)) sim.history = [];
+    sim.history.push({ week: Number(sim.currentWeek || 1), event: key, title, timestamp: Date.now() });
+}
+
 function initializeSimulator(
     season
 ) {
@@ -3766,6 +3837,9 @@ function initializeSimulator(
 
     if (simulation.currentWeek > getSeasonLength(season)) { simulation.currentWeek = getSeasonLength(season); }
     setText("current-week", simulation.currentWeek || 1);
+    setText("sim-season-length", getSeasonLength(season));
+    setText("sim-jury-size", season.rules?.jurySize ?? 7);
+    renderSimulationWeekNavigation();
     renderDynamicGameChain();
 
     updateSimulatorStatus(
@@ -3856,6 +3930,7 @@ function renderDynamicGameChain() {
 
 function resetGameChain(activeIndex = 0) {
     renderDynamicGameChain();
+    renderSimulationWeekNavigation();
     const steps = document.querySelectorAll("#game-chain .chain-step");
     steps.forEach((step,index) => step.classList.toggle("active", index === activeIndex));
 }
@@ -3887,6 +3962,7 @@ function runNextEvent() {
         default: simulation.currentEventIndex = index + 1; break;
     }
     persistCurrentSeason();
+    renderSimulationWeekNavigation();
 }
 
 function runCustomCompetitionEvent(competitionId) {
@@ -3905,15 +3981,54 @@ function runEvictionVotingEvent() {
     const simulation = currentSeason.simulation;
     const active = getActiveHouseguests();
     const nominees = (simulation.currentNominees || []).map(id => active.find(p => p.id === id)).filter(Boolean);
-    if (nominees.length < 2) { simulation.currentEventIndex++; resetGameChain(simulation.currentEventIndex); showEvent("Eviction Voting", "EVICTION VOTING", "<p>There are not enough nominees for a standard vote.</p>"); return; }
-    const target = chooseEvictionTarget(nominees, active);
-    simulation.pendingEvictionId = target?.id || null;
-    const other = nominees.find(p => p.id !== target?.id);
-    const voteCount = Math.max(1, active.filter(p => p.id !== simulation.currentHOH && !nominees.some(n => n.id === p.id)).length);
-    simulation.evictionVoteResult = {target: target?.id || null, targetVotes: Math.ceil(voteCount * 0.65), otherVotes: Math.floor(voteCount * 0.35), totalVotes: voteCount};
+    if (nominees.length < 2) {
+        simulation.currentEventIndex++;
+        resetGameChain(simulation.currentEventIndex);
+        showEvent("Eviction Voting", "EVICTION VOTING", "<p>There are not enough nominees for a standard vote.</p>");
+        return;
+    }
+
+    const voters = active.filter(p => p.id !== simulation.currentHOH && !nominees.some(n => n.id === p.id));
+    const votes = [];
+    voters.forEach(voter => {
+        const scores = nominees.map(target => {
+            const bond = allianceBond(voter.id, target.id);
+            return { target, score: Math.max(0.1, 10 - bond + Math.random() * 5) };
+        }).sort((a,b) => b.score - a.score);
+        const target = scores[0].target;
+        votes.push({ voter: voter.id, target: target.id });
+    });
+
+    const counts = {};
+    nominees.forEach(n => counts[n.id] = 0);
+    votes.forEach(v => counts[v.target] = (counts[v.target] || 0) + 1);
+    const sorted = nominees.slice().sort((a,b) => (counts[b.id] || 0) - (counts[a.id] || 0));
+    const target = sorted[0];
+    const other = sorted[1];
+
+    simulation.pendingEvictionId = target.id;
+    simulation.evictionVoteResult = {
+        target: target.id,
+        targetVotes: counts[target.id] || 0,
+        other: other?.id || null,
+        otherVotes: other ? (counts[other.id] || 0) : 0,
+        totalVotes: votes.length,
+        votes
+    };
     simulation.currentEventIndex++;
-    updateSimulatorStatus(simulation); resetGameChain(simulation.currentEventIndex);
-    showEvent("Eviction Voting", "EVICTION VOTING", `<p>The house has voted to evict <strong>${escapeHTML(target?.name || "a nominee")}</strong>.</p>${other ? `<p>Vote result: ${escapeHTML(target.name)} ${simulation.evictionVoteResult.targetVotes} — ${escapeHTML(other.name)} ${simulation.evictionVoteResult.otherVotes}</p>` : ""}`);
+    updateSimulatorStatus(simulation);
+    resetGameChain(simulation.currentEventIndex);
+
+    const voteRows = votes.map(v => {
+        const voter = getHouseguestForSimulation(v.voter);
+        const voted = getHouseguestForSimulation(v.target);
+        return `<div class="vote-row"><span>${escapeHTML(getHouseguestDisplayName(voter?.id, currentSeason.houseguests))}</span><strong>votes to evict</strong><span>${escapeHTML(getHouseguestDisplayName(voted?.id, currentSeason.houseguests))}</span></div>`;
+    }).join("");
+
+    showEvent("Eviction Voting", "EVICTION VOTING", `
+        <div class="eviction-vote-result">${simulationPortrait(target, "large")}<h3>${escapeHTML(getHouseguestDisplayName(target.id, currentSeason.houseguests))} will be evicted.</h3><p>${escapeHTML(getHouseguestDisplayName(target.id, currentSeason.houseguests))}: <strong>${counts[target.id] || 0}</strong> votes</p>${other ? `<p>${escapeHTML(getHouseguestDisplayName(other.id, currentSeason.houseguests))}: <strong>${counts[other.id] || 0}</strong> votes</p>` : ""}</div>
+        <div class="live-vote-list"><h3>Live Vote</h3>${voteRows || "<p>No eligible voters.</p>"}</div>
+    `);
 }
 
 
@@ -3997,17 +4112,9 @@ function runHOHEvent() {
         hohCompetition?.name || "Head of Household",
         "HOH",
         `
-            <p>
-                <strong>
-                    ${escapeHTML(
-                        getHouseguestDisplayName(
-                            hoh.id,
-                            houseguests
-                        )
-                    )}
-                </strong>
-                has won the Head of Household competition.
-            </p>
+            ${simulationPortrait(hoh, "large")}
+            <p><strong>${escapeHTML(getHouseguestDisplayName(hoh.id, houseguests))}</strong> has won <strong>${escapeHTML(hohCompetition?.name || "Head of Household")}</strong>.</p>
+            ${hohCompetition?.description ? `<p class="event-description">${escapeHTML(hohCompetition.description)}</p>` : ""}
         `
     );
 }
@@ -4083,25 +4190,9 @@ function runNominationEvent() {
         "Nominations",
         "NOMINATIONS",
         `
-            <p>
-                The Head of Household has nominated:
-            </p>
-
-            <p>
-                <strong>
-                    ${escapeHTML(
-                        nominees
-                            .map(
-                                nominee =>
-                                    getHouseguestDisplayName(
-                                        nominee.id,
-                                        active
-                                    )
-                            )
-                            .join(" & ")
-                    )}
-                </strong>
-            </p>
+            <p>The Head of Household has nominated:</p>
+            ${simulationPortraits(nominees.map(p => p.id), "large")}
+            <p><strong>${escapeHTML(nominees.map(n => getHouseguestDisplayName(n.id, active)).join(" & "))}</strong></p>
         `
     );
 }
@@ -4180,26 +4271,9 @@ function runPOVPlayersEvent() {
         "Power of Veto Players",
         "POV PLAYERS",
         `
-            <p>
-                The following houseguests will compete
-                in the Power of Veto:
-            </p>
-
-            <p>
-                <strong>
-                    ${escapeHTML(
-                        selected
-                            .map(
-                                player =>
-                                    getHouseguestDisplayName(
-                                        player.id,
-                                        active
-                                    )
-                            )
-                            .join(", ")
-                    )}
-                </strong>
-            </p>
+            <p>The following houseguests will compete in <strong>${escapeHTML(getCompetitionForWeekType(simulation.currentWeek, "pov")?.name || "Power of Veto")}</strong>:</p>
+            ${simulationPortraits(selected.map(p => p.id), "medium")}
+            <p><strong>${escapeHTML(selected.map(p => getHouseguestDisplayName(p.id, active)).join(", "))}</strong></p>
         `
     );
 }
@@ -4387,24 +4461,11 @@ function runVetoCeremonyEvent() {
         "Veto Ceremony",
         "VETO CEREMONY",
         `
-            <p>
-                The Power of Veto ceremony has been held.
-            </p>
-
-            <p>
-                The current nominees are:
-            </p>
-
-            <p>
-                <strong>
-                    ${escapeHTML(
-                        formatHouseguestList(
-                            simulation.currentNominees,
-                            currentSeason.houseguests
-                        )
-                    )}
-                </strong>
-            </p>
+            <p>The Veto Ceremony has been held.</p>
+            <p>${vetoWinner && nominees.includes(vetoWinner) ? `<strong>${escapeHTML(getHouseguestDisplayName(vetoWinner, currentSeason.houseguests))}</strong> used the Veto, and a replacement nominee was selected.` : `<strong>${escapeHTML(getHouseguestDisplayName(vetoWinner, currentSeason.houseguests))}</strong> did not remove a nominee.`}</p>
+            <p>Current nominees:</p>
+            ${simulationPortraits(simulation.currentNominees, "large")}
+            <p><strong>${escapeHTML(formatHouseguestList(simulation.currentNominees, currentSeason.houseguests))}</strong></p>
         `
     );
 }
@@ -4568,15 +4629,9 @@ function runEvictionEvent() {
         "Eviction",
         "EVICTION",
         `
-            <p>
-                <strong>
-                    ${escapeHTML(
-                        evictionTarget?.name ||
-                        "A houseguest"
-                    )}
-                </strong>
-                has been evicted from the Big Brother house.
-            </p>
+            ${simulationPortrait(evictionTarget, "large")}
+            <p><strong>${escapeHTML(getHouseguestDisplayName(evictionTarget?.id, currentSeason.houseguests))}</strong> has been evicted from the Big Brother house.</p>
+            ${simulation.evictionVoteResult ? `<p>Final vote: <strong>${simulation.evictionVoteResult.targetVotes}</strong> vote(s) to evict.</p>` : ""}
 
             <p>
                 Week ${simulation.currentWeek}
