@@ -4981,7 +4981,334 @@ function showResults() {
     );
 
 
-    renderFinalPlacements();
+    function renderFinalPlacements() {
+
+    const container =
+        document.getElementById("final-placements");
+
+    if (!container) {
+        return;
+    }
+
+    /*
+     * Get placements recorded by the simulation.
+     */
+    const recordedPlacements =
+        currentSeason?.simulation?.finalPlacements || [];
+
+    /*
+     * Use a Map so each houseguest can only appear
+     * once in the final results.
+     */
+    const placementMap = new Map();
+
+    /*
+     * First use the simulation's finalPlacements data.
+     */
+    recordedPlacements.forEach(placement => {
+
+        if (!placement || !placement.id) {
+            return;
+        }
+
+        const houseguest =
+            currentSeason?.houseguests?.find(
+                p => p.id === placement.id
+            );
+
+        placementMap.set(
+            placement.id,
+            {
+                id: placement.id,
+
+                name:
+                    placement.name ||
+                    houseguest?.name ||
+                    "Unknown",
+
+                placement:
+                    Number(placement.placement) || null,
+
+                image:
+                    houseguest?.image || ""
+            }
+        );
+    });
+
+    /*
+     * Also check every houseguest directly.
+     *
+     * This guarantees that anyone who has a
+     * placement recorded on their houseguest
+     * object will appear in the final grid.
+     */
+    (
+        currentSeason?.houseguests || []
+    ).forEach(houseguest => {
+
+        const placement =
+            Number(houseguest.placement);
+
+        if (
+            !Number.isFinite(placement) ||
+            placement <= 0
+        ) {
+            return;
+        }
+
+        const existing =
+            placementMap.get(houseguest.id);
+
+        if (!existing) {
+
+            placementMap.set(
+                houseguest.id,
+                {
+                    id: houseguest.id,
+
+                    name:
+                        houseguest.name ||
+                        "Unknown",
+
+                    placement: placement,
+
+                    image:
+                        houseguest.image || ""
+                }
+            );
+
+        } else {
+
+            existing.placement = placement;
+
+            existing.name =
+                houseguest.name ||
+                existing.name ||
+                "Unknown";
+
+            existing.image =
+                houseguest.image ||
+                existing.image ||
+                "";
+        }
+    });
+
+    /*
+     * Sort everyone by placement:
+     *
+     * 1st
+     * 2nd
+     * 3rd
+     * ...
+     * 16th
+     */
+    const placements =
+        Array.from(placementMap.values())
+            .filter(
+                placement =>
+                    Number.isFinite(
+                        Number(
+                            placement.placement
+                        )
+                    )
+            )
+            .sort(
+                (a, b) =>
+                    Number(a.placement) -
+                    Number(b.placement)
+            );
+
+    /*
+     * Nothing to display yet.
+     */
+    if (placements.length === 0) {
+
+        container.innerHTML = `
+
+            <div class="empty-state">
+
+                <h3>
+                    No Placements Yet
+                </h3>
+
+                <p>
+                    Finish the simulation to see
+                    final placements.
+                </p>
+
+            </div>
+
+        `;
+
+        return;
+    }
+
+    /*
+     * Build the individual placement cards.
+     */
+    const cards =
+        placements
+            .map(placement => {
+
+                const number =
+                    Number(
+                        placement.placement
+                    );
+
+                /*
+                 * Determine the special class and
+                 * label for each placement.
+                 */
+                let placementClass = "";
+                let placementLabel =
+                    `${number}TH PLACE`;
+
+                if (number === 1) {
+
+                    placementClass =
+                        "placement-winner";
+
+                    placementLabel =
+                        "WINNER";
+
+                } else if (number === 2) {
+
+                    placementClass =
+                        "placement-runner-up";
+
+                    placementLabel =
+                        "RUNNER-UP";
+
+                } else if (number === 3) {
+
+                    placementLabel =
+                        "3RD PLACE";
+                }
+
+                /*
+                 * Find the actual houseguest object
+                 * so their existing portrait is used.
+                 */
+                const houseguest =
+                    currentSeason?.houseguests?.find(
+                        p =>
+                            p.id === placement.id
+                    );
+
+                let portrait = "";
+
+                if (houseguest) {
+
+                    portrait =
+                        simulationPortrait(
+                            houseguest,
+                            "large"
+                        );
+
+                } else {
+
+                    /*
+                     * Fallback portrait if a placement
+                     * somehow exists without a matching
+                     * houseguest.
+                     */
+                    const initials =
+                        String(
+                            placement.name || "?"
+                        )
+                            .split(/\s+/)
+                            .filter(Boolean)
+                            .slice(0, 2)
+                            .map(
+                                x =>
+                                    x[0]
+                            )
+                            .join("")
+                            .toUpperCase();
+
+                    portrait = `
+
+                        <div class="
+                            sim-portrait
+                            sim-portrait-large
+                            no-image
+                        ">
+
+                            <div class="
+                                sim-portrait-placeholder
+                            ">
+                                ${escapeHTML(
+                                    initials || "?"
+                                )}
+                            </div>
+
+                            <span>
+                                ${escapeHTML(
+                                    placement.name ||
+                                    "Unknown"
+                                )}
+                            </span>
+
+                        </div>
+
+                    `;
+                }
+
+                return `
+
+                    <div class="
+                        final-placement-card
+                        ${placementClass}
+                    ">
+
+                        <div class="
+                            final-placement-number
+                        ">
+                            ${number}
+                        </div>
+
+                        <div class="
+                            final-placement-portrait
+                        ">
+                            ${portrait}
+                        </div>
+
+                        <div class="
+                            final-placement-name
+                        ">
+                            ${escapeHTML(
+                                placement.name ||
+                                "Unknown"
+                            )}
+                        </div>
+
+                        <div class="
+                            final-placement-label
+                        ">
+                            ${placementLabel}
+                        </div>
+
+                    </div>
+
+                `;
+            })
+            .join("");
+
+    /*
+     * Render the complete placement grid.
+     */
+    container.innerHTML = `
+
+        <div class="
+            final-placement-grid
+        ">
+
+            ${cards}
+
+        </div>
+
+    `;
+}
 
     renderSeasonStatistics();
 
