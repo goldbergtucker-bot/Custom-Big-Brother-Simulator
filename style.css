@@ -2029,3 +2029,30 @@ select {
     .quick-tools-header .secondary-button { width: 100%; }
     .matrix-legend { flex-direction: column; }
 }
+
+/* =========================================================
+   HOUSEGUEST NAME DISPLAY
+   ========================================================= */
+
+.houseguest-card-header > div:first-child {
+    min-width: 0;
+}
+
+.houseguest-display-name {
+    margin-top: 3px;
+    font-size: 16px;
+    line-height: 1.25;
+    font-weight: 800;
+    color: var(--text-primary, #f5f5f5);
+    overflow-wrap: anywhere;
+}
+
+.houseguest-card .houseguest-basic-info {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 700px) {
+    .houseguest-card .houseguest-basic-info {
+        grid-template-columns: 1fr;
+    }
+}
