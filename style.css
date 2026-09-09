@@ -1917,175 +1917,20 @@ select {
 
 
 /* =========================================================
-   ALLIANCES
+   ADVANCED SEASON SYSTEMS
    ========================================================= */
-
-#alliances-section {
-    position: relative;
-}
-
-.alliance-editor {
-    background: #0c0f15;
-    border: 1px solid #292e39;
-    border-radius: 14px;
-    padding: 22px;
-}
-
-.alliance-editor-header {
-    margin-bottom: 22px;
-}
-
-.alliance-editor-header h3 {
-    font-size: 18px;
-    margin-top: 4px;
-}
-
-.alliance-editor-header p {
-    margin-top: 5px;
-    color: #7f8797;
-    font-size: 13px;
-}
-
-.alliance-form-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 18px;
-}
-
-.alliance-description-field {
-    margin-top: 18px;
-}
-
-.alliance-description-field textarea {
-    width: 100%;
-    min-height: 84px;
-    resize: vertical;
-}
-
-.alliance-member-select {
-    width: 100%;
-    min-height: 180px;
-    margin-top: 6px;
-    padding: 8px;
-    background: #11151d;
-    color: #e8ebf0;
-    border: 1px solid #292e39;
-    border-radius: 10px;
-}
-
-.alliance-member-select option {
-    padding: 8px;
-}
-
-.alliance-member-count {
-    margin-top: 8px;
-    color: #aeb5c2;
-    font-size: 12px;
-    font-weight: 700;
-}
-
-.alliance-actions-form,
-.alliance-actions {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-}
-
-.alliance-actions-form {
-    justify-content: flex-end;
-    margin-top: 20px;
-}
-
-.saved-alliances {
-    margin-top: 34px;
-}
-
-.alliances-container {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
-}
-
-.alliance-card {
-    background: #0c0f15;
-    border: 1px solid #292e39;
-    border-radius: 14px;
-    padding: 18px;
-}
-
-.alliance-card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 14px;
-}
-
-.alliance-card-header h3 {
-    margin-top: 6px;
-    font-size: 18px;
-}
-
-.alliance-status {
-    display: inline-flex;
-    align-items: center;
-    padding: 4px 8px;
-    border-radius: 999px;
-    border: 1px solid #343a47;
-    font-size: 10px;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: .05em;
-}
-
-.alliance-status.active {
-    color: #dce8ff;
-}
-
-.alliance-status.inactive {
-    color: #858c99;
-}
-
-.alliance-description {
-    margin-top: 12px;
-    color: #969eac;
-    font-size: 13px;
-    line-height: 1.5;
-}
-
-.alliance-members {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 7px;
-    margin-top: 16px;
-}
-
-.alliance-member-chip {
-    display: inline-flex;
-    padding: 6px 9px;
-    border: 1px solid #303642;
-    border-radius: 999px;
-    background: #151922;
-    color: #e3e6eb;
-    font-size: 11px;
-    font-weight: 700;
-}
-
-.alliance-member-total {
-    margin-top: 14px;
-    color: #777f8f;
-    font-size: 11px;
-    font-weight: 800;
-    text-transform: uppercase;
-}
-
-@media (max-width: 800px) {
-    .alliance-form-grid,
-    .alliances-container {
-        grid-template-columns: 1fr;
-    }
-
-    .alliance-card-header {
-        flex-direction: column;
-    }
-}
-
+.advanced-systems-section { margin-top: 28px; }
+.advanced-editor-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:22px; }
+.editor-panel { border:1px solid #ddd; border-radius:14px; padding:22px; background:#fff; }
+.editor-panel h3 { margin-top:0; }
+.editor-actions { display:flex; gap:10px; margin-top:18px; flex-wrap:wrap; }
+.advanced-list { display:grid; gap:14px; }
+.advanced-card { border:1px solid #e2e2e2; border-radius:12px; padding:16px; background:#fafafa; }
+.advanced-card-header { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; }
+.advanced-card-header h4 { margin:0 0 7px; font-size:17px; }
+.advanced-card-header p { margin:8px 0; }
+.advanced-card-actions { display:flex; gap:7px; }
+.advanced-card-actions button { border:1px solid #ccc; background:#fff; border-radius:7px; padding:7px 10px; cursor:pointer; }
+#alliance-members { width:100%; min-height:150px; }
+#alliance-members option { padding:5px; }
+@media (max-width: 850px) { .advanced-editor-grid { grid-template-columns:1fr; } }
