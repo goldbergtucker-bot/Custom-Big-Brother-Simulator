@@ -5547,4 +5547,3 @@ chooseCompetitionWinner = function(players, primaryStat, secondaryStat, generalS
     if(!custom) return _baseChooseCompetitionWinner(players,primaryStat,secondaryStat,generalStat);
     return _baseChooseCompetitionWinner(players,custom.primary||primaryStat,custom.secondary||secondaryStat,"general");
 };
-
