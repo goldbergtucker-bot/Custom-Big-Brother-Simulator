@@ -2385,3 +2385,38 @@ select {
 .twist-event-card { max-width: 700px; margin: 18px auto; border: 1px solid #555; background: #292929; padding: 16px; text-align: center; }
 .twist-event-card h3 { margin: 0 0 8px; }
 .twist-power-holder { margin-top: 15px; }
+
+/* =========================================================
+   FINAL BRANTSTEELE PRESENTATION PASS
+   ========================================================= */
+.brantsteele-sim-layout { grid-template-columns: 210px minmax(0, 1fr) 210px; background:#242424; }
+.sim-left-sidebar { background:#303030; }
+.sim-right-sidebar { background:#303030; }
+.sim-main-panel { background:#3b3b3b; }
+.sim-main-header { background:#303030; padding:0 12px; }
+.sim-main-panel .event-display { max-width:900px; padding:20px 18px 40px; }
+.sim-main-panel #event-content { min-height:220px; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; }
+.sim-main-panel #event-content > p,
+.sim-main-panel #event-content > h3,
+.sim-main-panel #event-content > h2,
+.sim-main-panel #event-content > div { width:100%; }
+.sim-main-panel #event-content .sim-portrait-grid { width:auto; }
+.sim-event-nav.completed { cursor:pointer; }
+.sim-week-block.past .sim-week-label { color:#ddd; }
+.sim-week-block.viewing .sim-week-label { outline:1px solid #666; }
+.sim-history-return { margin-bottom:12px; }
+
+.final-results-cards { display:flex; flex-wrap:wrap; justify-content:center; align-items:flex-start; gap:45px; margin:20px auto 28px; }
+.final-results-cards .sim-portrait { width:140px; }
+.final-winner-label { font-weight:900; letter-spacing:.7px; }
+.final-runner-label { font-weight:900; color:#bbb; letter-spacing:.5px; }
+.final-jury-tally { width:min(560px,100%); margin:20px auto; border:1px solid #555; background:#292929; }
+.final-jury-tally > div, .final-jury-tally-row { display:flex; justify-content:space-between; gap:12px; padding:10px 13px; border-bottom:1px solid #444; }
+.final-jury-tally > div:last-child, .final-jury-tally-row:last-child { border-bottom:0; }
+.jury-vote-list, .final-jury-votes { width:min(700px,100%); margin:10px auto; }
+.jury-vote-row, .final-jury-row { display:grid; grid-template-columns: 1fr auto auto auto; gap:10px; align-items:center; padding:8px 10px; border-bottom:1px solid #444; background:#303030; }
+.jury-vote-row .sim-portrait { width:48px; }
+.jury-vote-row .sim-portrait img, .jury-vote-row .sim-portrait-placeholder { width:42px; height:54px; }
+.runner-up-card { margin-top:12px; }
+
+@media (max-width:1050px){ .brantsteele-sim-layout{grid-template-columns:190px minmax(0,1fr);} }
