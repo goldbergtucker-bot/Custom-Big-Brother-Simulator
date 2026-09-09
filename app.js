@@ -1,43 +1,40 @@
 /*
  * =========================================================
  * BIG BROTHER SIMULATOR
- * APP CONTROLLER
- * =========================================================
+ * APPLICATION CONTROLLER
  *
- * Version: 0.2
+ * Version 0.3
  *
  * Current systems:
- * - Home page
  * - Season creation
- * - Season editing
- * - Season deletion
- * - LocalStorage persistence
- * - Houseguest editor
- * - Houseguest photos
+ * - Custom season information
+ * - Custom houseguests
+ * - Houseguest images
  * - Houseguest ratings
- * - Season logo preview
- * - Season background preview
- * - Basic simulator framework
- * - BrantSteele-style event chain foundation
+ * - Season Rules & Settings
+ * - Saved seasons
+ * - Edit seasons
+ * - Delete seasons
+ * - Chain-by-chain simulator foundation
  *
- * Future systems:
- * - Season rules
+ * Next major systems:
  * - Relationships
  * - Alliances
  * - Competitions
  * - Twists
- * - Full simulation engine
- * - Jury voting
- * - End-of-season statistics
+ * - Real simulation engine
+ * - Jury
+ * - Finale
+ * - Statistics
+ * =========================================================
  */
 
 
 /* =========================================================
-   GLOBAL CONSTANTS
+   CONSTANTS
    ========================================================= */
 
 const STORAGE_KEY = "bigBrotherSimulatorSeasons";
-
 
 const STAT_KEYS = [
     "general",
@@ -47,37 +44,36 @@ const STAT_KEYS = [
     "strategic"
 ];
 
-
 const EVENT_CHAIN = [
     {
         id: "hoh",
         label: "HOH",
-        title: "Head of Household"
+        type: "HEAD OF HOUSEHOLD"
     },
     {
         id: "nominations",
         label: "Nominations",
-        title: "Nomination Ceremony"
+        type: "NOMINATIONS"
     },
     {
         id: "pov-players",
         label: "POV Players",
-        title: "Power of Veto Players"
+        type: "POWER OF VETO"
     },
     {
         id: "pov",
         label: "POV",
-        title: "Power of Veto Competition"
+        type: "POWER OF VETO"
     },
     {
         id: "veto-ceremony",
         label: "Veto Ceremony",
-        title: "Veto Ceremony"
+        type: "VETO CEREMONY"
     },
     {
         id: "eviction",
         label: "Eviction",
-        title: "Eviction"
+        type: "EVICTION"
     }
 ];
 
@@ -87,11 +83,8 @@ const EVENT_CHAIN = [
    ========================================================= */
 
 let savedSeasons = [];
-
 let currentSeason = null;
-
 let editingSeasonId = null;
-
 let currentHouseguestId = 0;
 
 
@@ -101,17 +94,15 @@ let currentHouseguestId = 0;
 
 document.addEventListener("DOMContentLoaded", () => {
 
-    loadSeasonsFromStorage();
+    loadSavedSeasons();
 
     renderSavedSeasons();
 
-    setupSeasonLogoPreview();
+    setupImagePreviews();
 
-    setupSeasonBackgroundPreview();
+    setupRuleControls();
 
-    updateHouseguestCount();
-
-    setupImageErrorHandling();
+    initializeHouseguestCount();
 
 });
 
@@ -128,21 +119,20 @@ function showPage(pageId) {
         page.classList.remove("active-page");
     });
 
+    const page = document.getElementById(pageId);
 
-    const targetPage = document.getElementById(pageId);
-
-    if (!targetPage) {
-        console.warn(`Page not found: ${pageId}`);
-        return;
+    if (page) {
+        page.classList.add("active-page");
     }
-
-
-    targetPage.classList.add("active-page");
 
     window.scrollTo({
         top: 0,
         behavior: "smooth"
     });
+
+    if (pageId === "saved-seasons-page") {
+        renderSavedSeasons();
+    }
 }
 
 
@@ -150,25 +140,21 @@ function showPage(pageId) {
    LOCAL STORAGE
    ========================================================= */
 
-function loadSeasonsFromStorage() {
+function loadSavedSeasons() {
 
     try {
 
-        const storedSeasons =
-            localStorage.getItem(STORAGE_KEY);
+        const stored = localStorage.getItem(STORAGE_KEY);
 
-        if (!storedSeasons) {
+        if (!stored) {
             savedSeasons = [];
             return;
         }
 
+        const parsed = JSON.parse(stored);
 
-        const parsedSeasons =
-            JSON.parse(storedSeasons);
-
-
-        if (Array.isArray(parsedSeasons)) {
-            savedSeasons = parsedSeasons;
+        if (Array.isArray(parsed)) {
+            savedSeasons = parsed;
         } else {
             savedSeasons = [];
         }
@@ -176,7 +162,7 @@ function loadSeasonsFromStorage() {
     } catch (error) {
 
         console.error(
-            "Unable to load saved seasons:",
+            "Could not load saved seasons:",
             error
         );
 
@@ -185,7 +171,7 @@ function loadSeasonsFromStorage() {
 }
 
 
-function saveSeasonsToStorage() {
+function persistSavedSeasons() {
 
     try {
 
@@ -197,12 +183,12 @@ function saveSeasonsToStorage() {
     } catch (error) {
 
         console.error(
-            "Unable to save seasons:",
+            "Could not save seasons:",
             error
         );
 
         alert(
-            "The season could not be saved. Your browser may have local storage disabled or full."
+            "The season could not be saved. Your browser may have storage disabled."
         );
     }
 }
@@ -214,50 +200,50 @@ function saveSeasonsToStorage() {
 
 function renderSavedSeasons() {
 
-    const container =
+    const homeContainer =
         document.getElementById(
             "saved-seasons-container"
         );
 
-
-    if (!container) {
-        return;
-    }
-
-
-    container.innerHTML = "";
-
-
-    if (savedSeasons.length === 0) {
-
-        container.innerHTML = `
-            <div class="empty-state">
-                <h3>No Saved Seasons Yet</h3>
-
-                <p>
-                    Create your first custom Big Brother
-                    season to get started.
-                </p>
-
-                <button
-                    class="primary-button"
-                    type="button"
-                    onclick="createNewSeason()"
-                >
-                    Create Your First Season
-                </button>
-            </div>
-        `;
-
-        return;
-    }
-
-
-    savedSeasons.forEach(season => {
-
-        container.appendChild(
-            createSeasonCard(season)
+    const savedPageContainer =
+        document.getElementById(
+            "all-saved-seasons-container"
         );
+
+    const containers = [
+        homeContainer,
+        savedPageContainer
+    ].filter(Boolean);
+
+    containers.forEach(container => {
+
+        container.innerHTML = "";
+
+        if (savedSeasons.length === 0) {
+
+            container.innerHTML = `
+                <div class="empty-state">
+
+                    <h3>No Saved Seasons</h3>
+
+                    <p>
+                        Create your first custom Big Brother season
+                        to get started.
+                    </p>
+
+                </div>
+            `;
+
+            return;
+        }
+
+        savedSeasons.forEach(season => {
+
+            container.appendChild(
+                createSeasonCard(season)
+            );
+
+        });
 
     });
 }
@@ -268,94 +254,83 @@ function createSeasonCard(season) {
     const card =
         document.createElement("div");
 
-    card.className = "season-card";
+    card.className = "saved-season-card";
 
+    const logo =
+        season.logo ||
+        "";
+
+    const imageHTML = logo
+        ? `
+            <img
+                src="${escapeHTML(logo)}"
+                alt="${escapeHTML(season.name || "Season")} logo"
+                onerror="this.style.display='none'; this.parentElement.innerHTML='<span class=&quot;saved-season-image-placeholder&quot;>NO IMAGE</span>';"
+            >
+        `
+        : `
+            <span class="saved-season-image-placeholder">
+                NO IMAGE
+            </span>
+        `;
 
     const houseguestCount =
         Array.isArray(season.houseguests)
             ? season.houseguests.length
             : 0;
 
-
-    const logo =
-        season.logo
-            ? `
-                <img
-                    src="${escapeAttribute(season.logo)}"
-                    alt="${escapeAttribute(season.name || "Season logo")}"
-                    onerror="this.style.display='none'"
-                >
-            `
-            : "";
-
+    const finalists =
+        season.rules?.finalists || 2;
 
     card.innerHTML = `
 
-        <div class="season-card-image">
-
-            ${
-                logo ||
-                `<span style="
-                    display:flex;
-                    align-items:center;
-                    justify-content:center;
-                    width:100%;
-                    height:100%;
-                    color:#555a67;
-                    font-size:12px;
-                    font-weight:800;
-                ">
-                    NO LOGO
-                </span>`
-            }
-
+        <div class="saved-season-image">
+            ${imageHTML}
         </div>
 
-
-        <div class="season-card-body">
+        <div class="saved-season-content">
 
             <h3>
                 ${escapeHTML(
-                    season.name || "Unnamed Season"
+                    season.name || "Untitled Season"
                 )}
             </h3>
 
+            <div class="saved-season-theme">
+                ${escapeHTML(
+                    season.theme || "Custom Season"
+                )}
+            </div>
 
-            <p>
-                ${
-                    escapeHTML(
-                        season.theme || "Custom Season"
-                    )
-                }
-            </p>
+            <div class="saved-season-meta">
 
+                ${houseguestCount} Houseguests
+                · Final ${finalists}
 
-            <p>
-                ${houseguestCount} Houseguest${
-                    houseguestCount === 1 ? "" : "s"
-                }
-            </p>
+            </div>
 
-
-            <div class="season-card-actions">
+            <div class="saved-season-actions">
 
                 <button
+                    class="button button-secondary"
                     type="button"
-                    onclick="openSeason('${escapeAttribute(season.id)}')"
-                >
-                    Simulate
-                </button>
-
-                <button
-                    type="button"
-                    onclick="editSeason('${escapeAttribute(season.id)}')"
+                    onclick="editSeason('${season.id}')"
                 >
                     Edit
                 </button>
 
                 <button
+                    class="button button-primary"
                     type="button"
-                    onclick="deleteSeason('${escapeAttribute(season.id)}')"
+                    onclick="openSeason('${season.id}')"
+                >
+                    Play
+                </button>
+
+                <button
+                    class="button button-secondary"
+                    type="button"
+                    onclick="deleteSeason('${season.id}')"
                 >
                     Delete
                 </button>
@@ -364,7 +339,6 @@ function createSeasonCard(season) {
 
         </div>
     `;
-
 
     return card;
 }
@@ -381,55 +355,45 @@ function createNewSeason() {
     resetSeasonCreator();
 
     showPage("creator-page");
-
 }
 
 
-/* =========================================================
-   RESET SEASON CREATOR
-   ========================================================= */
-
 function resetSeasonCreator() {
 
-    const nameInput =
+    const name =
         document.getElementById("season-name");
 
-    const themeInput =
+    const theme =
         document.getElementById("season-theme");
 
-    const descriptionInput =
-        document.getElementById("season-description");
+    const description =
+        document.getElementById(
+            "season-description"
+        );
 
-    const logoInput =
+    const logo =
         document.getElementById("season-logo");
 
-    const backgroundInput =
-        document.getElementById("season-background");
+    const background =
+        document.getElementById(
+            "season-background"
+        );
+
+    if (name) name.value = "";
+
+    if (theme) theme.value = "";
+
+    if (description) description.value = "";
+
+    if (logo) logo.value = "";
+
+    if (background) background.value = "";
+
 
     const editor =
-        document.getElementById("houseguest-editor");
-
-
-    if (nameInput) {
-        nameInput.value = "";
-    }
-
-    if (themeInput) {
-        themeInput.value = "";
-    }
-
-    if (descriptionInput) {
-        descriptionInput.value = "";
-    }
-
-    if (logoInput) {
-        logoInput.value = "";
-    }
-
-    if (backgroundInput) {
-        backgroundInput.value = "";
-    }
-
+        document.getElementById(
+            "houseguest-editor"
+        );
 
     if (editor) {
         editor.innerHTML = "";
@@ -438,17 +402,134 @@ function resetSeasonCreator() {
 
     currentHouseguestId = 0;
 
+
+    const count =
+        document.getElementById(
+            "houseguest-count"
+        );
+
+    if (count) {
+        count.value = 16;
+    }
+
+
+    resetSeasonRules();
+
     updateHouseguestCount();
 
-    updateSeasonLogoPreview();
-
-    updateBackgroundPreview();
+    updateLogoPreview();
 
 }
 
 
 /* =========================================================
-   HOUSEGUEST EDITOR
+   HOUSEGUEST COUNT
+   ========================================================= */
+
+function initializeHouseguestCount() {
+
+    const count =
+        document.getElementById(
+            "houseguest-count"
+        );
+
+    if (!count) {
+        return;
+    }
+
+    count.addEventListener(
+        "change",
+        updateHouseguestCount
+    );
+
+    count.addEventListener(
+        "input",
+        updateHouseguestCount
+    );
+
+    updateHouseguestCount();
+}
+
+
+function updateHouseguestCount() {
+
+    const countInput =
+        document.getElementById(
+            "houseguest-count"
+        );
+
+    const editor =
+        document.getElementById(
+            "houseguest-editor"
+        );
+
+    if (!countInput || !editor) {
+        return;
+    }
+
+    let desiredCount =
+        parseInt(countInput.value, 10);
+
+    if (Number.isNaN(desiredCount)) {
+        desiredCount = 16;
+    }
+
+    desiredCount =
+        Math.max(
+            2,
+            Math.min(50, desiredCount)
+        );
+
+    countInput.value = desiredCount;
+
+    const existingCards =
+        editor.querySelectorAll(
+            ".houseguest-card"
+        );
+
+    const existingCount =
+        existingCards.length;
+
+
+    if (desiredCount > existingCount) {
+
+        for (
+            let i = existingCount;
+            i < desiredCount;
+            i++
+        ) {
+
+            addHouseguest();
+        }
+
+    } else if (desiredCount < existingCount) {
+
+        for (
+            let i = existingCount;
+            i > desiredCount;
+            i--
+        ) {
+
+            const cards =
+                editor.querySelectorAll(
+                    ".houseguest-card"
+                );
+
+            const lastCard =
+                cards[cards.length - 1];
+
+            if (lastCard) {
+                lastCard.remove();
+            }
+        }
+
+        updateHouseguestNumbers();
+    }
+}
+
+
+/* =========================================================
+   HOUSEGUEST CREATION
    ========================================================= */
 
 function addHouseguest(data = null) {
@@ -458,17 +539,14 @@ function addHouseguest(data = null) {
             "houseguest-editor"
         );
 
-
     if (!editor) {
         return;
     }
 
-
     currentHouseguestId++;
 
-
-    const id = currentHouseguestId;
-
+    const id =
+        currentHouseguestId;
 
     const houseguest =
         data || createDefaultHouseguest();
@@ -477,42 +555,29 @@ function addHouseguest(data = null) {
     const card =
         document.createElement("div");
 
-
-    card.className = "houseguest-card";
+    card.className =
+        "houseguest-card";
 
     card.dataset.houseguestId = id;
 
 
-    const imageUrl =
-        houseguest.image ||
-        houseguest.photo ||
-        "";
-
-
     card.innerHTML = `
-
-        <!-- =========================================
-             CARD HEADER
-             ========================================= -->
 
         <div class="houseguest-card-header">
 
-            <div class="houseguest-card-title">
-
-                <span class="houseguest-number">
-                    ${editor.children.length + 1}
+            <div>
+                <span>
+                    HOUSEGUEST
                 </span>
 
-                <h3>
-                    Houseguest
+                <h3 class="houseguest-number">
+                    Houseguest ${id}
                 </h3>
-
             </div>
 
-
             <button
-                class="remove-houseguest-button"
                 type="button"
+                class="button button-secondary"
                 onclick="removeHouseguest(${id})"
             >
                 Remove
@@ -520,10 +585,6 @@ function addHouseguest(data = null) {
 
         </div>
 
-
-        <!-- =========================================
-             PHOTO + URL
-             ========================================= -->
 
         <div class="houseguest-photo-section">
 
@@ -533,21 +594,19 @@ function addHouseguest(data = null) {
             >
 
                 ${
-                    imageUrl
-                    ?
-                    `
-                        <img
-                            src="${escapeAttribute(imageUrl)}"
-                            alt="Houseguest photo"
-                            onerror="showHouseguestPlaceholder(${id})"
-                        >
-                    `
-                    :
-                    `
-                        <div class="houseguest-photo-placeholder">
-                            PHOTO
-                        </div>
-                    `
+                    houseguest.image
+                        ? `
+                            <img
+                                src="${escapeHTML(houseguest.image)}"
+                                alt="${escapeHTML(houseguest.name || "Houseguest")}"
+                                onerror="showHouseguestPlaceholder(${id})"
+                            >
+                        `
+                        : `
+                            <span class="houseguest-photo-placeholder">
+                                NO PHOTO
+                            </span>
+                        `
                 }
 
             </div>
@@ -557,18 +616,17 @@ function addHouseguest(data = null) {
 
                 <div class="form-group">
 
-                    <label for="houseguest-name-${id}">
+                    <label>
                         Name
                     </label>
 
                     <input
                         type="text"
-                        id="houseguest-name-${id}"
-                        class="houseguest-name"
-                        placeholder="Houseguest name"
+                        class="hg-name"
                         value="${escapeAttribute(
                             houseguest.name || ""
                         )}"
+                        placeholder="Houseguest name"
                     >
 
                 </div>
@@ -576,99 +634,70 @@ function addHouseguest(data = null) {
 
                 <div class="form-group">
 
-                    <label for="houseguest-age-${id}">
-                        Age
-                    </label>
-
-                    <input
-                        type="number"
-                        id="houseguest-age-${id}"
-                        class="houseguest-age"
-                        min="18"
-                        max="100"
-                        placeholder="Age"
-                        value="${escapeAttribute(
-                            houseguest.age ?? ""
-                        )}"
-                    >
-
-                </div>
-
-
-                <div class="form-group form-group-full">
-
-                    <label for="houseguest-occupation-${id}">
-                        Occupation
-                    </label>
-
-                    <input
-                        type="text"
-                        id="houseguest-occupation-${id}"
-                        class="houseguest-occupation"
-                        placeholder="Example: Teacher"
-                        value="${escapeAttribute(
-                            houseguest.occupation || ""
-                        )}"
-                    >
-
-                </div>
-
-
-                <div class="form-group form-group-full">
-
-                    <label for="houseguest-image-${id}">
-                        Photo URL
+                    <label>
+                        Image URL
                     </label>
 
                     <input
                         type="url"
-                        id="houseguest-image-${id}"
-                        class="houseguest-image"
-                        placeholder="https://i.imgur.com/example.jpg"
+                        class="hg-image"
                         value="${escapeAttribute(
-                            imageUrl
+                            houseguest.image || ""
                         )}"
+                        placeholder="https://i.imgur.com/..."
                         oninput="updateHouseguestImage(${id}, this.value)"
                     >
 
                 </div>
 
+
+                <div class="form-group">
+
+                    <label>
+                        Age
+                    </label>
+
+                    <input
+                        type="number"
+                        class="hg-age"
+                        value="${escapeAttribute(
+                            houseguest.age || ""
+                        )}"
+                        min="18"
+                        max="100"
+                        placeholder="Age"
+                    >
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label>
+                        Occupation
+                    </label>
+
+                    <input
+                        type="text"
+                        class="hg-occupation"
+                        value="${escapeAttribute(
+                            houseguest.occupation || ""
+                        )}"
+                        placeholder="Occupation"
+                    >
+
+                </div>
+
             </div>
 
         </div>
 
-
-        <!-- =========================================
-             BIO
-             ========================================= -->
-
-        <div class="form-group">
-
-            <label for="houseguest-bio-${id}">
-                Bio
-            </label>
-
-            <textarea
-                id="houseguest-bio-${id}"
-                class="houseguest-bio"
-                rows="4"
-                placeholder="Tell us about this houseguest..."
-            >${escapeHTML(
-                houseguest.bio || ""
-            )}</textarea>
-
-        </div>
-
-
-        <!-- =========================================
-             RATINGS
-             ========================================= -->
 
         <div class="houseguest-ratings">
 
-            <div class="houseguest-ratings-title">
-                Game Ratings
-            </div>
+            <h4>
+                Player Ratings
+            </h4>
 
 
             <div class="ratings-grid">
@@ -677,45 +706,35 @@ function addHouseguest(data = null) {
                     id,
                     "general",
                     "General",
-                    houseguest.ratings?.general ??
-                    houseguest.general ??
-                    5
+                    houseguest.ratings?.general ?? 5
                 )}
 
                 ${createRatingInput(
                     id,
                     "physical",
                     "Physical",
-                    houseguest.ratings?.physical ??
-                    houseguest.physical ??
-                    5
+                    houseguest.ratings?.physical ?? 5
                 )}
 
                 ${createRatingInput(
                     id,
                     "mental",
                     "Mental",
-                    houseguest.ratings?.mental ??
-                    houseguest.mental ??
-                    5
+                    houseguest.ratings?.mental ?? 5
                 )}
 
                 ${createRatingInput(
                     id,
                     "social",
                     "Social",
-                    houseguest.ratings?.social ??
-                    houseguest.social ??
-                    5
+                    houseguest.ratings?.social ?? 5
                 )}
 
                 ${createRatingInput(
                     id,
                     "strategic",
                     "Strategic",
-                    houseguest.ratings?.strategic ??
-                    houseguest.strategic ??
-                    5
+                    houseguest.ratings?.strategic ?? 5
                 )}
 
             </div>
@@ -727,19 +746,7 @@ function addHouseguest(data = null) {
 
     editor.appendChild(card);
 
-
     updateHouseguestNumbers();
-
-    updateHouseguestCount();
-
-
-    if (imageUrl) {
-        updateHouseguestImage(
-            id,
-            imageUrl
-        );
-    }
-
 }
 
 
@@ -749,24 +756,18 @@ function createDefaultHouseguest() {
 
         name: "",
 
+        image: "",
+
         age: "",
 
         occupation: "",
 
-        bio: "",
-
-        image: "",
-
         ratings: {
 
             general: 5,
-
             physical: 5,
-
             mental: 5,
-
             social: 5,
-
             strategic: 5
 
         }
@@ -782,33 +783,21 @@ function createRatingInput(
     value
 ) {
 
-    const safeValue =
-        Number.isFinite(Number(value))
-            ? Math.max(
-                1,
-                Math.min(10, Number(value))
-            )
-            : 5;
-
-
     return `
 
         <div class="rating-group">
 
-            <label
-                for="houseguest-${key}-${id}"
-            >
-                ${escapeHTML(label)}
+            <label>
+                ${label}
             </label>
 
             <input
                 type="number"
-                id="houseguest-${key}-${id}"
-                class="rating-${key}"
+                class="hg-rating"
+                data-rating="${key}"
+                value="${escapeAttribute(value)}"
                 min="1"
                 max="10"
-                step="1"
-                value="${safeValue}"
             >
 
         </div>
@@ -817,10 +806,6 @@ function createRatingInput(
 }
 
 
-/* =========================================================
-   REMOVE HOUSEGUEST
-   ========================================================= */
-
 function removeHouseguest(id) {
 
     const card =
@@ -828,24 +813,30 @@ function removeHouseguest(id) {
             `.houseguest-card[data-houseguest-id="${id}"]`
         );
 
-
     if (!card) {
         return;
     }
 
-
     card.remove();
 
+    const count =
+        document.getElementById(
+            "houseguest-count"
+        );
+
+    if (count) {
+
+        const total =
+            document.querySelectorAll(
+                ".houseguest-card"
+            ).length;
+
+        count.value = total;
+    }
+
     updateHouseguestNumbers();
-
-    updateHouseguestCount();
-
 }
 
-
-/* =========================================================
-   HOUSEGUEST NUMBERS
-   ========================================================= */
 
 function updateHouseguestNumbers() {
 
@@ -854,7 +845,6 @@ function updateHouseguestNumbers() {
             ".houseguest-card"
         );
 
-
     cards.forEach((card, index) => {
 
         const number =
@@ -862,10 +852,10 @@ function updateHouseguestNumbers() {
                 ".houseguest-number"
             );
 
-
         if (number) {
+
             number.textContent =
-                index + 1;
+                `Houseguest ${index + 1}`;
         }
 
     });
@@ -873,76 +863,32 @@ function updateHouseguestNumbers() {
 
 
 /* =========================================================
-   HOUSEGUEST COUNT
+   HOUSEGUEST IMAGES
    ========================================================= */
 
-function updateHouseguestCount() {
-
-    const countElement =
-        document.getElementById(
-            "houseguest-count"
-        );
-
-
-    const editor =
-        document.getElementById(
-            "houseguest-editor"
-        );
-
-
-    if (!countElement || !editor) {
-        return;
-    }
-
-
-    const count =
-        editor.querySelectorAll(
-            ".houseguest-card"
-        ).length;
-
-
-    countElement.textContent = count;
-
-}
-
-
-/* =========================================================
-   HOUSEGUEST IMAGE
-   ========================================================= */
-
-function updateHouseguestImage(
-    id,
-    url
-) {
+function updateHouseguestImage(id, url) {
 
     const preview =
         document.getElementById(
             `houseguest-photo-preview-${id}`
         );
 
-
     if (!preview) {
         return;
     }
 
-
-    const cleanUrl =
-        String(url || "").trim();
-
-
-    if (!cleanUrl) {
+    if (!url.trim()) {
 
         showHouseguestPlaceholder(id);
 
         return;
     }
 
-
     preview.innerHTML = `
 
         <img
-            src="${escapeAttribute(cleanUrl)}"
-            alt="Houseguest photo"
+            src="${escapeAttribute(url.trim())}"
+            alt="Houseguest"
             onerror="showHouseguestPlaceholder(${id})"
         >
 
@@ -957,17 +903,15 @@ function showHouseguestPlaceholder(id) {
             `houseguest-photo-preview-${id}`
         );
 
-
     if (!preview) {
         return;
     }
 
-
     preview.innerHTML = `
 
-        <div class="houseguest-photo-placeholder">
-            PHOTO
-        </div>
+        <span class="houseguest-photo-placeholder">
+            NO PHOTO
+        </span>
 
     `;
 }
@@ -984,306 +928,194 @@ function collectHouseguests() {
             ".houseguest-card"
         );
 
-
     const houseguests = [];
 
-
-    cards.forEach(card => {
-
-        const id =
-            card.dataset.houseguestId;
-
+    cards.forEach((card, index) => {
 
         const name =
             card.querySelector(
-                ".houseguest-name"
+                ".hg-name"
             )?.value.trim() || "";
-
-
-        const ageRaw =
-            card.querySelector(
-                ".houseguest-age"
-            )?.value;
-
-
-        const age =
-            ageRaw === ""
-                ? ""
-                : Number(ageRaw);
-
-
-        const occupation =
-            card.querySelector(
-                ".houseguest-occupation"
-            )?.value.trim() || "";
-
-
-        const bio =
-            card.querySelector(
-                ".houseguest-bio"
-            )?.value.trim() || "";
-
 
         const image =
             card.querySelector(
-                ".houseguest-image"
+                ".hg-image"
+            )?.value.trim() || "";
+
+        const age =
+            card.querySelector(
+                ".hg-age"
+            )?.value || "";
+
+        const occupation =
+            card.querySelector(
+                ".hg-occupation"
             )?.value.trim() || "";
 
 
         const ratings = {};
 
 
-        STAT_KEYS.forEach(stat => {
+        card.querySelectorAll(
+            ".hg-rating"
+        ).forEach(input => {
 
-            ratings[stat] =
+            const key =
+                input.dataset.rating;
+
+            ratings[key] =
                 getRatingValue(
-                    card,
-                    `.rating-${stat}`
+                    input.value
                 );
-
         });
 
 
         houseguests.push({
 
-            id: `hg-${id}`,
+            id:
+                `hg-${index + 1}`,
 
             name,
+
+            image,
 
             age,
 
             occupation,
 
-            bio,
+            ratings,
 
-            image,
+            status: "active",
 
-            ratings
+            placement: null,
+
+            weeksInGame: 0,
+
+            hohWins: 0,
+
+            povWins: 0,
+
+            safetyWins: 0,
+
+            nominationCount: 0,
+
+            vetoUsedOn: [],
+
+            evictionVotesReceived: 0
 
         });
 
     });
 
-
     return houseguests;
 }
 
 
-/* =========================================================
-   RATING HELPER
-   ========================================================= */
+function getRatingValue(value) {
 
-function getRatingValue(
-    card,
-    selector
-) {
+    let number =
+        parseInt(value, 10);
 
-    const input =
-        card.querySelector(selector);
-
-
-    if (!input) {
-        return 5;
+    if (Number.isNaN(number)) {
+        number = 5;
     }
 
-
-    let value =
-        Number(input.value);
-
-
-    if (!Number.isFinite(value)) {
-        value = 5;
-    }
-
-
-    value =
-        Math.max(
-            1,
-            Math.min(
-                10,
-                Math.round(value)
-            )
-        );
-
-
-    input.value = value;
-
-
-    return value;
-}
-
-
-/* =========================================================
-   SEASON LOGO PREVIEW
-   ========================================================= */
-
-function setupSeasonLogoPreview() {
-
-    const input =
-        document.getElementById(
-            "season-logo"
-        );
-
-
-    if (!input) {
-        return;
-    }
-
-
-    input.addEventListener(
-        "input",
-        updateSeasonLogoPreview
+    return Math.max(
+        1,
+        Math.min(10, number)
     );
-
 }
 
 
-function updateSeasonLogoPreview() {
+/* =========================================================
+   IMAGE PREVIEWS
+   ========================================================= */
+
+function setupImagePreviews() {
+
+    const logo =
+        document.getElementById(
+            "season-logo"
+        );
+
+    const background =
+        document.getElementById(
+            "season-background"
+        );
+
+
+    if (logo) {
+
+        logo.addEventListener(
+            "input",
+            updateLogoPreview
+        );
+
+    }
+
+
+    if (background) {
+
+        background.addEventListener(
+            "input",
+            updateBackgroundPreview
+        );
+
+    }
+}
+
+
+function updateLogoPreview() {
 
     const input =
         document.getElementById(
             "season-logo"
         );
-
-
-    const image =
-        document.getElementById(
-            "season-logo-preview-image"
-        );
-
 
     const container =
         document.getElementById(
             "season-logo-preview"
         );
 
+    const image =
+        document.getElementById(
+            "season-logo-preview-image"
+        );
 
-    if (!input || !image || !container) {
+    if (!input || !container || !image) {
         return;
     }
-
 
     const url =
         input.value.trim();
 
 
-    const box =
-        container.querySelector(
-            ".image-preview-box"
-        );
-
-
-    if (!box) {
-        return;
-    }
-
-
     if (!url) {
 
-        image.style.display = "none";
+        container.style.display =
+            "none";
 
-        let placeholder =
-            box.querySelector(
-                ".preview-placeholder"
-            );
-
-
-        if (!placeholder) {
-
-            placeholder =
-                document.createElement(
-                    "span"
-                );
-
-            placeholder.className =
-                "preview-placeholder";
-
-            box.appendChild(
-                placeholder
-            );
-        }
-
-
-        placeholder.textContent =
-            "Enter a logo URL above";
+        image.src = "";
 
         return;
     }
 
 
-    image.src = url;
+    image.onload = () => {
 
-    image.style.display = "block";
-
-
-    const placeholder =
-        box.querySelector(
-            ".preview-placeholder"
-        );
-
-
-    if (placeholder) {
-        placeholder.remove();
-    }
+        container.style.display =
+            "block";
+    };
 
 
     image.onerror = () => {
 
-        image.style.display = "none";
-
-
-        let errorMessage =
-            box.querySelector(
-                ".preview-placeholder"
-            );
-
-
-        if (!errorMessage) {
-
-            errorMessage =
-                document.createElement(
-                    "span"
-                );
-
-            errorMessage.className =
-                "preview-placeholder";
-
-            box.appendChild(
-                errorMessage
-            );
-
-        }
-
-
-        errorMessage.textContent =
-            "Unable to load logo";
+        container.style.display =
+            "none";
     };
 
-}
 
-
-/* =========================================================
-   BACKGROUND PREVIEW
-   ========================================================= */
-
-function setupSeasonBackgroundPreview() {
-
-    const input =
-        document.getElementById(
-            "season-background"
-        );
-
-
-    if (!input) {
-        return;
-    }
-
-
-    input.addEventListener(
-        "input",
-        updateBackgroundPreview
-    );
-
+    image.src = url;
 }
 
 
@@ -1294,49 +1126,448 @@ function updateBackgroundPreview() {
             "season-background"
         );
 
-
     if (!input) {
         return;
     }
-
 
     const url =
         input.value.trim();
 
 
-    if (!url) {
-        document.body.style.backgroundImage = "";
-        return;
+    if (url) {
+
+        document.body.style.backgroundImage =
+            `url("${url}")`;
+
+        document.body.style.backgroundSize =
+            "cover";
+
+        document.body.style.backgroundAttachment =
+            "fixed";
+
+    } else {
+
+        document.body.style.backgroundImage =
+            "";
     }
+}
 
 
-    /*
-     * We don't permanently apply the background here.
-     * This is simply a live preview while editing.
-     */
+/* =========================================================
+   SEASON RULES
+   ========================================================= */
 
-    const page =
+function setupRuleControls() {
+
+    const nominees =
         document.getElementById(
-            "creator-page"
+            "rule-nominees"
+        );
+
+    const vetoPlayers =
+        document.getElementById(
+            "rule-veto-players"
+        );
+
+    const startingHOH =
+        document.getElementById(
+            "rule-starting-hoh"
         );
 
 
-    if (!page) {
-        return;
+    if (nominees) {
+
+        nominees.addEventListener(
+            "change",
+            updateCustomNomineesVisibility
+        );
+
     }
 
 
-    page.style.backgroundImage =
-        `linear-gradient(
-            rgba(16,17,22,0.94),
-            rgba(16,17,22,0.97)
-        ), url("${url}")`;
+    if (vetoPlayers) {
 
-    page.style.backgroundSize = "cover";
+        vetoPlayers.addEventListener(
+            "change",
+            updateCustomVetoPlayersVisibility
+        );
 
-    page.style.backgroundAttachment =
-        "fixed";
+    }
 
+
+    if (startingHOH) {
+
+        startingHOH.addEventListener(
+            "change",
+            updateSpecificHOHVisibility
+        );
+
+    }
+
+
+    updateCustomNomineesVisibility();
+
+    updateCustomVetoPlayersVisibility();
+
+    updateSpecificHOHVisibility();
+
+}
+
+
+function resetSeasonRules() {
+
+    setSelectValue(
+        "rule-finalists",
+        "2"
+    );
+
+    setInputValue(
+        "rule-jury-size",
+        "7"
+    );
+
+    setCheckboxValue(
+        "rule-veto-enabled",
+        true
+    );
+
+    setCheckboxValue(
+        "rule-safety-enabled",
+        false
+    );
+
+    setCheckboxValue(
+        "rule-battle-back",
+        false
+    );
+
+    setCheckboxValue(
+        "rule-double-eviction",
+        false
+    );
+
+    setSelectValue(
+        "rule-nominees",
+        "2"
+    );
+
+    setInputValue(
+        "rule-custom-nominees",
+        "2"
+    );
+
+    setSelectValue(
+        "rule-veto-players",
+        "6"
+    );
+
+    setInputValue(
+        "rule-custom-veto-players",
+        "6"
+    );
+
+    setSelectValue(
+        "rule-eviction-type",
+        "house"
+    );
+
+    setSelectValue(
+        "rule-starting-hoh",
+        "random"
+    );
+
+    setSelectValue(
+        "rule-specific-hoh",
+        ""
+    );
+
+    setCheckboxValue(
+        "rule-jury-voting",
+        true
+    );
+
+
+    updateCustomNomineesVisibility();
+
+    updateCustomVetoPlayersVisibility();
+
+    updateSpecificHOHVisibility();
+}
+
+
+function collectSeasonRules() {
+
+    let nominees =
+        document.getElementById(
+            "rule-nominees"
+        )?.value || "2";
+
+
+    if (nominees === "custom") {
+
+        nominees =
+            getSafeNumber(
+                "rule-custom-nominees",
+                2,
+                1,
+                10
+            );
+
+    } else {
+
+        nominees =
+            parseInt(
+                nominees,
+                10
+            );
+    }
+
+
+    let vetoPlayers =
+        document.getElementById(
+            "rule-veto-players"
+        )?.value || "6";
+
+
+    if (vetoPlayers === "custom") {
+
+        vetoPlayers =
+            getSafeNumber(
+                "rule-custom-veto-players",
+                6,
+                3,
+                15
+            );
+
+    } else {
+
+        vetoPlayers =
+            parseInt(
+                vetoPlayers,
+                10
+            );
+    }
+
+
+    return {
+
+        finalists:
+            getSafeNumber(
+                "rule-finalists",
+                2,
+                2,
+                3
+            ),
+
+        jurySize:
+            getSafeNumber(
+                "rule-jury-size",
+                7,
+                0,
+                30
+            ),
+
+        vetoEnabled:
+            getCheckboxValue(
+                "rule-veto-enabled",
+                true
+            ),
+
+        safetyCompetitionEnabled:
+            getCheckboxValue(
+                "rule-safety-enabled",
+                false
+            ),
+
+        battleBackEnabled:
+            getCheckboxValue(
+                "rule-battle-back",
+                false
+            ),
+
+        doubleEvictionEnabled:
+            getCheckboxValue(
+                "rule-double-eviction",
+                false
+            ),
+
+        nomineesPerWeek:
+            nominees,
+
+        vetoPlayers:
+            vetoPlayers,
+
+        evictionType:
+            getSelectValue(
+                "rule-eviction-type",
+                "house"
+            ),
+
+        startingHOH:
+            getSelectValue(
+                "rule-starting-hoh",
+                "random"
+            ),
+
+        specificStartingHOH:
+            getSelectValue(
+                "rule-specific-hoh",
+                ""
+            ),
+
+        juryVotingEnabled:
+            getCheckboxValue(
+                "rule-jury-voting",
+                true
+            )
+
+    };
+}
+
+
+/* =========================================================
+   RULE VISIBILITY
+   ========================================================= */
+
+function updateCustomNomineesVisibility() {
+
+    const select =
+        document.getElementById(
+            "rule-nominees"
+        );
+
+    const container =
+        document.getElementById(
+            "custom-nominees-container"
+        );
+
+    if (!select || !container) {
+        return;
+    }
+
+    container.style.display =
+        select.value === "custom"
+            ? "flex"
+            : "none";
+}
+
+
+function updateCustomVetoPlayersVisibility() {
+
+    const select =
+        document.getElementById(
+            "rule-veto-players"
+        );
+
+    const container =
+        document.getElementById(
+            "custom-veto-players-container"
+        );
+
+    if (!select || !container) {
+        return;
+    }
+
+    container.style.display =
+        select.value === "custom"
+            ? "flex"
+            : "none";
+}
+
+
+function updateSpecificHOHVisibility() {
+
+    const select =
+        document.getElementById(
+            "rule-starting-hoh"
+        );
+
+    const container =
+        document.getElementById(
+            "specific-hoh-container"
+        );
+
+    if (!select || !container) {
+        return;
+    }
+
+    container.style.display =
+        select.value === "specific"
+            ? "flex"
+            : "none";
+
+    if (
+        select.value === "specific"
+    ) {
+
+        populateSpecificHOHOptions();
+    }
+}
+
+
+function populateSpecificHOHOptions() {
+
+    const select =
+        document.getElementById(
+            "rule-specific-hoh"
+        );
+
+    if (!select) {
+        return;
+    }
+
+    const previousValue =
+        select.value;
+
+
+    select.innerHTML = `
+
+        <option value="">
+            Select Houseguest
+        </option>
+
+    `;
+
+
+    const houseguests =
+        collectHouseguests();
+
+
+    houseguests.forEach(
+        (houseguest, index) => {
+
+            const option =
+                document.createElement(
+                    "option"
+                );
+
+            option.value =
+                houseguest.id;
+
+            option.textContent =
+                houseguest.name ||
+                `Houseguest ${index + 1}`;
+
+            select.appendChild(option);
+
+        }
+    );
+
+
+    const stillExists =
+        Array.from(
+            select.options
+        ).some(
+            option =>
+                option.value === previousValue
+        );
+
+
+    if (stillExists) {
+
+        select.value =
+            previousValue;
+    }
 }
 
 
@@ -1346,54 +1577,30 @@ function updateBackgroundPreview() {
 
 function saveSeason() {
 
-    const nameInput =
+    const name =
         document.getElementById(
             "season-name"
-        );
-
-
-    const themeInput =
-        document.getElementById(
-            "season-theme"
-        );
-
-
-    const descriptionInput =
-        document.getElementById(
-            "season-description"
-        );
-
-
-    const logoInput =
-        document.getElementById(
-            "season-logo"
-        );
-
-
-    const backgroundInput =
-        document.getElementById(
-            "season-background"
-        );
-
-
-    const name =
-        nameInput?.value.trim() || "";
-
+        )?.value.trim() || "";
 
     const theme =
-        themeInput?.value.trim() || "";
-
+        document.getElementById(
+            "season-theme"
+        )?.value.trim() || "";
 
     const description =
-        descriptionInput?.value.trim() || "";
-
+        document.getElementById(
+            "season-description"
+        )?.value.trim() || "";
 
     const logo =
-        logoInput?.value.trim() || "";
-
+        document.getElementById(
+            "season-logo"
+        )?.value.trim() || "";
 
     const background =
-        backgroundInput?.value.trim() || "";
+        document.getElementById(
+            "season-background"
+        )?.value.trim() || "";
 
 
     if (!name) {
@@ -1401,9 +1608,6 @@ function saveSeason() {
         alert(
             "Please enter a season name."
         );
-
-
-        nameInput?.focus();
 
         return;
     }
@@ -1416,28 +1620,27 @@ function saveSeason() {
     if (houseguests.length < 2) {
 
         alert(
-            "Please add at least 2 houseguests."
+            "A season needs at least two houseguests."
         );
 
         return;
     }
 
 
-    const now =
-        new Date().toISOString();
+    const rules =
+        collectSeasonRules();
 
 
     let season;
 
 
-    /*
-     * UPDATE EXISTING SEASON
-     */
-
     if (editingSeasonId) {
 
         const existing =
-            findSeason(editingSeasonId);
+            savedSeasons.find(
+                season =>
+                    season.id === editingSeasonId
+            );
 
 
         if (!existing) {
@@ -1445,8 +1648,6 @@ function saveSeason() {
             alert(
                 "The season you were editing could not be found."
             );
-
-            editingSeasonId = null;
 
             return;
         }
@@ -1468,7 +1669,10 @@ function saveSeason() {
 
             houseguests,
 
-            updatedAt: now
+            rules,
+
+            updatedAt:
+                new Date().toISOString()
 
         };
 
@@ -1480,23 +1684,15 @@ function saveSeason() {
             );
 
 
-        if (index !== -1) {
-            savedSeasons[index] =
-                season;
-        }
+        savedSeasons[index] =
+            season;
 
-    }
-
-
-    /*
-     * CREATE NEW SEASON
-     */
-
-    else {
+    } else {
 
         season = {
 
-            id: createSeasonId(),
+            id:
+                generateId(),
 
             name,
 
@@ -1509,12 +1705,6 @@ function saveSeason() {
             background,
 
             houseguests,
-
-
-            /*
-             * These systems will be populated
-             * in upcoming development stages.
-             */
 
             alliances: [],
 
@@ -1536,23 +1726,7 @@ function saveSeason() {
 
             twists: [],
 
-
-            rules: {
-
-                finalists: 2,
-
-                jurySize: 7,
-
-                vetoEnabled: true,
-
-                safetyCompetitionEnabled: false,
-
-                battleBackEnabled: false,
-
-                doubleEvictionEnabled: false
-
-            },
-
+            rules,
 
             simulation: {
 
@@ -1572,107 +1746,60 @@ function saveSeason() {
 
                 winner: null,
 
-                runnerUp: null
+                runnerUp: null,
+
+                jury: [],
+
+                finalists: [],
+
+                currentHOH: null,
+
+                currentNominees: [],
+
+                currentPOVPlayers: [],
+
+                currentPOVWinner: null,
+
+                currentSafetyWinner: null,
+
+                currentEviction: null
 
             },
 
+            createdAt:
+                new Date().toISOString(),
 
-            createdAt: now,
-
-            updatedAt: now
+            updatedAt:
+                new Date().toISOString()
 
         };
 
 
         savedSeasons.push(season);
-
     }
 
 
-    saveSeasonsToStorage();
+    persistSavedSeasons();
+
+    currentSeason =
+        season;
+
+
+    editingSeasonId =
+        null;
+
 
     renderSavedSeasons();
 
 
-    editingSeasonId = null;
-
-    currentSeason = season;
-
-
     alert(
-        "Season saved successfully!"
-    );
-
-
-    showPage("home-page");
-
-}
-
-
-/* =========================================================
-   CREATE UNIQUE SEASON ID
-   ========================================================= */
-
-function createSeasonId() {
-
-    return (
-        "season-" +
-        Date.now() +
-        "-" +
-        Math.random()
-            .toString(36)
-            .substring(2, 8)
-    );
-
-}
-
-
-/* =========================================================
-   FIND SEASON
-   ========================================================= */
-
-function findSeason(id) {
-
-    return savedSeasons.find(
-        season =>
-            season.id === id
-    );
-
-}
-
-
-/* =========================================================
-   OPEN SEASON
-   ========================================================= */
-
-function openSeason(id) {
-
-    const season =
-        findSeason(id);
-
-
-    if (!season) {
-
-        alert(
-            "Season could not be found."
-        );
-
-        return;
-    }
-
-
-    currentSeason = season;
-
-
-    loadSeasonIntoSimulator(
-        season
+        `"${name}" has been saved successfully.`
     );
 
 
     showPage(
-        "simulator-page"
+        "saved-seasons-page"
     );
-
 }
 
 
@@ -1683,95 +1810,64 @@ function openSeason(id) {
 function editSeason(id) {
 
     const season =
-        findSeason(id);
+        savedSeasons.find(
+            item =>
+                item.id === id
+        );
 
 
     if (!season) {
-
-        alert(
-            "Season could not be found."
-        );
-
         return;
     }
 
 
-    editingSeasonId = season.id;
+    editingSeasonId =
+        season.id;
 
 
-    /*
-     * Load basic season information
-     */
-
-    const nameInput =
-        document.getElementById(
-            "season-name"
-        );
+    loadSeasonIntoCreator(
+        season
+    );
 
 
-    const themeInput =
-        document.getElementById(
-            "season-theme"
-        );
+    showPage(
+        "creator-page"
+    );
+}
 
 
-    const descriptionInput =
-        document.getElementById(
-            "season-description"
-        );
+function loadSeasonIntoCreator(season) {
 
+    setInputValue(
+        "season-name",
+        season.name || ""
+    );
 
-    const logoInput =
-        document.getElementById(
-            "season-logo"
-        );
+    setInputValue(
+        "season-theme",
+        season.theme || ""
+    );
 
+    setInputValue(
+        "season-description",
+        season.description || ""
+    );
 
-    const backgroundInput =
-        document.getElementById(
-            "season-background"
-        );
+    setInputValue(
+        "season-logo",
+        season.logo || ""
+    );
 
+    setInputValue(
+        "season-background",
+        season.background || ""
+    );
 
-    if (nameInput) {
-        nameInput.value =
-            season.name || "";
-    }
-
-
-    if (themeInput) {
-        themeInput.value =
-            season.theme || "";
-    }
-
-
-    if (descriptionInput) {
-        descriptionInput.value =
-            season.description || "";
-    }
-
-
-    if (logoInput) {
-        logoInput.value =
-            season.logo || "";
-    }
-
-
-    if (backgroundInput) {
-        backgroundInput.value =
-            season.background || "";
-    }
-
-
-    /*
-     * Clear current houseguest editor
-     */
 
     const editor =
         document.getElementById(
             "houseguest-editor"
         );
-
 
     if (editor) {
         editor.innerHTML = "";
@@ -1781,16 +1877,26 @@ function editSeason(id) {
     currentHouseguestId = 0;
 
 
-    /*
-     * Rebuild the cast
-     */
-
     const houseguests =
         Array.isArray(
             season.houseguests
         )
             ? season.houseguests
             : [];
+
+
+    const count =
+        document.getElementById(
+            "houseguest-count"
+        );
+
+    if (count) {
+        count.value =
+            Math.max(
+                2,
+                houseguests.length
+            );
+    }
 
 
     houseguests.forEach(
@@ -1804,17 +1910,267 @@ function editSeason(id) {
     );
 
 
+    loadSeasonRules(
+        season.rules
+    );
+
+
     updateHouseguestCount();
 
-    updateSeasonLogoPreview();
+    updateLogoPreview();
 
     updateBackgroundPreview();
 
+    updateSpecificHOHVisibility();
+}
 
-    showPage(
-        "creator-page"
+
+function loadSeasonRules(rules = {}) {
+
+    const defaults = {
+
+        finalists: 2,
+
+        jurySize: 7,
+
+        vetoEnabled: true,
+
+        safetyCompetitionEnabled: false,
+
+        battleBackEnabled: false,
+
+        doubleEvictionEnabled: false,
+
+        nomineesPerWeek: 2,
+
+        vetoPlayers: 6,
+
+        evictionType: "house",
+
+        startingHOH: "random",
+
+        specificStartingHOH: "",
+
+        juryVotingEnabled: true
+
+    };
+
+
+    const settings = {
+        ...defaults,
+        ...rules
+    };
+
+
+    setSelectValue(
+        "rule-finalists",
+        String(settings.finalists)
     );
 
+
+    setInputValue(
+        "rule-jury-size",
+        settings.jurySize
+    );
+
+
+    setCheckboxValue(
+        "rule-veto-enabled",
+        settings.vetoEnabled
+    );
+
+
+    setCheckboxValue(
+        "rule-safety-enabled",
+        settings.safetyCompetitionEnabled
+    );
+
+
+    setCheckboxValue(
+        "rule-battle-back",
+        settings.battleBackEnabled
+    );
+
+
+    setCheckboxValue(
+        "rule-double-eviction",
+        settings.doubleEvictionEnabled
+    );
+
+
+    const nomineeValue =
+        String(
+            settings.nomineesPerWeek
+        );
+
+
+    if (
+        nomineeValue === "2" ||
+        nomineeValue === "3"
+    ) {
+
+        setSelectValue(
+            "rule-nominees",
+            nomineeValue
+        );
+
+    } else {
+
+        setSelectValue(
+            "rule-nominees",
+            "custom"
+        );
+
+        setInputValue(
+            "rule-custom-nominees",
+            settings.nomineesPerWeek
+        );
+    }
+
+
+    const vetoValue =
+        String(
+            settings.vetoPlayers
+        );
+
+
+    if (
+        vetoValue === "6" ||
+        vetoValue === "7"
+    ) {
+
+        setSelectValue(
+            "rule-veto-players",
+            vetoValue
+        );
+
+    } else {
+
+        setSelectValue(
+            "rule-veto-players",
+            "custom"
+        );
+
+        setInputValue(
+            "rule-custom-veto-players",
+            settings.vetoPlayers
+        );
+    }
+
+
+    setSelectValue(
+        "rule-eviction-type",
+        settings.evictionType
+    );
+
+
+    setSelectValue(
+        "rule-starting-hoh",
+        settings.startingHOH
+    );
+
+
+    setCheckboxValue(
+        "rule-jury-voting",
+        settings.juryVotingEnabled
+    );
+
+
+    updateCustomNomineesVisibility();
+
+    updateCustomVetoPlayersVisibility();
+
+    updateSpecificHOHVisibility();
+
+
+    setTimeout(() => {
+
+        setSelectValue(
+            "rule-specific-hoh",
+            settings.specificStartingHOH || ""
+        );
+
+    }, 0);
+}
+
+
+/* =========================================================
+   OPEN SEASON
+   ========================================================= */
+
+function openSeason(id) {
+
+    const season =
+        savedSeasons.find(
+            item =>
+                item.id === id
+        );
+
+
+    if (!season) {
+        return;
+    }
+
+
+    currentSeason =
+        season;
+
+
+    /*
+     * If the simulation has never started,
+     * initialize its setup state.
+     */
+
+    if (!season.simulation) {
+
+        season.simulation = {
+
+            started: false,
+
+            completed: false,
+
+            currentWeek: 1,
+
+            currentPhase: "setup",
+
+            currentEventIndex: 0,
+
+            history: [],
+
+            finalPlacements: [],
+
+            winner: null,
+
+            runnerUp: null,
+
+            jury: [],
+
+            finalists: [],
+
+            currentHOH: null,
+
+            currentNominees: [],
+
+            currentPOVPlayers: [],
+
+            currentPOVWinner: null,
+
+            currentSafetyWinner: null,
+
+            currentEviction: null
+
+        };
+    }
+
+
+    loadSimulator(
+        season
+    );
+
+
+    showPage(
+        "simulator-page"
+    );
 }
 
 
@@ -1825,7 +2181,10 @@ function editSeason(id) {
 function deleteSeason(id) {
 
     const season =
-        findSeason(id);
+        savedSeasons.find(
+            item =>
+                item.id === id
+        );
 
 
     if (!season) {
@@ -1851,7 +2210,7 @@ function deleteSeason(id) {
         );
 
 
-    saveSeasonsToStorage();
+    persistSavedSeasons();
 
     renderSavedSeasons();
 
@@ -1860,582 +2219,156 @@ function deleteSeason(id) {
         currentSeason &&
         currentSeason.id === id
     ) {
-        currentSeason = null;
-    }
 
+        currentSeason =
+            null;
+    }
 }
 
 
 /* =========================================================
-   LOAD SEASON INTO SIMULATOR
+   SIMULATOR LOADING
    ========================================================= */
 
-function loadSeasonIntoSimulator(
-    season
-) {
+function loadSimulator(season) {
 
-    const seasonName =
-        document.getElementById(
-            "simulator-season-name"
-        );
+    document.getElementById(
+        "simulator-season-name"
+    ).textContent =
+        season.name || "Season";
 
 
-    const seasonTheme =
-        document.getElementById(
-            "simulator-season-theme"
-        );
-
-
-    const currentWeek =
-        document.getElementById(
-            "current-week"
-        );
-
-
-    const currentHoh =
-        document.getElementById(
-            "current-hoh"
-        );
-
-
-    const currentNominees =
-        document.getElementById(
-            "current-nominees"
-        );
-
-
-    const currentVeto =
-        document.getElementById(
-            "current-veto"
-        );
-
-
-    if (seasonName) {
-
-        seasonName.textContent =
-            season.name ||
-            "Season";
-
-    }
-
-
-    if (seasonTheme) {
-
-        seasonTheme.textContent =
-            season.theme ||
-            "Custom Big Brother Season";
-
-    }
-
-
-    if (currentWeek) {
-        currentWeek.textContent =
-            season.simulation?.currentWeek ||
-            1;
-    }
-
-
-    if (currentHoh) {
-        currentHoh.textContent =
-            "—";
-    }
-
-
-    if (currentNominees) {
-        currentNominees.textContent =
-            "—";
-    }
-
-
-    if (currentVeto) {
-        currentVeto.textContent =
-            "—";
-    }
-
-
-    resetSimulationChain();
-
-
-    const eventType =
-        document.getElementById(
-            "event-type"
-        );
-
-
-    const eventTitle =
-        document.getElementById(
-            "event-title"
-        );
-
-
-    const eventContent =
-        document.getElementById(
-            "event-content"
-        );
-
-
-    if (eventType) {
-        eventType.textContent =
-            "WEEK 1";
-    }
-
-
-    if (eventTitle) {
-        eventTitle.textContent =
-            "Ready to Begin";
-    }
-
-
-    if (eventContent) {
-
-        const count =
-            season.houseguests?.length ||
-            0;
-
-
-        eventContent.innerHTML = `
-
-            <p>
-                ${escapeHTML(
-                    season.name ||
-                    "Your season"
-                )}
-                is ready to simulate.
-            </p>
-
-            <p style="
-                margin-top:10px;
-                color:#666c79;
-            ">
-                ${count} houseguests are currently in the cast.
-            </p>
-
-        `;
-
-    }
+    document.getElementById(
+        "simulator-season-theme"
+    ).textContent =
+        season.theme || "Custom Season";
 
 
     if (
-        season.background &&
-        typeof season.background === "string"
+        season.background
     ) {
 
-        document.body.style.backgroundImage =
-            `linear-gradient(
-                rgba(16,17,22,0.95),
-                rgba(16,17,22,0.98)
-            ), url("${season.background}")`;
+        document.getElementById(
+            "simulator-page"
+        ).style.backgroundImage =
+            `url("${season.background}")`;
 
-        document.body.style.backgroundSize =
+        document.getElementById(
+            "simulator-page"
+        ).style.backgroundSize =
             "cover";
 
-        document.body.style.backgroundAttachment =
+        document.getElementById(
+            "simulator-page"
+        ).style.backgroundAttachment =
             "fixed";
-
     }
 
-}
 
+    updateSimulatorStatus();
 
-/* =========================================================
-   SIMULATION CHAIN
-   ========================================================= */
+    resetGameChainVisuals();
 
-function resetSimulationChain() {
-
-    const steps =
-        document.querySelectorAll(
-            ".chain-step"
-        );
-
-
-    steps.forEach(
-        (step, index) => {
-
-            step.classList.remove(
-                "active",
-                "completed"
-            );
-
-
-            if (index === 0) {
-
-                step.classList.add(
-                    "active"
-                );
-
-            }
-
-        }
+    displaySimulationEvent(
+        "hoh"
     );
-
 }
 
 
 /* =========================================================
-   RUN NEXT EVENT
+   SIMULATOR STATUS
    ========================================================= */
 
-function runNextEvent() {
+function updateSimulatorStatus() {
 
     if (!currentSeason) {
-
-        alert(
-            "Please open a season before starting the simulation."
-        );
-
         return;
-    }
-
-
-    if (!currentSeason.simulation) {
-
-        currentSeason.simulation = {
-
-            started: false,
-
-            completed: false,
-
-            currentWeek: 1,
-
-            currentPhase: "setup",
-
-            currentEventIndex: 0,
-
-            history: [],
-
-            finalPlacements: [],
-
-            winner: null,
-
-            runnerUp: null
-
-        };
-
     }
 
 
     const simulation =
-        currentSeason.simulation;
+        currentSeason.simulation || {};
 
 
-    simulation.started = true;
+    const week =
+        simulation.currentWeek || 1;
 
 
-    let eventIndex =
-        Number(
-            simulation.currentEventIndex
+    document.getElementById(
+        "current-week"
+    ).textContent =
+        week;
+
+
+    document.getElementById(
+        "current-hoh"
+    ).textContent =
+        getHouseguestName(
+            simulation.currentHOH
         );
 
 
-    if (
-        !Number.isFinite(eventIndex) ||
-        eventIndex < 0
-    ) {
-        eventIndex = 0;
-    }
+    document.getElementById(
+        "current-nominees"
+    ).textContent =
+        formatHouseguestList(
+            simulation.currentNominees
+        );
 
 
-    const event =
-        EVENT_CHAIN[eventIndex];
+    document.getElementById(
+        "current-veto"
+    ).textContent =
+        getHouseguestName(
+            simulation.currentPOVWinner
+        );
+}
 
 
-    if (!event) {
+/* =========================================================
+   GAME CHAIN
+   ========================================================= */
 
-        showResults();
+function resetGameChainVisuals() {
 
-        return;
-    }
-
-
-    displaySimulationEvent(
-        event
-    );
-
-
-    markChainStep(
-        eventIndex
-    );
+    const steps =
+        document.querySelectorAll(
+            ".chain-step"
+        );
 
 
-    /*
-     * Move to the next event.
-     *
-     * This is intentionally only the
-     * framework for now.
-     *
-     * The real decision-making engine
-     * will be added after we build:
-     *
-     * - relationships
-     * - alliances
-     * - rules
-     * - competitions
-     * - twists
-     */
+    steps.forEach(
+        step => {
 
-    simulation.currentPhase =
-        event.id;
-
-
-    simulation.currentEventIndex =
-        eventIndex + 1;
-
-
-    if (
-        event.id === "eviction"
-    ) {
-
-        /*
-         * For now, advance the week
-         * without actually eliminating
-         * someone.
-         *
-         * This will be replaced by the
-         * real simulation engine.
-         */
-
-        simulation.currentWeek =
-            Number(
-                simulation.currentWeek || 1
-            ) + 1;
-
-
-        simulation.currentEventIndex =
-            0;
-
-
-        simulation.currentPhase =
-            "hoh";
-
-
-        const currentWeek =
-            document.getElementById(
-                "current-week"
+            step.classList.remove(
+                "active"
             );
 
-
-        if (currentWeek) {
-
-            currentWeek.textContent =
-                simulation.currentWeek;
+            step.classList.remove(
+                "completed"
+            );
 
         }
+    );
 
 
-        setTimeout(() => {
+    if (steps[0]) {
 
-            resetSimulationChain();
-
-        }, 100);
-
+        steps[0].classList.add(
+            "active"
+        );
     }
-
-
-    saveCurrentSeasonState();
-
 }
 
 
-/* =========================================================
-   DISPLAY SIMULATION EVENT
-   ========================================================= */
+function markChainStep(eventId) {
 
-function displaySimulationEvent(
-    event
-) {
-
-    const eventType =
-        document.getElementById(
-            "event-type"
+    const currentIndex =
+        EVENT_CHAIN.findIndex(
+            event =>
+                event.id === eventId
         );
 
-
-    const eventTitle =
-        document.getElementById(
-            "event-title"
-        );
-
-
-    const eventContent =
-        document.getElementById(
-            "event-content"
-        );
-
-
-    if (eventType) {
-
-        eventType.textContent =
-            `WEEK ${
-                currentSeason.simulation?.currentWeek ||
-                1
-            }`;
-
-    }
-
-
-    if (eventTitle) {
-
-        eventTitle.textContent =
-            event.title;
-
-    }
-
-
-    if (!eventContent) {
-        return;
-    }
-
-
-    const houseguestCount =
-        currentSeason.houseguests?.length ||
-        0;
-
-
-    let message = "";
-
-
-    switch (event.id) {
-
-        case "hoh":
-
-            message = `
-                <p>
-                    The Head of Household competition
-                    is ready to begin.
-                </p>
-
-                <p style="
-                    margin-top:10px;
-                    color:#666c79;
-                ">
-                    ${houseguestCount} houseguests
-                    are competing.
-                </p>
-            `;
-
-            break;
-
-
-        case "nominations":
-
-            message = `
-                <p>
-                    The HOH will nominate two
-                    houseguests for eviction.
-                </p>
-
-                <p style="
-                    margin-top:10px;
-                    color:#666c79;
-                ">
-                    Nomination logic will be controlled
-                    by relationships, alliances, strategy,
-                    and houseguest ratings.
-                </p>
-            `;
-
-            break;
-
-
-        case "pov-players":
-
-            message = `
-                <p>
-                    The Power of Veto players
-                    will now be selected.
-                </p>
-            `;
-
-            break;
-
-
-        case "pov":
-
-            message = `
-                <p>
-                    The Power of Veto competition
-                    is ready to begin.
-                </p>
-
-                <p style="
-                    margin-top:10px;
-                    color:#666c79;
-                ">
-                    Competition outcomes will eventually
-                    use the custom competition system
-                    and houseguest ratings.
-                </p>
-            `;
-
-            break;
-
-
-        case "veto-ceremony":
-
-            message = `
-                <p>
-                    The Power of Veto ceremony
-                    is now taking place.
-                </p>
-
-                <p style="
-                    margin-top:10px;
-                    color:#666c79;
-                ">
-                    The veto holder will eventually
-                    decide whether to use the veto.
-                </p>
-            `;
-
-            break;
-
-
-        case "eviction":
-
-            message = `
-                <p>
-                    The house is ready for the
-                    eviction vote.
-                </p>
-
-                <p style="
-                    margin-top:10px;
-                    color:#666c79;
-                ">
-                    Voting logic will eventually be
-                    determined by relationships,
-                    alliances, nominations, and strategy.
-                </p>
-            `;
-
-            break;
-
-
-        default:
-
-            message = `
-                <p>
-                    The next event is ready.
-                </p>
-            `;
-
-    }
-
-
-    eventContent.innerHTML =
-        message;
-
-}
-
-
-/* =========================================================
-   MARK CHAIN STEP
-   ========================================================= */
-
-function markChainStep(
-    currentIndex
-) {
 
     const steps =
         document.querySelectorAll(
@@ -2447,7 +2380,10 @@ function markChainStep(
         (step, index) => {
 
             step.classList.remove(
-                "active",
+                "active"
+            );
+
+            step.classList.remove(
                 "completed"
             );
 
@@ -2471,7 +2407,396 @@ function markChainStep(
 
         }
     );
+}
 
+
+/* =========================================================
+   RUN NEXT EVENT
+   ========================================================= */
+
+function runNextEvent() {
+
+    if (!currentSeason) {
+        return;
+    }
+
+
+    const simulation =
+        currentSeason.simulation;
+
+
+    if (!simulation) {
+        return;
+    }
+
+
+    simulation.started =
+        true;
+
+
+    const event =
+        EVENT_CHAIN[
+            simulation.currentEventIndex
+        ];
+
+
+    if (!event) {
+        return;
+    }
+
+
+    /*
+     * FOUNDATION ONLY
+     *
+     * For now we display the chain.
+     *
+     * The actual simulation decisions will
+     * be implemented in the Simulation Engine stage.
+     */
+
+    displaySimulationEvent(
+        event.id
+    );
+
+
+    /*
+     * Move to the next event.
+     */
+
+    if (
+        simulation.currentEventIndex <
+        EVENT_CHAIN.length - 1
+    ) {
+
+        simulation.currentEventIndex++;
+
+    } else {
+
+        /*
+         * End of weekly chain.
+         *
+         * For now, advance to the next week.
+         */
+
+        simulation.currentWeek++;
+
+        simulation.currentEventIndex = 0;
+
+        simulation.currentPhase =
+            "weekly";
+
+    }
+
+
+    saveCurrentSeasonState();
+
+    updateSimulatorStatus();
+
+
+    /*
+     * Highlight the next step.
+     */
+
+    const nextEvent =
+        EVENT_CHAIN[
+            simulation.currentEventIndex
+        ];
+
+
+    if (nextEvent) {
+
+        markChainStep(
+            nextEvent.id
+        );
+    }
+}
+
+
+/* =========================================================
+   DISPLAY SIMULATION EVENT
+   ========================================================= */
+
+function displaySimulationEvent(
+    eventId
+) {
+
+    const event =
+        EVENT_CHAIN.find(
+            item =>
+                item.id === eventId
+        );
+
+
+    if (!event) {
+        return;
+    }
+
+
+    const type =
+        document.getElementById(
+            "event-type"
+        );
+
+    const title =
+        document.getElementById(
+            "event-title"
+        );
+
+    const content =
+        document.getElementById(
+            "event-content"
+        );
+
+
+    type.textContent =
+        event.type;
+
+
+    title.textContent =
+        getEventTitle(
+            eventId
+        );
+
+
+    content.innerHTML =
+        getEventContent(
+            eventId
+        );
+
+
+    markChainStep(
+        eventId
+    );
+}
+
+
+function getEventTitle(eventId) {
+
+    switch (eventId) {
+
+        case "hoh":
+            return "The HOH Competition";
+
+        case "nominations":
+            return "Nomination Ceremony";
+
+        case "pov-players":
+            return "POV Players Are Selected";
+
+        case "pov":
+            return "The Power of Veto Competition";
+
+        case "veto-ceremony":
+            return "The Veto Ceremony";
+
+        case "eviction":
+            return "Eviction";
+
+        default:
+            return "Big Brother";
+    }
+}
+
+
+function getEventContent(eventId) {
+
+    if (!currentSeason) {
+
+        return `
+            <p>
+                The simulation is ready to begin.
+            </p>
+        `;
+    }
+
+
+    const rules =
+        currentSeason.rules || {};
+
+
+    switch (eventId) {
+
+        case "hoh":
+
+            return `
+
+                <p>
+                    The houseguests are competing for
+                    Head of Household.
+                </p>
+
+                <p>
+                    Starting HOH:
+                    <strong>
+                        ${
+                            rules.startingHOH === "specific"
+                                ? getHouseguestName(
+                                    rules.specificStartingHOH
+                                )
+                                : "Random Houseguest"
+                        }
+                    </strong>
+                </p>
+
+            `;
+
+
+        case "nominations":
+
+            return `
+
+                <p>
+                    The Head of Household will nominate
+                    <strong>
+                        ${
+                            rules.nomineesPerWeek || 2
+                        }
+                    </strong>
+                    houseguest${
+                        (rules.nomineesPerWeek || 2) === 1
+                            ? ""
+                            : "s"
+                    } for eviction.
+                </p>
+
+            `;
+
+
+        case "pov-players":
+
+            if (
+                rules.vetoEnabled === false
+            ) {
+
+                return `
+
+                    <p>
+                        The Power of Veto is disabled
+                        for this season.
+                    </p>
+
+                `;
+            }
+
+
+            return `
+
+                <p>
+                    <strong>
+                        ${
+                            rules.vetoPlayers || 6
+                        }
+                    </strong>
+                    houseguests will compete in
+                    the Power of Veto competition.
+                </p>
+
+            `;
+
+
+        case "pov":
+
+            if (
+                rules.vetoEnabled === false
+            ) {
+
+                return `
+
+                    <p>
+                        There is no Power of Veto
+                        competition this season.
+                    </p>
+
+                `;
+            }
+
+
+            return `
+
+                <p>
+                    The houseguests compete for the
+                    Power of Veto.
+                </p>
+
+            `;
+
+
+        case "veto-ceremony":
+
+            if (
+                rules.vetoEnabled === false
+            ) {
+
+                return `
+
+                    <p>
+                        Because the Power of Veto is
+                        disabled, there is no veto
+                        ceremony.
+                    </p>
+
+                `;
+            }
+
+
+            return `
+
+                <p>
+                    The Power of Veto winner decides
+                    whether to use the Veto.
+                </p>
+
+            `;
+
+
+        case "eviction":
+
+            return `
+
+                <p>
+                    The house will vote to evict
+                    a houseguest.
+                </p>
+
+                <p>
+                    Voting method:
+                    <strong>
+                        ${
+                            getEvictionTypeLabel(
+                                rules.evictionType
+                            )
+                        }
+                    </strong>
+                </p>
+
+            `;
+
+
+        default:
+
+            return `
+                <p>
+                    The simulation is continuing.
+                </p>
+            `;
+    }
+}
+
+
+function getEvictionTypeLabel(type) {
+
+    switch (type) {
+
+        case "public":
+            return "Public Vote";
+
+        case "custom":
+            return "Custom";
+
+        case "house":
+        default:
+            return "House Vote";
+    }
 }
 
 
@@ -2498,16 +2823,11 @@ function saveCurrentSeasonState() {
     }
 
 
-    currentSeason.updatedAt =
-        new Date().toISOString();
-
-
     savedSeasons[index] =
         currentSeason;
 
 
-    saveSeasonsToStorage();
-
+    persistSavedSeasons();
 }
 
 
@@ -2522,182 +2842,456 @@ function showResults() {
     }
 
 
-    const resultsName =
-        document.getElementById(
-            "results-season-name"
+    const simulation =
+        currentSeason.simulation || {};
+
+
+    document.getElementById(
+        "results-season-name"
+    ).textContent =
+        currentSeason.name || "Season Results";
+
+
+    document.getElementById(
+        "winner-name"
+    ).textContent =
+        getHouseguestName(
+            simulation.winner
         );
 
 
-    const winnerName =
-        document.getElementById(
-            "winner-name"
-        );
+    renderFinalPlacements();
+
+    renderSeasonStatistics();
+
+    showPage(
+        "results-page"
+    );
+}
 
 
-    if (resultsName) {
+function renderFinalPlacements() {
 
-        resultsName.textContent =
-            currentSeason.name ||
-            "Season";
-
-    }
-
-
-    if (winnerName) {
-
-        winnerName.textContent =
-            currentSeason.simulation?.winner ||
-            "Simulation not yet completed";
-
-    }
-
-
-    const placements =
+    const container =
         document.getElementById(
             "final-placements"
         );
 
 
-    if (placements) {
+    if (!container || !currentSeason) {
+        return;
+    }
 
-        placements.innerHTML = `
+
+    const placements =
+        currentSeason.simulation
+            ?.finalPlacements || [];
+
+
+    container.innerHTML = "";
+
+
+    if (placements.length === 0) {
+
+        container.innerHTML = `
 
             <div class="empty-state">
 
                 <h3>
-                    Final Results Coming Soon
+                    No Final Placements Yet
                 </h3>
 
                 <p>
-                    The full simulation engine will
-                    generate placements, eviction history,
-                    jury votes, competition statistics,
-                    alliance history, and more.
+                    Complete the simulation to see
+                    the final results.
                 </p>
 
             </div>
 
         `;
 
+        return;
     }
 
 
-    const statistics =
+    placements.forEach(
+        (placement, index) => {
+
+            const row =
+                document.createElement(
+                    "div"
+                );
+
+            row.className =
+                "placement-row";
+
+
+            row.innerHTML = `
+
+                <span class="placement-number">
+                    ${index + 1}
+                </span>
+
+                <span class="placement-name">
+                    ${
+                        getHouseguestName(
+                            placement
+                        )
+                    }
+                </span>
+
+                <span class="placement-status">
+                    ${
+                        index === 0
+                            ? "WINNER"
+                            : index === 1
+                                ? "RUNNER-UP"
+                                : "PLACED"
+                    }
+                </span>
+
+            `;
+
+
+            container.appendChild(
+                row
+            );
+
+        }
+    );
+}
+
+
+function renderSeasonStatistics() {
+
+    const container =
         document.getElementById(
             "season-statistics"
         );
 
 
-    if (statistics) {
-
-        statistics.innerHTML = `
-
-            <div class="stat-card">
-
-                <strong>
-                    Houseguests
-                </strong>
-
-                <span>
-                    ${
-                        currentSeason.houseguests?.length ||
-                        0
-                    }
-                </span>
-
-            </div>
-
-
-            <div class="stat-card">
-
-                <strong>
-                    Weeks
-                </strong>
-
-                <span>
-                    ${
-                        currentSeason.simulation?.currentWeek ||
-                        1
-                    }
-                </span>
-
-            </div>
-
-
-            <div class="stat-card">
-
-                <strong>
-                    Winner
-                </strong>
-
-                <span>
-                    ${
-                        escapeHTML(
-                            currentSeason.simulation?.winner ||
-                            "—"
-                        )
-                    }
-                </span>
-
-            </div>
-
-
-            <div class="stat-card">
-
-                <strong>
-                    Status
-                </strong>
-
-                <span>
-                    ${
-                        currentSeason.simulation?.completed
-                            ? "Complete"
-                            : "In Progress"
-                    }
-                </span>
-
-            </div>
-
-        `;
-
+    if (!container || !currentSeason) {
+        return;
     }
 
 
-    showPage(
-        "results-page"
-    );
+    const houseguests =
+        currentSeason.houseguests || [];
 
+
+    const totalHOHWins =
+        houseguests.reduce(
+            (total, hg) =>
+                total +
+                (hg.hohWins || 0),
+            0
+        );
+
+
+    const totalPOVWins =
+        houseguests.reduce(
+            (total, hg) =>
+                total +
+                (hg.povWins || 0),
+            0
+        );
+
+
+    const totalNominations =
+        houseguests.reduce(
+            (total, hg) =>
+                total +
+                (hg.nominationCount || 0),
+            0
+        );
+
+
+    const stats = [
+
+        {
+            label: "Houseguests",
+            value: houseguests.length
+        },
+
+        {
+            label: "HOH Wins",
+            value: totalHOHWins
+        },
+
+        {
+            label: "POV Wins",
+            value: totalPOVWins
+        },
+
+        {
+            label: "Nominations",
+            value: totalNominations
+        }
+
+    ];
+
+
+    container.innerHTML = "";
+
+
+    stats.forEach(stat => {
+
+        const card =
+            document.createElement(
+                "div"
+            );
+
+        card.className =
+            "stat-card";
+
+
+        card.innerHTML = `
+
+            <strong>
+                ${escapeHTML(stat.label)}
+            </strong>
+
+            <span>
+                ${escapeHTML(stat.value)}
+            </span>
+
+        `;
+
+
+        container.appendChild(
+            card
+        );
+
+    });
 }
 
 
 /* =========================================================
-   SCROLL TO SAVED SEASONS
+   HOUSEGUEST HELPERS
    ========================================================= */
 
-function scrollToSavedSeasons() {
+function getHouseguestName(id) {
 
-    showPage("home-page");
-
-
-    setTimeout(() => {
-
-        const section =
-            document.getElementById(
-                "saved-seasons"
-            );
+    if (!id || !currentSeason) {
+        return "—";
+    }
 
 
-        if (section) {
+    const houseguest =
+        currentSeason.houseguests?.find(
+            hg =>
+                hg.id === id
+        );
 
-            section.scrollIntoView({
-                behavior: "smooth",
-                block: "start"
-            });
 
-        }
+    return houseguest?.name ||
+        "Unknown";
+}
 
-    }, 50);
 
+function formatHouseguestList(ids) {
+
+    if (
+        !Array.isArray(ids) ||
+        ids.length === 0
+    ) {
+
+        return "—";
+    }
+
+
+    return ids
+        .map(id =>
+            getHouseguestName(id)
+        )
+        .join(", ");
+}
+
+
+/* =========================================================
+   GENERAL INPUT HELPERS
+   ========================================================= */
+
+function setInputValue(
+    id,
+    value
+) {
+
+    const element =
+        document.getElementById(id);
+
+    if (element) {
+        element.value =
+            value ?? "";
+    }
+}
+
+
+function setSelectValue(
+    id,
+    value
+) {
+
+    const element =
+        document.getElementById(id);
+
+    if (!element) {
+        return;
+    }
+
+
+    const exists =
+        Array.from(
+            element.options
+        ).some(
+            option =>
+                option.value === String(value)
+        );
+
+
+    if (exists) {
+
+        element.value =
+            String(value);
+
+    } else {
+
+        element.selectedIndex =
+            0;
+    }
+}
+
+
+function setCheckboxValue(
+    id,
+    value
+) {
+
+    const element =
+        document.getElementById(id);
+
+    if (element) {
+
+        element.checked =
+            Boolean(value);
+    }
+}
+
+
+function getSelectValue(
+    id,
+    fallback
+) {
+
+    const element =
+        document.getElementById(id);
+
+    return element
+        ? element.value
+        : fallback;
+}
+
+
+function getCheckboxValue(
+    id,
+    fallback
+) {
+
+    const element =
+        document.getElementById(id);
+
+    return element
+        ? element.checked
+        : fallback;
+}
+
+
+function getSafeNumber(
+    id,
+    fallback,
+    min,
+    max
+) {
+
+    const element =
+        document.getElementById(id);
+
+    let value =
+        parseInt(
+            element?.value,
+            10
+        );
+
+
+    if (Number.isNaN(value)) {
+        value = fallback;
+    }
+
+
+    return Math.max(
+        min,
+        Math.min(max, value)
+    );
+}
+
+
+/* =========================================================
+   ID GENERATOR
+   ========================================================= */
+
+function generateId() {
+
+    return (
+        "season-" +
+        Date.now().toString(36) +
+        "-" +
+        Math.random()
+            .toString(36)
+            .substring(2, 9)
+    );
+}
+
+
+/* =========================================================
+   HTML ESCAPING
+   ========================================================= */
+
+function escapeHTML(value) {
+
+    if (value === null ||
+        value === undefined) {
+
+        return "";
+    }
+
+
+    return String(value)
+        .replace(
+            /&/g,
+            "&amp;"
+        )
+        .replace(
+            /</g,
+            "&lt;"
+        )
+        .replace(
+            />/g,
+            "&gt;"
+        )
+        .replace(
+            /"/g,
+            "&quot;"
+        )
+        .replace(
+            /'/g,
+            "&#039;"
+        );
+}
+
+
+function escapeAttribute(value) {
+
+    return escapeHTML(value);
 }
 
 
@@ -2711,7 +3305,6 @@ function openModal(content) {
         document.getElementById(
             "modal"
         );
-
 
     const body =
         document.getElementById(
@@ -2728,16 +3321,8 @@ function openModal(content) {
         content;
 
 
-    modal.classList.add(
-        "active"
-    );
-
-
-    modal.setAttribute(
-        "aria-hidden",
-        "false"
-    );
-
+    modal.style.display =
+        "flex";
 }
 
 
@@ -2749,96 +3334,16 @@ function closeModal() {
         );
 
 
-    if (!modal) {
-        return;
+    if (modal) {
+
+        modal.style.display =
+            "none";
     }
-
-
-    modal.classList.remove(
-        "active"
-    );
-
-
-    modal.setAttribute(
-        "aria-hidden",
-        "true"
-    );
-
 }
 
 
 /* =========================================================
-   ESC KEY FOR MODAL
-   ========================================================= */
-
-document.addEventListener(
-    "keydown",
-    event => {
-
-        if (
-            event.key === "Escape"
-        ) {
-
-            closeModal();
-
-        }
-
-    }
-);
-
-
-/* =========================================================
-   IMAGE ERROR HANDLING
-   ========================================================= */
-
-function setupImageErrorHandling() {
-
-    /*
-     * Most image handling is attached directly
-     * to dynamically-created image elements.
-     *
-     * This function is reserved for future
-     * global image handling.
-     */
-
-}
-
-
-/* =========================================================
-   HTML ESCAPING
-   ========================================================= */
-
-function escapeHTML(value) {
-
-    if (
-        value === null ||
-        value === undefined
-    ) {
-        return "";
-    }
-
-
-    return String(value)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
-}
-
-
-function escapeAttribute(value) {
-
-    return escapeHTML(value);
-
-}
-
-
-/* =========================================================
-   GLOBAL FUNCTIONS
-   =========================================================
-   These make functions accessible to the
-   onclick="" handlers in index.html.
+   GLOBAL FUNCTION EXPORTS
    ========================================================= */
 
 window.showPage =
@@ -2862,11 +3367,11 @@ window.showHouseguestPlaceholder =
 window.saveSeason =
     saveSeason;
 
-window.openSeason =
-    openSeason;
-
 window.editSeason =
     editSeason;
+
+window.openSeason =
+    openSeason;
 
 window.deleteSeason =
     deleteSeason;
@@ -2874,11 +3379,11 @@ window.deleteSeason =
 window.runNextEvent =
     runNextEvent;
 
-window.scrollToSavedSeasons =
-    scrollToSavedSeasons;
-
-window.closeModal =
-    closeModal;
+window.showResults =
+    showResults;
 
 window.openModal =
     openModal;
+
+window.closeModal =
+    closeModal;
