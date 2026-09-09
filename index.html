@@ -1343,6 +1343,17 @@
                     </div>
 
 
+                    <div class="relationship-quick-tools">
+                        <div class="quick-tools-header">
+                            <div>
+                                <h3>Quick Relationship Matrix</h3>
+                                <p>Set common relationship types in seconds. Each cell represents how the row houseguest feels about the column houseguest. Use the detailed editor above for fine-tuning.</p>
+                            </div>
+                            <button type="button" class="secondary-button" onclick="resetRelationshipMatrix()">Clear Matrix</button>
+                        </div>
+                        <div id="relationship-matrix-container" class="relationship-matrix-container"></div>
+                    </div>
+
                     <div
                         id="relationships-container"
                         class="relationships-container"
@@ -1392,7 +1403,11 @@
                             <div class="form-group form-group-full"><label for="alliance-name">Alliance Name</label><input id="alliance-name" type="text" placeholder="Example: The Brigade"></div>
                             <div class="form-group form-group-full"><label for="alliance-description">Description</label><textarea id="alliance-description" rows="3" placeholder="Describe the alliance..."></textarea></div>
                             <div class="form-group"><label for="alliance-status">Status</label><select id="alliance-status"><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
-                            <div class="form-group form-group-full"><label for="alliance-members">Members</label><select id="alliance-members" multiple size="8" aria-describedby="alliance-member-count"></select><small id="alliance-member-count" class="field-hint">Select at least 2 houseguests.</small></div>
+                            <div class="form-group form-group-full">
+                                <label>Members</label>
+                                <div id="alliance-member-picker" class="member-picker" aria-label="Alliance members"></div>
+                                <small id="alliance-member-count" class="field-hint">Select at least 2 houseguests.</small>
+                            </div>
                         </div>
                         <div class="editor-actions"><button id="save-alliance-btn" class="primary-button" type="button">Add Alliance</button><button id="cancel-alliance-btn" class="secondary-button" type="button">Clear</button></div>
                     </div>
