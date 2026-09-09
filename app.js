@@ -3325,8 +3325,14 @@ function saveSeason() {
         competitions:
             collectCompetitions(),
 
+        competitionWeeks:
+            deepClone(getAdvancedArrays().competitionWeeks || {}),
+
         twists:
             collectTwists(),
+
+        twistWeeks:
+            deepClone(getAdvancedArrays().twistWeeks || {}),
 
         rules,
 
@@ -3527,8 +3533,8 @@ function loadSeasonIntoCreator(
 
     renderRelationships();
     loadAlliances(season.alliances || []);
-    loadCompetitions(season.competitions || {});
-    loadTwists(season.twists || []);
+    loadCompetitions({ competitions: season.competitions || {}, competitionWeeks: season.competitionWeeks || {} });
+    loadTwists({ twists: season.twists || [], twistWeeks: season.twistWeeks || {} });
 
 
     updateSeasonLogoPreview();
@@ -5542,17 +5548,21 @@ function getAdvancedArrays() {
             alliances: [],
             relationships: [],
             competitions: { hoh: [], pov: [], safety: [], luxury: [], finalHoh: [] },
+            competitionWeeks: {},
             twists: [],
+            twistWeeks: {},
             simulation: createDefaultSimulation()
         };
     }
     if (!Array.isArray(currentSeason.alliances)) currentSeason.alliances = [];
     if (!Array.isArray(currentSeason.relationships)) currentSeason.relationships = [];
     if (!currentSeason.competitions || typeof currentSeason.competitions !== "object") currentSeason.competitions = {};
-    ["hoh", "pov", "safety", "luxury", "finalHoh"].forEach(k => {
+    ["hoh", "pov", "safety", "luxury", "finalHoh", "special"].forEach(k => {
         if (!Array.isArray(currentSeason.competitions[k])) currentSeason.competitions[k] = [];
     });
+    if (!currentSeason.competitionWeeks || typeof currentSeason.competitionWeeks !== "object") currentSeason.competitionWeeks = {};
     if (!Array.isArray(currentSeason.twists)) currentSeason.twists = [];
+    if (!currentSeason.twistWeeks || typeof currentSeason.twistWeeks !== "object") currentSeason.twistWeeks = {};
     return currentSeason;
 }
 
@@ -5587,19 +5597,261 @@ function deleteAlliance(id) { if(!confirm("Delete this alliance?"))return; getAd
 function cleanupAlliancesForHouseguest(id) { getAdvancedArrays().alliances.forEach(a=>a.members=(a.members||[]).filter(x=>x!==id)); getAdvancedArrays().alliances=getAdvancedArrays().alliances.filter(a=>(a.members||[]).length>=2); renderAlliances(); }
 function renderAlliances() { const c=document.getElementById("alliances-container"); if(!c)return; refreshAdvancedHouseguestOptions(); const gs=getLiveCreatorHouseguests() || collectHouseguests(); const as=getAdvancedArrays().alliances; if(!as.length){c.innerHTML='<div class="empty-state"><p>No alliances created yet.</p></div>';return;} c.innerHTML=as.map(a=>`<div class="advanced-card"><div class="advanced-card-header"><div><h4>${escapeHTML(a.name)}</h4><span class="feature-status">${escapeHTML(a.status||"active")}</span></div><div class="advanced-card-actions"><button type="button" onclick="editAlliance('${escapeAttribute(a.id)}')">Edit</button><button type="button" onclick="deleteAlliance('${escapeAttribute(a.id)}')">Delete</button></div></div><p>${escapeHTML(a.description||"No description.")}</p><strong>Members (${a.members.length})</strong><p>${escapeHTML(a.members.map(id=>getHouseguestDisplayName(id,gs)).join(", "))}</p></div>`).join(""); }
 
-function saveCompetition() { const season=getAdvancedArrays(); const name=getInputValue("competition-name").trim(); if(!name)return alert("Please enter a competition name."); const type=getValue("competition-type")||"hoh"; const obj={id:editingCompetitionId||uid("competition"),name,type,description:getInputValue("competition-description").trim(),primary:getValue("competition-primary")||"physical",secondary:getValue("competition-secondary")||"mental"}; const arr=season.competitions[type]||(season.competitions[type]=[]); let found=false; Object.keys(season.competitions).forEach(k=>{const i=season.competitions[k].findIndex(x=>x.id===obj.id);if(i>=0){season.competitions[k].splice(i,1);found=true;}}); arr.push(obj); editingCompetitionId=null; resetCompetitionEditor(); renderCompetitions(); persistCurrentSeasonIfSaved(); }
-function resetCompetitionEditor(){editingCompetitionId=null;setValue("competition-name","");setValue("competition-type","hoh");setValue("competition-description","");setValue("competition-primary","physical");setValue("competition-secondary","mental");setText("competition-form-title","Create Competition");setText("save-competition-btn","Add Competition");}
-function editCompetition(id){const s=getAdvancedArrays();let c=null;Object.values(s.competitions).some(arr=>{const x=arr.find(y=>y.id===id);if(x)c=x;return !!x;});if(!c)return;editingCompetitionId=id;setValue("competition-name",c.name);setValue("competition-type",c.type);setValue("competition-description",c.description||"");setValue("competition-primary",c.primary||"physical");setValue("competition-secondary",c.secondary||"mental");setText("competition-form-title","Edit Competition");setText("save-competition-btn","Save Competition");document.getElementById("competition-name")?.scrollIntoView({behavior:"smooth",block:"center"});}
-function deleteCompetition(id){if(!confirm("Delete this competition?"))return;const s=getAdvancedArrays();Object.keys(s.competitions).forEach(k=>s.competitions[k]=s.competitions[k].filter(c=>c.id!==id));renderCompetitions();persistCurrentSeasonIfSaved();}
-function renderCompetitions(){const c=document.getElementById("competitions-container");if(!c)return;const s=getAdvancedArrays();const all=Object.values(s.competitions).flat();if(!all.length){c.innerHTML='<div class="empty-state"><p>No custom competitions created yet.</p></div>';return;}const labels={hoh:"HOH",pov:"POV",safety:"Safety",luxury:"Luxury",finalHoh:"Final HOH"};c.innerHTML=all.map(x=>`<div class="advanced-card"><div class="advanced-card-header"><div><h4>${escapeHTML(x.name)}</h4><span class="feature-status">${labels[x.type]||x.type}</span></div><div class="advanced-card-actions"><button type="button" onclick="editCompetition('${escapeAttribute(x.id)}')">Edit</button><button type="button" onclick="deleteCompetition('${escapeAttribute(x.id)}')">Delete</button></div></div><p>${escapeHTML(x.description||"No description.")}</p><small>Primary: ${escapeHTML(x.primary)} · Secondary: ${escapeHTML(x.secondary)}</small></div>`).join("");}
-function loadCompetitions(data){const s=getAdvancedArrays();s.competitions=data&&typeof data==='object'?deepClone(data):{hoh:[],pov:[],safety:[],luxury:[],finalHoh:[]};["hoh","pov","safety","luxury","finalHoh"].forEach(k=>{if(!Array.isArray(s.competitions[k]))s.competitions[k]=[]});resetCompetitionEditor();renderCompetitions();}
+function getWeekNumber(value) {
+    const n = Number(String(value || "").replace(/[^0-9]/g, ""));
+    return Number.isFinite(n) && n >= 1 ? Math.floor(n) : 1;
+}
 
-function saveTwist(){const s=getAdvancedArrays();const name=getInputValue("twist-name").trim();if(!name)return alert("Please enter a twist name.");const duplicate=s.twists.some(t=>t.id!==editingTwistId&&String(t.name).toLowerCase()===name.toLowerCase());if(duplicate)return alert("A twist with that name already exists.");const obj={id:editingTwistId||uid("twist"),name,description:getInputValue("twist-description").trim(),timing:getValue("twist-timing")||"season",active:getChecked("twist-active")};const i=s.twists.findIndex(t=>t.id===obj.id);if(i>=0)s.twists[i]=obj;else s.twists.push(obj);resetTwistEditor();renderTwists();persistCurrentSeasonIfSaved();}
-function resetTwistEditor(){editingTwistId=null;setValue("twist-name","");setValue("twist-description","");setValue("twist-timing","season");setChecked("twist-active",true);setText("twist-form-title","Create Twist");setText("save-twist-btn","Add Twist");}
-function editTwist(id){const t=getAdvancedArrays().twists.find(x=>x.id===id);if(!t)return;editingTwistId=id;setValue("twist-name",t.name);setValue("twist-description",t.description||"");setValue("twist-timing",t.timing||"season");setChecked("twist-active",t.active!==false);setText("twist-form-title","Edit Twist");setText("save-twist-btn","Save Twist");document.getElementById("twist-name")?.scrollIntoView({behavior:"smooth",block:"center"});}
-function deleteTwist(id){if(!confirm("Delete this twist?"))return;getAdvancedArrays().twists=getAdvancedArrays().twists.filter(t=>t.id!==id);renderTwists();persistCurrentSeasonIfSaved();}
-function renderTwists(){const c=document.getElementById("twists-container");if(!c)return;const ts=getAdvancedArrays().twists;if(!ts.length){c.innerHTML='<div class="empty-state"><p>No twists created yet.</p></div>';return;}c.innerHTML=ts.map(t=>`<div class="advanced-card"><div class="advanced-card-header"><div><h4>${escapeHTML(t.name)}</h4><span class="feature-status">${t.active===false?"Inactive":"Active"}</span></div><div class="advanced-card-actions"><button type="button" onclick="editTwist('${escapeAttribute(t.id)}')">Edit</button><button type="button" onclick="deleteTwist('${escapeAttribute(t.id)}')">Delete</button></div></div><p>${escapeHTML(t.description||"No description.")}</p><small>Timing: ${escapeHTML(t.timing||"season")}</small></div>`).join("");}
-function loadTwists(data){getAdvancedArrays().twists=deepClone(Array.isArray(data)?data:[]);resetTwistEditor();renderTwists();}
+function ensureWeekCollections(season) {
+    if (!season.competitionWeeks || typeof season.competitionWeeks !== "object") season.competitionWeeks = {};
+    if (!season.twistWeeks || typeof season.twistWeeks !== "object") season.twistWeeks = {};
+    return season;
+}
+
+function getWeekCompetitions(week) {
+    const s = ensureWeekCollections(getAdvancedArrays());
+    const key = String(getWeekNumber(week));
+    if (!Array.isArray(s.competitionWeeks[key])) s.competitionWeeks[key] = [];
+    return s.competitionWeeks[key];
+}
+
+function getWeekTwists(week) {
+    const s = ensureWeekCollections(getAdvancedArrays());
+    const key = String(getWeekNumber(week));
+    if (!Array.isArray(s.twistWeeks[key])) s.twistWeeks[key] = [];
+    return s.twistWeeks[key];
+}
+
+function populateWeekSelectors() {
+    const options = Array.from({length: 30}, (_, i) => `<option value="${i+1}">Week ${i+1}</option>`).join("");
+    ["competition-week", "twist-week"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = options;
+    });
+}
+
+function saveCompetition() {
+    const s = ensureWeekCollections(getAdvancedArrays());
+    const name = getInputValue("competition-name").trim();
+    if (!name) return alert("Please enter a competition name.");
+    const type = getValue("competition-type") || "hoh";
+    const week = getWeekNumber(getValue("competition-week") || 1);
+    const obj = {
+        id: editingCompetitionId || uid("competition"),
+        week,
+        name,
+        type,
+        description: getInputValue("competition-description").trim(),
+        primary: getValue("competition-primary") || "physical",
+        secondary: getValue("competition-secondary") || "mental"
+    };
+    Object.keys(s.competitionWeeks).forEach(k => {
+        s.competitionWeeks[k] = (s.competitionWeeks[k] || []).filter(x => x.id !== obj.id);
+        if (!s.competitionWeeks[k].length) delete s.competitionWeeks[k];
+    });
+    (s.competitionWeeks[String(week)] || (s.competitionWeeks[String(week)] = [])).push(obj);
+    // Keep the legacy type buckets synchronized for backward compatibility.
+    ["hoh", "pov", "safety", "luxury", "finalHoh", "special"].forEach(k => {
+        if (!Array.isArray(s.competitions[k])) s.competitions[k] = [];
+        s.competitions[k] = s.competitions[k].filter(x => x.id !== obj.id);
+    });
+    s.competitions[type].push(obj);
+    editingCompetitionId = null;
+    resetCompetitionEditor();
+    renderCompetitions();
+    persistCurrentSeasonIfSaved();
+}
+
+function resetCompetitionEditor() {
+    editingCompetitionId = null;
+    setValue("competition-name", "");
+    setValue("competition-week", "1");
+    setValue("competition-type", "hoh");
+    setValue("competition-description", "");
+    setValue("competition-primary", "physical");
+    setValue("competition-secondary", "mental");
+    setText("competition-form-title", "Create Competition");
+    setText("save-competition-btn", "Add Competition");
+}
+
+function findCompetition(id) {
+    const s = ensureWeekCollections(getAdvancedArrays());
+    for (const arr of Object.values(s.competitionWeeks)) {
+        const found = (arr || []).find(x => x.id === id);
+        if (found) return found;
+    }
+    for (const arr of Object.values(s.competitions || {})) {
+        const found = (arr || []).find(x => x.id === id);
+        if (found) return found;
+    }
+    return null;
+}
+
+function editCompetition(id) {
+    const c = findCompetition(id);
+    if (!c) return;
+    editingCompetitionId = id;
+    setValue("competition-name", c.name);
+    setValue("competition-week", c.week || 1);
+    setValue("competition-type", c.type || "hoh");
+    setValue("competition-description", c.description || "");
+    setValue("competition-primary", c.primary || "physical");
+    setValue("competition-secondary", c.secondary || "mental");
+    setText("competition-form-title", "Edit Competition");
+    setText("save-competition-btn", "Save Competition");
+    document.getElementById("competition-name")?.scrollIntoView({behavior:"smooth", block:"center"});
+}
+
+function deleteCompetition(id) {
+    if (!confirm("Delete this competition?")) return;
+    const s = ensureWeekCollections(getAdvancedArrays());
+    Object.keys(s.competitionWeeks).forEach(k => {
+        s.competitionWeeks[k] = (s.competitionWeeks[k] || []).filter(c => c.id !== id);
+        if (!s.competitionWeeks[k].length) delete s.competitionWeeks[k];
+    });
+    Object.keys(s.competitions).forEach(k => s.competitions[k] = (s.competitions[k] || []).filter(c => c.id !== id));
+    renderCompetitions();
+    persistCurrentSeasonIfSaved();
+}
+
+function renderCompetitions() {
+    const c = document.getElementById("competitions-container");
+    if (!c) return;
+    const s = ensureWeekCollections(getAdvancedArrays());
+    const labels = {hoh:"HOH", pov:"POV", safety:"Safety", luxury:"Luxury", finalHoh:"Final HOH", special:"Special Competition"};
+    const legacy = Object.values(s.competitions || {}).flat().filter(x => !Object.values(s.competitionWeeks).some(arr => (arr || []).some(y => y.id === x.id)));
+    const allWeeks = {};
+    Object.keys(s.competitionWeeks).forEach(k => { if ((s.competitionWeeks[k] || []).length) allWeeks[k] = [...s.competitionWeeks[k]]; });
+    if (legacy.length) {
+        legacy.forEach(x => { const w = String(x.week || 1); (allWeeks[w] || (allWeeks[w] = [])).push({...x, week:Number(w)}); });
+    }
+    const weeks = Object.keys(allWeeks).map(Number).sort((a,b)=>a-b);
+    if (!weeks.length) {
+        c.innerHTML = '<div class="empty-state"><p>No weekly competitions created yet. Add your Week 1 HOH/POV above.</p></div>';
+        return;
+    }
+    c.innerHTML = weeks.map(week => `
+        <div class="week-editor-card">
+            <div class="week-editor-header"><div><span class="section-label">WEEK ${week}</span><h4>Week ${week}</h4></div><span class="feature-status">${allWeeks[String(week)].length} competition${allWeeks[String(week)].length===1?"":"s"}</span></div>
+            <div class="week-item-list">
+                ${allWeeks[String(week)].map(x => `<div class="week-item"><div><strong>${escapeHTML(x.name)}</strong><span class="feature-status">${escapeHTML(labels[x.type]||x.type)}</span><p>${escapeHTML(x.description||"No description.")}</p><small>Primary: ${escapeHTML(x.primary||"general")} · Secondary: ${escapeHTML(x.secondary||"general")}</small></div><div class="advanced-card-actions"><button type="button" onclick="editCompetition('${escapeAttribute(x.id)}')">Edit</button><button type="button" onclick="deleteCompetition('${escapeAttribute(x.id)}')">Delete</button></div></div>`).join("")}
+            </div>
+        </div>`).join("");
+}
+
+function loadCompetitions(data) {
+    const s = getAdvancedArrays();
+    if (data && typeof data === "object" && data.competitionWeeks) {
+        s.competitionWeeks = deepClone(data.competitionWeeks);
+        s.competitions = deepClone(data.competitions || {hoh:[],pov:[],safety:[],luxury:[],finalHoh:[],special:[]});
+    } else {
+        // Migrate older library-only competitions into Week 1 unless a week is already stored.
+        s.competitions = data && typeof data === "object" ? deepClone(data) : {hoh:[],pov:[],safety:[],luxury:[],finalHoh:[],special:[]};
+        ["hoh", "pov", "safety", "luxury", "finalHoh", "special"].forEach(k => { if (!Array.isArray(s.competitions[k])) s.competitions[k] = []; });
+        s.competitionWeeks = {};
+        Object.values(s.competitions).flat().forEach(x => { const week = getWeekNumber(x.week || 1); const copy = {...x, week}; (s.competitionWeeks[String(week)] || (s.competitionWeeks[String(week)] = [])).push(copy); });
+    }
+    populateWeekSelectors();
+    resetCompetitionEditor();
+    renderCompetitions();
+}
+
+function saveTwist() {
+    const s = ensureWeekCollections(getAdvancedArrays());
+    const name = getInputValue("twist-name").trim();
+    if (!name) return alert("Please enter a twist name.");
+    const week = getWeekNumber(getValue("twist-week") || 1);
+    const obj = {id: editingTwistId || uid("twist"), name, week, description:getInputValue("twist-description").trim(), timing:`week${week}`, active:getChecked("twist-active")};
+    Object.keys(s.twistWeeks).forEach(k => {
+        s.twistWeeks[k] = (s.twistWeeks[k] || []).filter(t => t.id !== obj.id);
+        if (!s.twistWeeks[k].length) delete s.twistWeeks[k];
+    });
+    (s.twistWeeks[String(week)] || (s.twistWeeks[String(week)] = [])).push(obj);
+    s.twists = (s.twists || []).filter(t => t.id !== obj.id);
+    s.twists.push(obj);
+    resetTwistEditor();
+    renderTwists();
+    persistCurrentSeasonIfSaved();
+}
+
+function resetTwistEditor() {
+    editingTwistId = null;
+    setValue("twist-name", "");
+    setValue("twist-week", "1");
+    setValue("twist-description", "");
+    setChecked("twist-active", true);
+    setText("twist-form-title", "Create Twist");
+    setText("save-twist-btn", "Add Twist");
+}
+
+function findTwist(id) {
+    const s = ensureWeekCollections(getAdvancedArrays());
+    for (const arr of Object.values(s.twistWeeks)) {
+        const found = (arr || []).find(x => x.id === id);
+        if (found) return found;
+    }
+    return (s.twists || []).find(x => x.id === id) || null;
+}
+
+function editTwist(id) {
+    const t = findTwist(id);
+    if (!t) return;
+    editingTwistId = id;
+    setValue("twist-name", t.name);
+    setValue("twist-week", t.week || 1);
+    setValue("twist-description", t.description || "");
+    setChecked("twist-active", t.active !== false);
+    setText("twist-form-title", "Edit Twist");
+    setText("save-twist-btn", "Save Twist");
+    document.getElementById("twist-name")?.scrollIntoView({behavior:"smooth",block:"center"});
+}
+
+function deleteTwist(id) {
+    if (!confirm("Delete this twist?")) return;
+    const s = ensureWeekCollections(getAdvancedArrays());
+    Object.keys(s.twistWeeks).forEach(k => {
+        s.twistWeeks[k] = (s.twistWeeks[k] || []).filter(t => t.id !== id);
+        if (!s.twistWeeks[k].length) delete s.twistWeeks[k];
+    });
+    s.twists = (s.twists || []).filter(t => t.id !== id);
+    renderTwists();
+    persistCurrentSeasonIfSaved();
+}
+
+function renderTwists() {
+    const c = document.getElementById("twists-container");
+    if (!c) return;
+    const s = ensureWeekCollections(getAdvancedArrays());
+    const allWeeks = {};
+    Object.keys(s.twistWeeks).forEach(k => { if ((s.twistWeeks[k] || []).length) allWeeks[k] = [...s.twistWeeks[k]]; });
+    const legacy = (s.twists || []).filter(x => !Object.values(s.twistWeeks).some(arr => (arr || []).some(y => y.id === x.id)));
+    legacy.forEach(x => { const w = String(x.week || (String(x.timing||"").startsWith("week") ? getWeekNumber(x.timing) : 1)); (allWeeks[w] || (allWeeks[w] = [])).push({...x, week:Number(w)}); });
+    const weeks = Object.keys(allWeeks).map(Number).sort((a,b)=>a-b);
+    if (!weeks.length) { c.innerHTML = '<div class="empty-state"><p>No weekly twists created yet. Add a Week 1 twist above if applicable.</p></div>'; return; }
+    c.innerHTML = weeks.map(week => `
+        <div class="week-editor-card">
+            <div class="week-editor-header"><div><span class="section-label">WEEK ${week}</span><h4>Week ${week}</h4></div><span class="feature-status">${allWeeks[String(week)].length} twist${allWeeks[String(week)].length===1?"":"s"}</span></div>
+            <div class="week-item-list">
+                ${allWeeks[String(week)].map(t => `<div class="week-item"><div><strong>${escapeHTML(t.name)}</strong><span class="feature-status">${t.active===false?"Inactive":"Active"}</span><p>${escapeHTML(t.description||"No description.")}</p></div><div class="advanced-card-actions"><button type="button" onclick="editTwist('${escapeAttribute(t.id)}')">Edit</button><button type="button" onclick="deleteTwist('${escapeAttribute(t.id)}')">Delete</button></div></div>`).join("")}
+            </div>
+        </div>`).join("");
+}
+
+function loadTwists(data) {
+    const s = getAdvancedArrays();
+    if (data && typeof data === "object" && !Array.isArray(data) && data.twistWeeks) {
+        s.twistWeeks = deepClone(data.twistWeeks);
+        s.twists = deepClone(data.twists || []);
+    } else {
+        s.twists = deepClone(Array.isArray(data) ? data : []);
+        s.twistWeeks = {};
+        s.twists.forEach(t => { const week = getWeekNumber(t.week || (String(t.timing||"").startsWith("week") ? t.timing : 1)); const copy={...t,week,timing:`week${week}`}; (s.twistWeeks[String(week)] || (s.twistWeeks[String(week)] = [])).push(copy); });
+    }
+    populateWeekSelectors();
+    resetTwistEditor();
+    renderTwists();
+}
+
 function loadAlliances(data){getAdvancedArrays().alliances=deepClone(Array.isArray(data)?data:[]);refreshAdvancedHouseguestOptions();resetAllianceEditor();renderAlliances();}
 function clearAdvancedEditors(){resetAllianceEditor();resetCompetitionEditor();resetTwistEditor();}
 
@@ -5619,7 +5871,7 @@ function chooseCompetitionWinnerByCustom(players, competition) {
     );
 }
 
-function chooseCustomCompetition(type){const list=getAdvancedArrays().competitions[type]||[];if(!list.length)return null;return list[Math.floor(Math.random()*list.length)];}
+function chooseCustomCompetition(type){const s=ensureWeekCollections(getAdvancedArrays());const week=Number(currentSeason?.simulation?.currentWeek||1);const weekly=(s.competitionWeeks?.[String(week)]||[]).filter(c=>c.type===type);if(weekly.length)return weekly[Math.floor(Math.random()*weekly.length)];const list=s.competitions[type]||[];if(!list.length)return null;return list[Math.floor(Math.random()*list.length)];}
 
 // Upgrade competition winner selection with custom competition skill weights.
 const _baseChooseCompetitionWinner = chooseCompetitionWinner;
