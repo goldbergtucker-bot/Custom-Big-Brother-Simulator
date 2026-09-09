@@ -7093,7 +7093,7 @@ function resimulateSeason() {
         renderSimulationWeekNavigation();
         renderMemoryWallMini();
         resetGameChain(0);
-        showPage("game-page");
+        showPage("simulator-page");
 
         // Show the restart state without adding a fake historical event.
         showEvent(
@@ -7556,3 +7556,11 @@ window.showResults = showResults;
         }
     };
 })();
+
+/* =========================================================
+   FINAL INLINE-HANDLER EXPORTS — 2026-09-09
+   ========================================================= */
+window.resetRelationshipMatrix = resetRelationshipMatrix;
+window.showMemoryWall = showMemoryWall;
+window.showPage = showPage;
+window.runNextEvent = window.runNextEvent || runNextEvent;
