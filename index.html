@@ -1374,6 +1374,75 @@
 
 
             <!-- =================================================
+                 ALLIANCES
+                 ================================================= -->
+            <section class="creator-section" id="alliances-section">
+                <div class="section-heading">
+                    <div>
+                        <span class="section-label">STEP 5</span>
+                        <h2>Alliances</h2>
+                        <p>Create strategic alliances and choose their members.</p>
+                    </div>
+                </div>
+
+                <div class="alliance-editor">
+                    <div class="alliance-editor-header">
+                        <span class="section-label">ALLIANCE EDITOR</span>
+                        <h3 id="alliance-form-title">Create Alliance</h3>
+                        <p>Alliances can overlap, so a houseguest may belong to multiple groups.</p>
+                    </div>
+
+                    <div class="alliance-form-grid">
+                        <div class="form-group">
+                            <label for="alliance-name">Alliance Name</label>
+                            <input type="text" id="alliance-name" placeholder="Example: The Brigade">
+                        </div>
+                        <div class="form-group">
+                            <label for="alliance-status">Status</label>
+                            <select id="alliance-status">
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group alliance-description-field">
+                        <label for="alliance-description">Description</label>
+                        <textarea id="alliance-description" rows="3" placeholder="Describe the alliance's purpose, history, or strategy."></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="alliance-members">Members</label>
+                        <select id="alliance-members" class="alliance-member-select" multiple size="8"></select>
+                        <small>Hold Ctrl/Cmd while clicking to select multiple houseguests.</small>
+                        <div id="alliance-member-count" class="alliance-member-count">0 members selected</div>
+                    </div>
+
+                    <div class="alliance-actions-form">
+                        <button type="button" class="primary-button" id="alliance-save-button" onclick="saveAlliance()">Add Alliance</button>
+                        <button type="button" class="secondary-button" onclick="resetAllianceEditor()">Clear</button>
+                    </div>
+                </div>
+
+                <div class="saved-alliances">
+                    <div class="section-heading">
+                        <div>
+                            <span class="section-label">CURRENT SEASON</span>
+                            <h3>Alliance Chart</h3>
+                            <p>All alliances created for this season will appear here.</p>
+                        </div>
+                    </div>
+                    <div id="alliances-container" class="alliances-container">
+                        <div class="empty-state">
+                            <div class="empty-state-icon">👥</div>
+                            <h3>No Alliances Added</h3>
+                            <p>Create your first alliance above.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- =================================================
                  FUTURE CUSTOMIZATION
                  ================================================= -->
 
@@ -1422,7 +1491,7 @@
                         </p>
 
                         <span class="feature-status">
-                            Coming Next
+                            Added
                         </span>
 
                     </div>
