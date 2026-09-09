@@ -3496,7 +3496,9 @@ function createDefaultSimulation() {
         currentEviction: null,
         pendingEvictionId: null,
         evictionVoteResult: null,
-        evictionsThisWeek: 0
+        evictionsThisWeek: 0,
+        pendingWeekAdvance: false,
+        viewingWeek: 1
 
     };
 }
@@ -3758,16 +3760,72 @@ function getCompetitionForWeekType(week, type) {
     return getWeekCompetitions(week).find(c => c.type === type) || null;
 }
 
-function showEvent(title, type, content) {
+function showEvent(title, type, content, options = {}) {
     const titleEl = document.getElementById("event-title");
     const typeEl = document.getElementById("event-type");
     const contentEl = document.getElementById("event-content");
     if (titleEl) titleEl.textContent = title || "Event";
     if (typeEl) typeEl.textContent = type || "EVENT";
     if (contentEl) contentEl.innerHTML = content || "";
+
+    const sim = currentSeason?.simulation;
+    const displayWeek = Number(options.week || sim?.currentWeek || 1);
     const weekTitle = document.getElementById("simulator-event-week-title");
-    if (weekTitle) weekTitle.textContent = `Week ${currentSeason?.simulation?.currentWeek || 1}`;
+    if (weekTitle) weekTitle.textContent = `Week ${displayWeek}`;
+
+    // Save a viewable snapshot for BrantSteele-style back navigation.
+    if (sim && !options.skipHistory && sim.renderingEventKey) {
+        if (!Array.isArray(sim.history)) sim.history = [];
+        const sequence = sim.history.filter(h => Number(h.week) === displayWeek).length;
+        sim.history.push({
+            week: displayWeek,
+            event: sim.renderingEventKey,
+            label: sim.renderingEventLabel || title || "Event",
+            title: title || "Event",
+            type: type || "EVENT",
+            content: content || "",
+            sequence,
+            timestamp: Date.now()
+        });
+        sim.renderingEventKey = null;
+        sim.renderingEventLabel = null;
+    }
+
     renderSimulationWeekNavigation();
+}
+
+function getHistoryForWeek(week) {
+    const history = currentSeason?.simulation?.history || [];
+    return history.filter(item => Number(item.week) === Number(week));
+}
+
+function viewSimulationWeek(week) {
+    if (!currentSeason?.simulation) return;
+    const sim = currentSeason.simulation;
+    const targetWeek = Math.max(1, Math.min(getSeasonLength(currentSeason), Number(week) || 1));
+    sim.viewingWeek = targetWeek;
+    const items = getHistoryForWeek(targetWeek);
+
+    if (items.length) {
+        const latest = items[items.length - 1];
+        showHistoricalSimulationEvent(latest);
+    } else if (targetWeek === Number(sim.currentWeek || 1)) {
+        showEvent(`Week ${targetWeek}`, "WEEK", `<p>Week ${targetWeek} is currently in progress. Choose an event from the left or press <strong>Proceed</strong> to continue.</p>`, {skipHistory:true, week:targetWeek});
+    } else {
+        showEvent(`Week ${targetWeek}`, "WEEK", `<p>No events have been played for Week ${targetWeek} yet.</p>`, {skipHistory:true, week:targetWeek});
+    }
+}
+
+function showHistoricalSimulationEvent(item) {
+    if (!item) return;
+    const sim = currentSeason?.simulation;
+    if (sim) sim.viewingWeek = Number(item.week || sim.currentWeek || 1);
+    showEvent(item.title || item.label || "Event", item.type || "EVENT", item.content || "", {skipHistory:true, week:item.week});
+}
+
+function viewSimulationHistoryEvent(week, sequence) {
+    const item = getHistoryForWeek(week).find(h => Number(h.sequence) === Number(sequence));
+    if (item) showHistoricalSimulationEvent(item);
 }
 
 function renderSimulationWeekNavigation() {
@@ -3776,19 +3834,32 @@ function renderSimulationWeekNavigation() {
     const maxWeeks = getSeasonLength(currentSeason);
     const sim = currentSeason.simulation || createDefaultSimulation();
     const currentWeek = Number(sim.currentWeek || 1);
-    const chain = getWeekEventChain(currentWeek);
-    const active = Number(sim.currentEventIndex || 0);
+    const viewingWeek = Number(sim.viewingWeek || currentWeek);
     const html = [];
+
     for (let w = 1; w <= maxWeeks; w++) {
         const isCurrent = w === currentWeek;
-        html.push(`<div class="sim-week-block ${isCurrent ? "current" : ""}">`);
-        html.push(`<div class="sim-week-label">Week ${w}</div>`);
-        if (isCurrent) {
+        const isViewing = w === viewingWeek;
+        const historyItems = getHistoryForWeek(w);
+        html.push(`<div class="sim-week-block ${isCurrent ? "current" : ""} ${isViewing ? "viewing" : ""}">`);
+        html.push(`<button type="button" class="sim-week-label" onclick="viewSimulationWeek(${w})">Week ${w}</button>`);
+
+        if (isViewing) {
             html.push(`<div class="sim-event-list">`);
-            chain.forEach((item, i) => {
-                const state = i < active ? "completed" : (i === active ? "active" : "pending");
-                html.push(`<div class="sim-event-nav ${state}"><span>${escapeHTML(item.label)}</span></div>`);
-            });
+            if (historyItems.length) {
+                historyItems.forEach(item => {
+                    html.push(`<button type="button" class="sim-event-nav completed" onclick="viewSimulationHistoryEvent(${w}, ${Number(item.sequence)})"><span>${escapeHTML(item.label || item.title || "Event")}</span></button>`);
+                });
+            }
+
+            if (isCurrent && !sim.pendingWeekAdvance) {
+                const chain = getWeekEventChain(currentWeek);
+                const active = Number(sim.currentEventIndex || 0);
+                chain.slice(active).forEach((item, offset) => {
+                    const state = offset === 0 ? "active" : "pending";
+                    html.push(`<div class="sim-event-nav ${state}"><span>${escapeHTML(item.label)}</span></div>`);
+                });
+            }
             html.push(`</div>`);
         }
         html.push(`</div>`);
@@ -3797,10 +3868,7 @@ function renderSimulationWeekNavigation() {
 }
 
 function recordSimulationEvent(key, title) {
-    const sim = currentSeason?.simulation;
-    if (!sim) return;
-    if (!Array.isArray(sim.history)) sim.history = [];
-    sim.history.push({ week: Number(sim.currentWeek || 1), event: key, title, timestamp: Date.now() });
+    // Retained for backwards compatibility. Event snapshots are now recorded by showEvent().
 }
 
 function initializeSimulator(
@@ -3821,6 +3889,8 @@ function initializeSimulator(
 
     const simulation =
         season.simulation;
+
+    if (!Number(simulation.viewingWeek)) simulation.viewingWeek = Number(simulation.currentWeek || 1);
 
 
     setText(
@@ -3940,16 +4010,50 @@ function runNextEvent() {
     if (!currentSeason) { alert("Please open a saved season first."); return; }
     if (!currentSeason.simulation) currentSeason.simulation = createDefaultSimulation();
     const simulation = currentSeason.simulation;
+
+    // After an eviction, keep the eviction page attached to the week it belongs to.
+    // The following click starts the next week, preventing Week N eviction from
+    // visually overlapping Week N+1 HOH.
+    if (simulation.pendingWeekAdvance) {
+        const nextWeek = Number(simulation.currentWeek || 1) + 1;
+        if (nextWeek > getSeasonLength(currentSeason)) {
+            finalizeSeason(getActiveHouseguests());
+            return;
+        }
+        simulation.currentWeek = nextWeek;
+        simulation.viewingWeek = nextWeek;
+        simulation.pendingWeekAdvance = false;
+        simulation.evictionsThisWeek = 0;
+        simulation.currentEventIndex = 0;
+        simulation.currentHOH = null;
+        simulation.currentNominees = [];
+        simulation.currentPOVPlayers = [];
+        simulation.currentPOVWinner = null;
+        simulation.currentEviction = null;
+        simulation.pendingEvictionId = null;
+        simulation.evictionVoteResult = null;
+        setText("current-week", nextWeek);
+        updateSimulatorStatus(simulation);
+        resetGameChain(0);
+        showEvent(`Week ${nextWeek}`, "WEEK", `<p>Week ${nextWeek} is now beginning.</p>`, {skipHistory:true, week:nextWeek});
+        persistCurrentSeason();
+        return;
+    }
+
+    simulation.viewingWeek = Number(simulation.currentWeek || 1);
     const chain = getWeekEventChain(simulation.currentWeek);
     const index = Number(simulation.currentEventIndex || 0);
     const event = chain[index];
     if (!event) {
-        simulation.currentEventIndex = 0;
         renderDynamicGameChain();
-        showEvent("New Week", "WEEK", `<p>Week ${simulation.currentWeek} is beginning.</p>`);
+        showEvent("Week Complete", "WEEK", `<p>Week ${simulation.currentWeek} is complete.</p>`, {skipHistory:true});
         persistCurrentSeason();
         return;
     }
+
+    simulation.renderingEventKey = event.key;
+    simulation.renderingEventLabel = event.label;
+
     switch (event.key) {
         case "hoh": runHOHEvent(); break;
         case "nominations": runNominationEvent(); break;
@@ -3959,7 +4063,7 @@ function runNextEvent() {
         case "custom-competition": runCustomCompetitionEvent(event.competitionId); break;
         case "eviction-voting": runEvictionVotingEvent(); break;
         case "eviction": runEvictionEvent(); break;
-        default: simulation.currentEventIndex = index + 1; break;
+        default: simulation.currentEventIndex = index + 1; simulation.renderingEventKey = null; simulation.renderingEventLabel = null; break;
     }
     persistCurrentSeason();
     renderSimulationWeekNavigation();
@@ -4186,13 +4290,20 @@ function runNominationEvent() {
     resetGameChain(2);
 
 
+    const hohPlayer = getHouseguestForSimulation(simulation.currentHOH);
     showEvent(
-        "Nominations",
-        "NOMINATIONS",
+        "Nomination Ceremony",
+        "NOMINATION CEREMONY",
         `
-            <p>The Head of Household has nominated:</p>
-            ${simulationPortraits(nominees.map(p => p.id), "large")}
-            <p><strong>${escapeHTML(nominees.map(n => getHouseguestDisplayName(n.id, active)).join(" & "))}</strong></p>
+            <div class="ceremony-role-section">
+                <h3>Head of Household</h3>
+                ${simulationPortrait(hohPlayer, "large")}
+            </div>
+            <p class="ceremony-statement"><strong>${escapeHTML(getHouseguestDisplayName(simulation.currentHOH, active))}</strong> has nominated:</p>
+            <div class="ceremony-role-section">
+                <h3>Nominees</h3>
+                ${simulationPortraits(nominees.map(p => p.id), "large")}
+            </div>
         `
     );
 }
@@ -4348,231 +4459,101 @@ function runPOVEvent() {
 
 
     const povCompetition = getWeekCompetitions(simulation.currentWeek).find(c => c.type === "pov");
+    const povWinnerPlayer = getHouseguestForSimulation(simulation.currentPOVWinner);
     showEvent(
         povCompetition?.name || "Power of Veto",
-        "POV",
+        "POV RESULTS",
         `
-            <p>
-                <strong>
-                    ${escapeHTML(
-                        getHouseguestDisplayName(
-                            simulation.currentPOVWinner,
-                            currentSeason.houseguests
-                        )
-                    )}
-                </strong>
-                has won the Power of Veto.
-            </p>
+            ${simulationPortrait(povWinnerPlayer, "large")}
+            <p><strong>${escapeHTML(getHouseguestDisplayName(simulation.currentPOVWinner, currentSeason.houseguests))}</strong> has won <strong>${escapeHTML(povCompetition?.name || "the Power of Veto")}</strong>.</p>
+            ${povCompetition?.description ? `<p class="event-description">${escapeHTML(povCompetition.description)}</p>` : ""}
         `
     );
 }
 
 
 function runVetoCeremonyEvent() {
+    const simulation = currentSeason.simulation;
 
-    const simulation =
-        currentSeason.simulation;
-
-
-    if (
-        currentSeason.rules?.vetoEnabled ===
-        false
-    ) {
-
+    if (currentSeason.rules?.vetoEnabled === false) {
         simulation.currentEventIndex = simulation.currentEventIndex + 1;
-
-        resetGameChain(5);
-
-        showEvent(
-            "Veto Ceremony",
-            "VETO CEREMONY",
-            `
-                <p>
-                    The Power of Veto is not enabled
-                    for this season.
-                </p>
-            `
-        );
-
+        resetGameChain(simulation.currentEventIndex);
+        showEvent("Veto Ceremony", "VETO CEREMONY", `<p>The Power of Veto is not enabled for this season.</p>`);
         return;
     }
 
+    const vetoWinner = simulation.currentPOVWinner;
+    const originalNominees = [...(simulation.currentNominees || [])];
+    let vetoUsed = false;
+    let replacementId = null;
 
-    const vetoWinner =
-        simulation.currentPOVWinner;
-
-
-    const nominees =
-        simulation.currentNominees || [];
-
-
-    if (
-        vetoWinner &&
-        nominees.includes(vetoWinner)
-    ) {
-
-        const remaining =
-            getActiveHouseguests().filter(
-                houseguest =>
-                    houseguest.id !==
-                    simulation.currentHOH &&
-                    !nominees.includes(
-                        houseguest.id
-                    )
-            );
-
-
+    if (vetoWinner && originalNominees.includes(vetoWinner)) {
+        const remaining = getActiveHouseguests().filter(h =>
+            h.id !== simulation.currentHOH &&
+            !originalNominees.includes(h.id)
+        );
         if (remaining.length > 0) {
-
-            const replacement =
-                randomItem(
-                    remaining
-                );
-
-
-            const index =
-                nominees.indexOf(
-                    vetoWinner
-                );
-
-
+            const replacement = randomItem(remaining);
+            const index = simulation.currentNominees.indexOf(vetoWinner);
             if (index >= 0) {
-
-                simulation.currentNominees[
-                    index
-                ] =
-                    replacement.id;
+                simulation.currentNominees[index] = replacement.id;
+                replacementId = replacement.id;
+                vetoUsed = true;
             }
         }
     }
 
-
     simulation.currentEventIndex = simulation.currentEventIndex + 1;
+    updateSimulatorStatus(simulation);
+    resetGameChain(simulation.currentEventIndex);
 
-
-    updateSimulatorStatus(
-        simulation
-    );
-
-    resetGameChain(5);
-
-
+    const hohPlayer = getHouseguestForSimulation(simulation.currentHOH);
+    const vetoPlayer = getHouseguestForSimulation(vetoWinner);
     showEvent(
         "Veto Ceremony",
         "VETO CEREMONY",
         `
-            <p>The Veto Ceremony has been held.</p>
-            <p>${vetoWinner && nominees.includes(vetoWinner) ? `<strong>${escapeHTML(getHouseguestDisplayName(vetoWinner, currentSeason.houseguests))}</strong> used the Veto, and a replacement nominee was selected.` : `<strong>${escapeHTML(getHouseguestDisplayName(vetoWinner, currentSeason.houseguests))}</strong> did not remove a nominee.`}</p>
-            <p>Current nominees:</p>
-            ${simulationPortraits(simulation.currentNominees, "large")}
-            <p><strong>${escapeHTML(formatHouseguestList(simulation.currentNominees, currentSeason.houseguests))}</strong></p>
+            <div class="ceremony-leaders">
+                <div class="ceremony-role-section"><h3>Head of Household</h3>${simulationPortrait(hohPlayer, "large")}</div>
+                <div class="ceremony-role-section"><h3>Power of Veto Holder</h3>${simulationPortrait(vetoPlayer, "large")}</div>
+            </div>
+            <p class="ceremony-statement">${vetoUsed
+                ? `<strong>${escapeHTML(getHouseguestDisplayName(vetoWinner, currentSeason.houseguests))}</strong> used the Power of Veto.${replacementId ? ` <strong>${escapeHTML(getHouseguestDisplayName(replacementId, currentSeason.houseguests))}</strong> was named as the replacement nominee.` : ""}`
+                : vetoWinner ? `<strong>${escapeHTML(getHouseguestDisplayName(vetoWinner, currentSeason.houseguests))}</strong> did not use the Power of Veto.` : `No Power of Veto holder was available.`}</p>
+            <div class="ceremony-role-section">
+                <h3>Final Nominees</h3>
+                ${simulationPortraits(simulation.currentNominees, "large")}
+            </div>
         `
     );
 }
 
 
 function runEvictionEvent() {
-
-    const simulation =
-        currentSeason.simulation;
-
-
-    const nominees =
-        simulation.currentNominees || [];
-
-
-    const active =
-        getActiveHouseguests();
-
+    const simulation = currentSeason.simulation;
+    const nominees = simulation.currentNominees || [];
+    const active = getActiveHouseguests();
 
     if (nominees.length === 0) {
-
-        simulation.currentEventIndex = 0;
-
-        simulation.currentWeek++;
-
-        setText(
-            "current-week",
-            simulation.currentWeek
-        );
-
-        resetGameChain(0);
-
-        showEvent(
-            "New Week",
-            "WEEK",
-            `
-                <p>
-                    No eviction can occur because there
-                    are no current nominees.
-                </p>
-            `
-        );
-
+        simulation.currentEventIndex = getWeekEventChain(simulation.currentWeek).length;
+        simulation.pendingWeekAdvance = true;
+        resetGameChain(simulation.currentEventIndex);
+        showEvent("Eviction", "EVICTION", `<p>No eviction can occur because there are no current nominees.</p>`);
         return;
     }
 
-
-    /*
-     * Temporary foundation behavior:
-     * randomly select an eviction target.
-     *
-     * Later, this will use:
-     * - relationships
-     * - alliances
-     * - strategy
-     * - nominations
-     * - veto usage
-     * - threat level
-     * - voting preferences
-     */
-
-    const nomineesAsPlayers =
-        nominees
-            .map(
-                id =>
-                    active.find(
-                        houseguest =>
-                            houseguest.id === id
-                    )
-            )
-            .filter(Boolean);
-
-
-    const pending = active.find(p => p.id === currentSeason.simulation?.pendingEvictionId);
+    const nomineesAsPlayers = nominees.map(id => active.find(h => h.id === id)).filter(Boolean);
+    const pending = active.find(p => p.id === simulation.pendingEvictionId);
     const evictionTarget = pending || chooseEvictionTarget(nomineesAsPlayers, active);
 
-
     if (evictionTarget) {
-
-        evictionTarget.status =
-            "evicted";
-
-        evictionTarget.placement =
-            active.length;
-
-
-        simulation.currentEviction =
-            evictionTarget.id;
-
-
-        simulation.finalPlacements.push(
-            {
-                id:
-                    evictionTarget.id,
-
-                name:
-                    evictionTarget.name,
-
-                placement:
-                    evictionTarget.placement
-            }
-        );
+        evictionTarget.status = "evicted";
+        evictionTarget.placement = active.length;
+        simulation.currentEviction = evictionTarget.id;
+        simulation.finalPlacements.push({ id: evictionTarget.id, name: evictionTarget.name, placement: evictionTarget.placement });
     }
 
-
     const remainingAfterEviction = getActiveHouseguests();
-
     if (remainingAfterEviction.length <= Number(currentSeason.rules?.finalists || 2)) {
         finalizeSeason(remainingAfterEviction);
         return;
@@ -4583,62 +4564,46 @@ function runEvictionEvent() {
     simulation.evictionsThisWeek = Number(simulation.evictionsThisWeek || 0) + 1;
     const isDouble = currentSeason.rules?.doubleEvictionEnabled === true && (currentSeason.rules?.doubleEvictionWeeks || []).map(Number).includes(week);
 
-    if (isDouble && simulation.evictionsThisWeek < 2 && getActiveHouseguests().length > Number(currentSeason.rules?.finalists || 2)) {
+    // Keep the eviction visually attached to this week until the user proceeds.
+    simulation.currentEventIndex = getWeekEventChain(week).length;
+    simulation.pendingEvictionId = null;
+    updateSimulatorStatus(simulation);
+    resetGameChain(simulation.currentEventIndex);
+
+    const voteText = simulation.evictionVoteResult
+        ? `<p>Final vote: <strong>${simulation.evictionVoteResult.targetVotes}</strong> vote(s) to evict.</p>`
+        : "";
+
+    if (isDouble && simulation.evictionsThisWeek < 2 && remainingAfterEviction.length > Number(currentSeason.rules?.finalists || 2)) {
+        showEvent(
+            "Eviction",
+            "EVICTION",
+            `${simulationPortrait(evictionTarget, "large")}<p><strong>${escapeHTML(getHouseguestDisplayName(evictionTarget?.id, currentSeason.houseguests))}</strong> has been evicted from the Big Brother house.</p>${voteText}<p><strong>Double Eviction:</strong> another eviction cycle will immediately follow in Week ${week}.</p>`
+        );
+        // Re-enter this same week's event chain on the next click.
+        simulation.pendingWeekAdvance = false;
         simulation.currentEventIndex = 0;
+        simulation.currentHOH = null;
         simulation.currentNominees = [];
         simulation.currentPOVPlayers = [];
         simulation.currentPOVWinner = null;
         simulation.currentEviction = null;
-        setText("current-week", week);
-        resetGameChain(0);
-        showEvent("Double Eviction", "DOUBLE EVICTION", `<p>The first eviction is complete. The house will immediately begin the second eviction of Week ${week}.</p>`);
+        simulation.evictionVoteResult = null;
         return;
     }
-
-    if (week >= maxWeeks || getActiveHouseguests().length <= Number(currentSeason.rules?.finalists || 2)) {
-        finalizeSeason(getActiveHouseguests());
-        return;
-    }
-
-    simulation.currentWeek = week + 1;
-    simulation.evictionsThisWeek = 0;
-    simulation.currentEventIndex = 0;
-    simulation.currentNominees = [];
-
-    simulation.currentPOVPlayers = [];
-
-    simulation.currentPOVWinner = null;
-
-    simulation.currentEviction = null;
-
-
-    setText(
-        "current-week",
-        simulation.currentWeek
-    );
-
-
-    updateSimulatorStatus(
-        simulation
-    );
-
-    resetGameChain(0);
-
 
     showEvent(
         "Eviction",
         "EVICTION",
-        `
-            ${simulationPortrait(evictionTarget, "large")}
-            <p><strong>${escapeHTML(getHouseguestDisplayName(evictionTarget?.id, currentSeason.houseguests))}</strong> has been evicted from the Big Brother house.</p>
-            ${simulation.evictionVoteResult ? `<p>Final vote: <strong>${simulation.evictionVoteResult.targetVotes}</strong> vote(s) to evict.</p>` : ""}
-
-            <p>
-                Week ${simulation.currentWeek}
-                is now beginning.
-            </p>
-        `
+        `${simulationPortrait(evictionTarget, "large")}<p><strong>${escapeHTML(getHouseguestDisplayName(evictionTarget?.id, currentSeason.houseguests))}</strong> has been evicted from the Big Brother house.</p>${voteText}${week < maxWeeks ? `<p>Press <strong>Proceed</strong> to begin Week ${week + 1}.</p>` : ""}`
     );
+
+    if (week >= maxWeeks) {
+        finalizeSeason(getActiveHouseguests());
+        return;
+    }
+
+    simulation.pendingWeekAdvance = true;
 }
 
 
