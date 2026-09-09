@@ -40,6 +40,7 @@ const EVENT_CHAIN = [
     "pov-players",
     "pov",
     "veto-ceremony",
+    "eviction-voting",
     "eviction"
 ];
 
@@ -300,9 +301,12 @@ function resetSeasonCreator() {
             pov: [],
             safety: [],
             luxury: [],
-            finalHoh: []
+            finalHoh: [],
+            special: []
         },
+        competitionWeeks: {},
         twists: [],
+        twistWeeks: {},
         simulation: createDefaultSimulation()
     };
 
@@ -1495,6 +1499,9 @@ function resetSeasonRules() {
         false
     );
 
+    setValue("rule-season-weeks", 30);
+    renderDoubleEvictionWeekPicker(30, []);
+
     setValue(
         "rule-nominees",
         "2"
@@ -1631,6 +1638,9 @@ function collectSeasonRules() {
             getChecked(
                 "rule-double-eviction"
             ),
+
+        seasonWeeks: Math.min(30, Math.max(1, parseInt(getValue("rule-season-weeks"), 10) || 30)),
+        doubleEvictionWeeks: getSelectedDoubleEvictionWeeks(),
 
         nomineesPerWeek:
             nominees,
@@ -1792,6 +1802,43 @@ function populateSpecificHOHOptions() {
 }
 
 
+function getSeasonLength(season = currentSeason) {
+    return Math.min(30, Math.max(1, Number(season?.rules?.seasonWeeks) || 30));
+}
+
+function getSelectedDoubleEvictionWeeks() {
+    return Array.from(document.querySelectorAll("#double-eviction-weeks-picker input[type=checkbox]:checked"))
+        .map(el => Number(el.value))
+        .filter(n => Number.isInteger(n) && n >= 1 && n <= 30);
+}
+
+function renderDoubleEvictionWeekPicker(maxWeeks, selected = []) {
+    const picker = document.getElementById("double-eviction-weeks-picker");
+    const hint = document.getElementById("double-eviction-weeks-hint");
+    if (!picker) return;
+    const enabled = getChecked("rule-double-eviction");
+    const chosen = new Set((selected || []).map(Number));
+    const count = Math.min(30, Math.max(1, Number(maxWeeks) || 30));
+    picker.innerHTML = Array.from({length: count}, (_, i) => {
+        const week = i + 1;
+        return `<label class="member-picker-item"><input type="checkbox" value="${week}" ${chosen.has(week) ? "checked" : ""} ${enabled ? "" : "disabled"}><span>Week ${week}</span></label>`;
+    }).join("");
+    if (hint) hint.textContent = enabled ? "Select one or more double eviction weeks." : "Double eviction is disabled.";
+}
+
+function setupSeasonLengthControls() {
+    const weeks = document.getElementById("rule-season-weeks");
+    const de = document.getElementById("rule-double-eviction");
+    const refresh = () => {
+        const count = Math.min(30, Math.max(1, Number(weeks?.value) || 30));
+        const selected = getSelectedDoubleEvictionWeeks();
+        renderDoubleEvictionWeekPicker(count, selected.filter(w => w <= count));
+    };
+    weeks?.addEventListener("change", refresh);
+    de?.addEventListener("change", () => renderDoubleEvictionWeekPicker(Number(weeks?.value) || 30, getSelectedDoubleEvictionWeeks()));
+    refresh();
+}
+
 function loadSeasonRules(rules = {}) {
 
     setValue(
@@ -1823,6 +1870,10 @@ function loadSeasonRules(rules = {}) {
         "rule-double-eviction",
         rules.doubleEvictionEnabled === true
     );
+
+    const loadedWeeks = Math.min(30, Math.max(1, Number(rules.seasonWeeks) || 30));
+    setValue("rule-season-weeks", loadedWeeks);
+    renderDoubleEvictionWeekPicker(loadedWeeks, rules.doubleEvictionWeeks || []);
 
     setValue(
         "rule-nominees",
@@ -3442,7 +3493,10 @@ function createDefaultSimulation() {
 
         currentSafetyWinner: null,
 
-        currentEviction: null
+        currentEviction: null,
+        pendingEvictionId: null,
+        evictionVoteResult: null,
+        evictionsThisWeek: 0
 
     };
 }
@@ -3525,6 +3579,7 @@ function loadSeasonIntoCreator(
     loadSeasonRules(
         season.rules || {}
     );
+    populateWeekSelectors(getSeasonLength(season));
 
 
     resetRelationshipEditor();
@@ -3605,37 +3660,18 @@ function loadHouseguests(
    ========================================================= */
 
 function openSeason(id) {
-
-    const season =
-        savedSeasons.find(
-            item =>
-                item.id === id
-        );
-
-
-    if (!season) {
-        return;
-    }
-
-
-    currentSeason =
-        deepClone(
-            season
-        );
-
-
-    editingSeasonId =
-        season.id;
-
-
-    initializeSimulator(
-        currentSeason
-    );
-
-
-    showPage(
-        "simulator-page"
-    );
+    const season = savedSeasons.find(item => item.id === id);
+    if (!season) return;
+    currentSeason = deepClone(season);
+    editingSeasonId = season.id;
+    // Render the destination first, then initialize its controls. This makes
+    // the Open button independent from the creator/editor page.
+    showPage("simulator-page");
+    requestAnimationFrame(() => {
+        initializeSimulator(currentSeason);
+        updateSimulatorStatus(currentSeason.simulation || createDefaultSimulation());
+        renderDynamicGameChain();
+    });
 }
 
 
@@ -3728,11 +3764,9 @@ function initializeSimulator(
         "Custom Season"
     );
 
-    setText(
-        "current-week",
-        simulation.currentWeek || 1
-    );
-
+    if (simulation.currentWeek > getSeasonLength(season)) { simulation.currentWeek = getSeasonLength(season); }
+    setText("current-week", simulation.currentWeek || 1);
+    renderDynamicGameChain();
 
     updateSimulatorStatus(
         simulation
@@ -3798,132 +3832,88 @@ function updateSimulatorStatus(
 }
 
 
-function resetGameChain(
-    activeIndex = 0
-) {
+function getWeekEventChain(week = currentSeason?.simulation?.currentWeek || 1) {
+    const chain = [
+        {key:"hoh", label:"HOH"},
+        {key:"nominations", label:"Nomination Ceremony"},
+        {key:"pov-players", label:"Picked Players for Veto"},
+        {key:"pov", label:"Veto Results"},
+        {key:"veto-ceremony", label:"Veto Ceremony"}
+    ];
+    const special = getWeekCompetitions(week).filter(c => c.type === "special" || c.type === "safety" || c.type === "luxury");
+    special.forEach(c => chain.push({key:"custom-competition", label:c.name || "Special Competition", competitionId:c.id}));
+    chain.push({key:"eviction-voting", label:"Eviction Voting"}, {key:"eviction", label:"Eviction"});
+    return chain;
+}
 
-    const steps =
-        document.querySelectorAll(
-            ".chain-step"
-        );
+function renderDynamicGameChain() {
+    const container = document.getElementById("game-chain");
+    if (!container) return;
+    const chain = getWeekEventChain();
+    const active = Number(currentSeason?.simulation?.currentEventIndex || 0);
+    container.innerHTML = chain.map((item,i) => `<div class="chain-step ${i===active?"active":""}"><span class="chain-number">${i+1}</span><span>${escapeHTML(item.label)}</span></div>${i<chain.length-1?'<div class="chain-line"></div>':''}`).join("");
+}
 
-
-    steps.forEach(
-        (step, index) => {
-
-            step.classList.toggle(
-                "active",
-                index === activeIndex
-            );
-        }
-    );
+function resetGameChain(activeIndex = 0) {
+    renderDynamicGameChain();
+    const steps = document.querySelectorAll("#game-chain .chain-step");
+    steps.forEach((step,index) => step.classList.toggle("active", index === activeIndex));
 }
 
 
 function runNextEvent() {
-
-    if (!currentSeason) {
-
-        alert(
-            "Please open a saved season first."
-        );
-
+    if (!currentSeason) { alert("Please open a saved season first."); return; }
+    if (!currentSeason.simulation) currentSeason.simulation = createDefaultSimulation();
+    const simulation = currentSeason.simulation;
+    const chain = getWeekEventChain(simulation.currentWeek);
+    const index = Number(simulation.currentEventIndex || 0);
+    const event = chain[index];
+    if (!event) {
+        simulation.currentEventIndex = 0;
+        renderDynamicGameChain();
+        showEvent("New Week", "WEEK", `<p>Week ${simulation.currentWeek} is beginning.</p>`);
+        persistCurrentSeason();
         return;
     }
-
-
-    if (!currentSeason.simulation) {
-
-        currentSeason.simulation =
-            createDefaultSimulation();
+    switch (event.key) {
+        case "hoh": runHOHEvent(); break;
+        case "nominations": runNominationEvent(); break;
+        case "pov-players": runPOVPlayersEvent(); break;
+        case "pov": runPOVEvent(); break;
+        case "veto-ceremony": runVetoCeremonyEvent(); break;
+        case "custom-competition": runCustomCompetitionEvent(event.competitionId); break;
+        case "eviction-voting": runEvictionVotingEvent(); break;
+        case "eviction": runEvictionEvent(); break;
+        default: simulation.currentEventIndex = index + 1; break;
     }
-
-
-    const simulation =
-        currentSeason.simulation;
-
-
-    const index =
-        simulation.currentEventIndex || 0;
-
-
-    const event =
-        EVENT_CHAIN[index];
-
-
-    switch (event) {
-
-        case "hoh":
-
-            runHOHEvent();
-
-            break;
-
-
-        case "nominations":
-
-            runNominationEvent();
-
-            break;
-
-
-        case "pov-players":
-
-            runPOVPlayersEvent();
-
-            break;
-
-
-        case "pov":
-
-            runPOVEvent();
-
-            break;
-
-
-        case "veto-ceremony":
-
-            runVetoCeremonyEvent();
-
-            break;
-
-
-        case "eviction":
-
-            runEvictionEvent();
-
-            break;
-
-
-        default:
-
-            simulation.currentEventIndex = 0;
-
-            simulation.currentWeek++;
-
-            setText(
-                "current-week",
-                simulation.currentWeek
-            );
-
-            resetGameChain(0);
-
-            showEvent(
-                "New Week",
-                "WEEK",
-                `
-                    <p>
-                        Week ${simulation.currentWeek}
-                        is beginning.
-                    </p>
-                `
-            );
-
-            break;
-    }
-
-
     persistCurrentSeason();
+}
+
+function runCustomCompetitionEvent(competitionId) {
+    const simulation = currentSeason.simulation;
+    const players = getActiveHouseguests();
+    const comp = getWeekCompetitions(simulation.currentWeek).find(c => c.id === competitionId);
+    if (!comp || !players.length) { simulation.currentEventIndex++; return; }
+    const winner = chooseCompetitionWinnerByCustom(players, comp);
+    if (comp.type === "safety") winner.safetyWins = Number(winner.safetyWins || 0) + 1;
+    simulation.currentEventIndex++;
+    updateSimulatorStatus(simulation); resetGameChain(simulation.currentEventIndex);
+    showEvent(comp.name || "Special Competition", "SPECIAL COMPETITION", `<p><strong>${escapeHTML(getHouseguestDisplayName(winner.id, players))}</strong> has won <strong>${escapeHTML(comp.name || "the competition")}</strong>.</p>${comp.description ? `<p>${escapeHTML(comp.description)}</p>` : ""}`);
+}
+
+function runEvictionVotingEvent() {
+    const simulation = currentSeason.simulation;
+    const active = getActiveHouseguests();
+    const nominees = (simulation.currentNominees || []).map(id => active.find(p => p.id === id)).filter(Boolean);
+    if (nominees.length < 2) { simulation.currentEventIndex++; resetGameChain(simulation.currentEventIndex); showEvent("Eviction Voting", "EVICTION VOTING", "<p>There are not enough nominees for a standard vote.</p>"); return; }
+    const target = chooseEvictionTarget(nominees, active);
+    simulation.pendingEvictionId = target?.id || null;
+    const other = nominees.find(p => p.id !== target?.id);
+    const voteCount = Math.max(1, active.filter(p => p.id !== simulation.currentHOH && !nominees.some(n => n.id === p.id)).length);
+    simulation.evictionVoteResult = {target: target?.id || null, targetVotes: Math.ceil(voteCount * 0.65), otherVotes: Math.floor(voteCount * 0.35), totalVotes: voteCount};
+    simulation.currentEventIndex++;
+    updateSimulatorStatus(simulation); resetGameChain(simulation.currentEventIndex);
+    showEvent("Eviction Voting", "EVICTION VOTING", `<p>The house has voted to evict <strong>${escapeHTML(target?.name || "a nominee")}</strong>.</p>${other ? `<p>Vote result: ${escapeHTML(target.name)} ${simulation.evictionVoteResult.targetVotes} — ${escapeHTML(other.name)} ${simulation.evictionVoteResult.otherVotes}</p>` : ""}`);
 }
 
 
@@ -4002,8 +3992,9 @@ function runHOHEvent() {
     resetGameChain(1);
 
 
+    const hohCompetition = getWeekCompetitions(simulation.currentWeek).find(c => c.type === "hoh");
     showEvent(
-        "Head of Household",
+        hohCompetition?.name || "Head of Household",
         "HOH",
         `
             <p>
@@ -4130,7 +4121,7 @@ function runPOVPlayersEvent() {
         simulation.currentPOVPlayers =
             [];
 
-        simulation.currentEventIndex = 4;
+        simulation.currentEventIndex = simulation.currentEventIndex + 1;
 
         resetGameChain(4);
 
@@ -4282,8 +4273,9 @@ function runPOVEvent() {
     resetGameChain(4);
 
 
+    const povCompetition = getWeekCompetitions(simulation.currentWeek).find(c => c.type === "pov");
     showEvent(
-        "Power of Veto",
+        povCompetition?.name || "Power of Veto",
         "POV",
         `
             <p>
@@ -4313,7 +4305,7 @@ function runVetoCeremonyEvent() {
         false
     ) {
 
-        simulation.currentEventIndex = 5;
+        simulation.currentEventIndex = simulation.currentEventIndex + 1;
 
         resetGameChain(5);
 
@@ -4381,7 +4373,7 @@ function runVetoCeremonyEvent() {
     }
 
 
-    simulation.currentEventIndex = 5;
+    simulation.currentEventIndex = simulation.currentEventIndex + 1;
 
 
     updateSimulatorStatus(
@@ -4486,7 +4478,8 @@ function runEvictionEvent() {
             .filter(Boolean);
 
 
-    const evictionTarget = chooseEvictionTarget(nomineesAsPlayers, active);
+    const pending = active.find(p => p.id === currentSeason.simulation?.pendingEvictionId);
+    const evictionTarget = pending || chooseEvictionTarget(nomineesAsPlayers, active);
 
 
     if (evictionTarget) {
@@ -4524,10 +4517,31 @@ function runEvictionEvent() {
         return;
     }
 
-    simulation.currentWeek++;
+    const week = Number(simulation.currentWeek || 1);
+    const maxWeeks = getSeasonLength(currentSeason);
+    simulation.evictionsThisWeek = Number(simulation.evictionsThisWeek || 0) + 1;
+    const isDouble = currentSeason.rules?.doubleEvictionEnabled === true && (currentSeason.rules?.doubleEvictionWeeks || []).map(Number).includes(week);
 
+    if (isDouble && simulation.evictionsThisWeek < 2 && getActiveHouseguests().length > Number(currentSeason.rules?.finalists || 2)) {
+        simulation.currentEventIndex = 0;
+        simulation.currentNominees = [];
+        simulation.currentPOVPlayers = [];
+        simulation.currentPOVWinner = null;
+        simulation.currentEviction = null;
+        setText("current-week", week);
+        resetGameChain(0);
+        showEvent("Double Eviction", "DOUBLE EVICTION", `<p>The first eviction is complete. The house will immediately begin the second eviction of Week ${week}.</p>`);
+        return;
+    }
+
+    if (week >= maxWeeks || getActiveHouseguests().length <= Number(currentSeason.rules?.finalists || 2)) {
+        finalizeSeason(getActiveHouseguests());
+        return;
+    }
+
+    simulation.currentWeek = week + 1;
+    simulation.evictionsThisWeek = 0;
     simulation.currentEventIndex = 0;
-
     simulation.currentNominees = [];
 
     simulation.currentPOVPlayers = [];
@@ -5516,6 +5530,7 @@ function setupAdvancedSeasonControls() {
     if (saveT) saveT.onclick = saveTwist;
     if (clearT) clearT.onclick = resetTwistEditor;
     
+    populateWeekSelectors(getSeasonLength());
     refreshAdvancedHouseguestOptions();
     renderAlliances(); renderCompetitions(); renderTwists();
 }
@@ -5622,11 +5637,12 @@ function getWeekTwists(week) {
     return s.twistWeeks[key];
 }
 
-function populateWeekSelectors() {
-    const options = Array.from({length: 30}, (_, i) => `<option value="${i+1}">Week ${i+1}</option>`).join("");
-    ["competition-week", "twist-week"].forEach(id => {
+function populateWeekSelectors(maxWeeks = getSeasonLength()) {
+    const count = Math.min(30, Math.max(1, Number(maxWeeks) || 30));
+    const options = Array.from({length: count}, (_, i) => `<option value="${i+1}">Week ${i+1}</option>`).join("");
+    ["competition-week", "twist-week", "twist-start-week", "twist-end-week", "twist-power-until"].forEach(id => {
         const el = document.getElementById(id);
-        if (el) el.innerHTML = options;
+        if (el) { const old = el.value; el.innerHTML = options; if ([...el.options].some(o => o.value === old)) el.value = old; }
     });
 }
 
@@ -5760,24 +5776,37 @@ function saveTwist() {
     const s = ensureWeekCollections(getAdvancedArrays());
     const name = getInputValue("twist-name").trim();
     if (!name) return alert("Please enter a twist name.");
-    const week = getWeekNumber(getValue("twist-week") || 1);
-    const obj = {id: editingTwistId || uid("twist"), name, week, description:getInputValue("twist-description").trim(), timing:`week${week}`, active:getChecked("twist-active")};
-    Object.keys(s.twistWeeks).forEach(k => {
-        s.twistWeeks[k] = (s.twistWeeks[k] || []).filter(t => t.id !== obj.id);
-        if (!s.twistWeeks[k].length) delete s.twistWeeks[k];
-    });
-    (s.twistWeeks[String(week)] || (s.twistWeeks[String(week)] = [])).push(obj);
+    const maxWeeks = getSeasonLength();
+    const startWeek = Math.min(maxWeeks, getWeekNumber(getValue("twist-start-week") || 1));
+    const endWeek = Math.max(startWeek, Math.min(maxWeeks, getWeekNumber(getValue("twist-end-week") || startWeek)));
+    const powerUntilRaw = getWeekNumber(getValue("twist-power-until") || endWeek);
+    const powerUntil = Math.min(maxWeeks, Math.max(startWeek, powerUntilRaw));
+    const obj = {
+        id: editingTwistId || uid("twist"),
+        name,
+        startWeek,
+        endWeek,
+        week: startWeek,
+        power: getInputValue("twist-power").trim(),
+        powerUntil,
+        description: getInputValue("twist-description").trim(),
+        timing: startWeek === endWeek ? `week${startWeek}` : `weeks${startWeek}-${endWeek}`,
+        active: getChecked("twist-active")
+    };
+    Object.keys(s.twistWeeks).forEach(k => { s.twistWeeks[k] = (s.twistWeeks[k] || []).filter(t => t.id !== obj.id); if (!s.twistWeeks[k].length) delete s.twistWeeks[k]; });
+    for (let w = startWeek; w <= endWeek; w++) (s.twistWeeks[String(w)] || (s.twistWeeks[String(w)] = [])).push({...obj, week:w});
     s.twists = (s.twists || []).filter(t => t.id !== obj.id);
     s.twists.push(obj);
-    resetTwistEditor();
-    renderTwists();
-    persistCurrentSeasonIfSaved();
+    resetTwistEditor(); renderTwists(); persistCurrentSeasonIfSaved();
 }
 
 function resetTwistEditor() {
     editingTwistId = null;
     setValue("twist-name", "");
-    setValue("twist-week", "1");
+    setValue("twist-start-week", "1");
+    setValue("twist-end-week", "1");
+    setValue("twist-power", "");
+    setValue("twist-power-until", "1");
     setValue("twist-description", "");
     setChecked("twist-active", true);
     setText("twist-form-title", "Create Twist");
@@ -5798,7 +5827,10 @@ function editTwist(id) {
     if (!t) return;
     editingTwistId = id;
     setValue("twist-name", t.name);
-    setValue("twist-week", t.week || 1);
+    setValue("twist-start-week", t.startWeek || t.week || 1);
+    setValue("twist-end-week", t.endWeek || t.week || 1);
+    setValue("twist-power", t.power || "");
+    setValue("twist-power-until", t.powerUntil || t.endWeek || t.week || 1);
     setValue("twist-description", t.description || "");
     setChecked("twist-active", t.active !== false);
     setText("twist-form-title", "Edit Twist");
@@ -5822,34 +5854,36 @@ function renderTwists() {
     const c = document.getElementById("twists-container");
     if (!c) return;
     const s = ensureWeekCollections(getAdvancedArrays());
-    const allWeeks = {};
-    Object.keys(s.twistWeeks).forEach(k => { if ((s.twistWeeks[k] || []).length) allWeeks[k] = [...s.twistWeeks[k]]; });
-    const legacy = (s.twists || []).filter(x => !Object.values(s.twistWeeks).some(arr => (arr || []).some(y => y.id === x.id)));
-    legacy.forEach(x => { const w = String(x.week || (String(x.timing||"").startsWith("week") ? getWeekNumber(x.timing) : 1)); (allWeeks[w] || (allWeeks[w] = [])).push({...x, week:Number(w)}); });
-    const weeks = Object.keys(allWeeks).map(Number).sort((a,b)=>a-b);
-    if (!weeks.length) { c.innerHTML = '<div class="empty-state"><p>No weekly twists created yet. Add a Week 1 twist above if applicable.</p></div>'; return; }
-    c.innerHTML = weeks.map(week => `
-        <div class="week-editor-card">
-            <div class="week-editor-header"><div><span class="section-label">WEEK ${week}</span><h4>Week ${week}</h4></div><span class="feature-status">${allWeeks[String(week)].length} twist${allWeeks[String(week)].length===1?"":"s"}</span></div>
-            <div class="week-item-list">
-                ${allWeeks[String(week)].map(t => `<div class="week-item"><div><strong>${escapeHTML(t.name)}</strong><span class="feature-status">${t.active===false?"Inactive":"Active"}</span><p>${escapeHTML(t.description||"No description.")}</p></div><div class="advanced-card-actions"><button type="button" onclick="editTwist('${escapeAttribute(t.id)}')">Edit</button><button type="button" onclick="deleteTwist('${escapeAttribute(t.id)}')">Delete</button></div></div>`).join("")}
-            </div>
-        </div>`).join("");
+    const twists = [...(s.twists || [])].sort((a,b) => Number(a.startWeek || a.week || 1) - Number(b.startWeek || b.week || 1));
+    if (!twists.length) { c.innerHTML = '<div class="empty-state"><p>No weekly twists created yet. Add a twist above if applicable.</p></div>'; return; }
+    c.innerHTML = twists.map(t => {
+        const start = Number(t.startWeek || t.week || 1);
+        const end = Number(t.endWeek || start);
+        const range = start === end ? `Week ${start}` : `Weeks ${start}–${end}`;
+        const power = t.power ? `<small><strong>Power:</strong> ${escapeHTML(t.power)} · Usable through Week ${Number(t.powerUntil || end)}</small>` : '<small>No separate power-use deadline set.</small>';
+        return `<div class="week-editor-card"><div class="week-editor-header"><div><span class="section-label">${range.toUpperCase()}</span><h4>${escapeHTML(t.name)}</h4></div><span class="feature-status">${t.active===false?"Inactive":"Active"}</span></div><div class="week-item-list"><div class="week-item"><div><p>${escapeHTML(t.description||"No description.")}</p><small><strong>Active period:</strong> ${range}</small>${power}</div><div class="advanced-card-actions"><button type="button" onclick="editTwist('${escapeAttribute(t.id)}')">Edit</button><button type="button" onclick="deleteTwist('${escapeAttribute(t.id)}')">Delete</button></div></div></div></div>`;
+    }).join("");
 }
+
 
 function loadTwists(data) {
     const s = getAdvancedArrays();
     if (data && typeof data === "object" && !Array.isArray(data) && data.twistWeeks) {
         s.twistWeeks = deepClone(data.twistWeeks);
         s.twists = deepClone(data.twists || []);
+        s.twists = s.twists.map(t => ({...t, startWeek: getWeekNumber(t.startWeek || t.week || 1), endWeek: getWeekNumber(t.endWeek || t.week || 1), powerUntil: getWeekNumber(t.powerUntil || t.endWeek || t.week || 1)}));
     } else {
         s.twists = deepClone(Array.isArray(data) ? data : []);
         s.twistWeeks = {};
-        s.twists.forEach(t => { const week = getWeekNumber(t.week || (String(t.timing||"").startsWith("week") ? t.timing : 1)); const copy={...t,week,timing:`week${week}`}; (s.twistWeeks[String(week)] || (s.twistWeeks[String(week)] = [])).push(copy); });
+        s.twists.forEach(t => {
+            const startWeek = getWeekNumber(t.startWeek || t.week || (String(t.timing||"").startsWith("week") ? t.timing : 1));
+            const endWeek = Math.max(startWeek, getWeekNumber(t.endWeek || startWeek));
+            const obj = {...t, startWeek, endWeek, powerUntil: getWeekNumber(t.powerUntil || endWeek)};
+            for (let w=startWeek; w<=endWeek; w++) (s.twistWeeks[String(w)] || (s.twistWeeks[String(w)] = [])).push({...obj, week:w});
+        });
     }
-    populateWeekSelectors();
-    resetTwistEditor();
-    renderTwists();
+    populateWeekSelectors(getSeasonLength());
+    resetTwistEditor(); renderTwists();
 }
 
 function loadAlliances(data){getAdvancedArrays().alliances=deepClone(Array.isArray(data)?data:[]);refreshAdvancedHouseguestOptions();resetAllianceEditor();renderAlliances();}
