@@ -6645,3 +6645,338 @@ function runPOVEvent() {
     const comp = getCompetitionForWeekType(simulation.currentWeek, "pov");
     showEvent(comp?.name || "Power of Veto", "POV COMPETITION", `${simulationPortrait(winner, "large")}<p><strong>${escapeHTML(getHouseguestDisplayName(winner?.id, currentSeason.houseguests))}</strong> has won <strong>${escapeHTML(comp?.name || "the Power of Veto")}</strong>.</p>${comp?.description ? `<p class="event-description">${escapeHTML(comp.description)}</p>` : ""}`);
 }
+
+
+/* =========================================================
+   BRANTSTEELE-STYLE FINAL PASS
+   - durable week/event history navigation
+   - true finale / jury vote / runner-up presentation
+   - final-two / final-three handling
+   ========================================================= */
+
+function ensureFinaleState(sim) {
+    sim = ensureSimulationRuntimeState(sim);
+    if (!Array.isArray(sim.jury)) sim.jury = [];
+    if (!Array.isArray(sim.juryVotes)) sim.juryVotes = [];
+    if (!sim.finaleVoteResults || typeof sim.finaleVoteResults !== "object") sim.finaleVoteResults = null;
+    if (!sim.finalists || !Array.isArray(sim.finalists)) sim.finalists = [];
+    if (!Array.isArray(sim.weekHistory)) sim.weekHistory = [];
+    return sim;
+}
+
+function getJuryMembers() {
+    const sim = ensureFinaleState(currentSeason?.simulation || createDefaultSimulation());
+    const jurySize = Math.max(0, Number(currentSeason?.rules?.jurySize ?? 7));
+    const evicted = (currentSeason?.houseguests || []).filter(p => p.status === "evicted");
+    // Most recent evictees form the jury. This also works for seasons whose jury
+    // is smaller than the number of total evictions.
+    return evicted.slice(-jurySize).map(p => p.id);
+}
+
+function getFinalistsForFinale() {
+    const sim = ensureFinaleState(currentSeason?.simulation || createDefaultSimulation());
+    const active = getActiveHouseguests();
+    if (active.length <= 3) return active;
+    if (sim.finalists?.length) return sim.finalists.map(id => getHouseguestForSimulation(id)).filter(Boolean);
+    return active;
+}
+
+function getFinaleChain() {
+    const finalists = getFinalistsForFinale();
+    const chain = [];
+    if (finalists.length >= 3) chain.push({key:"final-hoh", label:"Final HOH"});
+    chain.push({key:"jury-voting", label:"Jury Voting"}, {key:"finale-results", label:"Final Results"});
+    return chain;
+}
+
+function getWeekEventChain(week = currentSeason?.simulation?.currentWeek || 1) {
+    const sim = currentSeason?.simulation;
+    if (sim?.currentPhase === "finale" || sim?.finaleStarted) return getFinaleChain();
+    const chain = [];
+    getScheduledTwistsForWeek(week).forEach(t => chain.push({key:"twist", label:t.name || "Twist", twistId:t.id}));
+    const hoh = getCompetitionForWeekType(week, "hoh");
+    const pov = getCompetitionForWeekType(week, "pov");
+    chain.push({key:"hoh", label:hoh?.name || "HOH Competition"});
+    chain.push({key:"nominations", label:"Nomination Ceremony"});
+    chain.push({key:"pov-players", label:"Veto Selections"});
+    chain.push({key:"pov", label:pov?.name || "POV Competition"});
+    chain.push({key:"veto-ceremony", label:"Veto Ceremony"});
+    getWeekCompetitions(week).filter(c => c.type === "special" || c.type === "safety" || c.type === "luxury")
+        .forEach(c => chain.push({key:"custom-competition", label:c.name || "Special Competition", competitionId:c.id}));
+    chain.push({key:"eviction-voting", label:"Eviction Voting"}, {key:"eviction", label:"Eviction"});
+    return chain;
+}
+
+function saveSimulationSnapshot(item) {
+    const sim = ensureFinaleState(currentSeason?.simulation);
+    if (!item) return;
+    if (!Array.isArray(sim.history)) sim.history = [];
+    const week = Number(item.week || sim.currentWeek || 1);
+    const key = `${week}|${item.event || item.label || item.title}`;
+    const existing = sim.history.find(h => h.snapshotKey === key && h.content === item.content);
+    if (!existing) {
+        const sequence = sim.history.filter(h => Number(h.week) === week).length;
+        sim.history.push({...item, sequence, snapshotKey:key, timestamp:Date.now()});
+    }
+    sim.weekHistory = sim.history;
+}
+
+function showEvent(title, type, content, options = {}) {
+    const titleEl = document.getElementById("event-title");
+    const typeEl = document.getElementById("event-type");
+    const contentEl = document.getElementById("event-content");
+    const sim = ensureFinaleState(currentSeason?.simulation);
+    const displayWeek = Number(options.week || sim?.currentWeek || 1);
+    const historyView = options.historyView === true;
+    if (titleEl) titleEl.textContent = title || "Event";
+    if (typeEl) typeEl.textContent = type || "EVENT";
+    if (contentEl) contentEl.innerHTML = content || "";
+    const weekTitle = document.getElementById("simulator-event-week-title");
+    if (weekTitle) weekTitle.textContent = `Week ${displayWeek}`;
+    if (sim && !historyView && options.skipLiveView !== true) {
+        sim.liveView = {title:title || "Event", type:type || "EVENT", content:content || "", week:displayWeek};
+    }
+    if (sim && !options.skipHistory && sim.renderingEventKey) {
+        saveSimulationSnapshot({week:displayWeek,event:sim.renderingEventKey,label:sim.renderingEventLabel || title,title:title || "Event",type:type || "EVENT",content:content || ""});
+        sim.renderingEventKey = null;
+        sim.renderingEventLabel = null;
+    }
+    renderSimulationWeekNavigation();
+    renderMemoryWallMini();
+    updateProceedButtonForViewMode();
+}
+
+function renderSimulationWeekNavigation() {
+    const container = document.getElementById("sim-week-navigation");
+    if (!container || !currentSeason) return;
+    const sim = ensureFinaleState(currentSeason.simulation || createDefaultSimulation());
+    const maxWeeks = getSeasonLength(currentSeason);
+    const currentWeek = Number(sim.currentWeek || 1);
+    const viewingWeek = Number(sim.viewingWeek || currentWeek);
+    const html = [];
+    for (let w=1; w<=maxWeeks; w++) {
+        const isCurrent=w===currentWeek, isViewing=w===viewingWeek, isPast=w<currentWeek;
+        const items=(sim.history||[]).filter(h=>Number(h.week)===w);
+        html.push(`<div class="sim-week-block ${isCurrent?'current':''} ${isViewing?'viewing':''} ${isPast?'past':''}">`);
+        html.push(`<button type="button" class="sim-week-label" data-sim-week="${w}">Week ${w}</button>`);
+        if (isViewing) {
+            html.push(`<div class="sim-event-list">`);
+            if (items.length) items.forEach((item,i)=>html.push(`<button type="button" class="sim-event-nav completed" data-history-week="${w}" data-history-index="${i}"><span>${escapeHTML(item.label || item.title || 'Event')}</span></button>`));
+            if (isCurrent && !sim.isViewingHistory && !sim.pendingWeekAdvance && !sim.pendingCycle && sim.currentPhase !== 'finale') {
+                const chain=getWeekEventChain(currentWeek), active=Number(sim.currentEventIndex||0);
+                chain.slice(active).forEach((item,i)=>html.push(`<div class="sim-event-nav ${i===0?'active':'pending'}"><span>${escapeHTML(item.label)}</span></div>`));
+            }
+            html.push(`</div>`);
+        }
+        html.push(`</div>`);
+    }
+    container.innerHTML=html.join('');
+    container.querySelectorAll('[data-sim-week]').forEach(btn=>btn.addEventListener('click',()=>viewSimulationWeek(Number(btn.dataset.simWeek))));
+    container.querySelectorAll('[data-history-week]').forEach(btn=>btn.addEventListener('click',()=>viewSimulationHistoryEvent(Number(btn.dataset.historyWeek),Number(btn.dataset.historyIndex))));
+    updateProceedButtonForViewMode();
+}
+
+function getHistoryForWeek(week) {
+    const sim=ensureFinaleState(currentSeason?.simulation);
+    return (sim.history||[]).filter(item=>Number(item.week)===Number(week));
+}
+
+function viewSimulationWeek(week) {
+    const sim=ensureFinaleState(currentSeason?.simulation);
+    const target=Math.max(1,Math.min(getSeasonLength(currentSeason),Number(week)||1));
+    sim.viewingWeek=target;
+    const items=getHistoryForWeek(target);
+    if (items.length) {
+        sim.isViewingHistory=true;
+        showHistoricalSimulationEvent(items[items.length-1]);
+    } else if (target===Number(sim.currentWeek||1)) {
+        returnToCurrentSimulation();
+    } else {
+        sim.isViewingHistory=true;
+        showEvent(`Week ${target}`,"WEEK",`<button type="button" class="secondary-button sim-history-return" onclick="returnToCurrentSimulation()">Return to Current Game</button><p>Week ${target} has not been played yet.</p>`,{skipHistory:true,skipLiveView:true,historyView:true,week:target});
+    }
+    updateProceedButtonForViewMode();
+}
+
+function viewSimulationHistoryEvent(week, index) {
+    const items=getHistoryForWeek(week);
+    const item=items[Number(index)];
+    if (item) showHistoricalSimulationEvent(item);
+}
+
+function showHistoricalSimulationEvent(item) {
+    const sim=ensureFinaleState(currentSeason?.simulation);
+    sim.viewingWeek=Number(item.week||sim.currentWeek||1);
+    sim.isViewingHistory=true;
+    showEvent(item.title||item.label||'Event',item.type||'EVENT',`<button type="button" class="secondary-button sim-history-return" onclick="returnToCurrentSimulation()">Return to Current Game</button>${item.content||''}`,{skipHistory:true,skipLiveView:true,historyView:true,week:item.week});
+    updateProceedButtonForViewMode();
+}
+
+function returnToCurrentSimulation() {
+    const sim=ensureFinaleState(currentSeason?.simulation);
+    sim.isViewingHistory=false;
+    sim.viewingWeek=Number(sim.currentWeek||1);
+    const live=sim.liveView;
+    if(live) showEvent(live.title,live.type,live.content,{skipHistory:true,skipLiveView:true,week:live.week});
+    else showEvent(`Week ${sim.currentWeek}`,'WEEK',`<p>Week ${sim.currentWeek} is currently in progress.</p>`,{skipHistory:true,skipLiveView:true,week:sim.currentWeek});
+    updateProceedButtonForViewMode();
+}
+
+function updateProceedButtonForViewMode() {
+    const btn=document.querySelector('.sim-proceed-button');
+    const sim=currentSeason?.simulation;
+    if(btn) btn.textContent=sim?.isViewingHistory?'Return to Current Game':'Proceed';
+}
+
+function runNextEvent() {
+    if (!currentSeason) { alert('Please open a saved season first.'); return; }
+    const sim=ensureFinaleState(currentSeason.simulation || (currentSeason.simulation=createDefaultSimulation()));
+    if (sim.isViewingHistory) { returnToCurrentSimulation(); return; }
+
+    if (sim.pendingWeekAdvance) {
+        const next=Number(sim.currentWeek||1)+1;
+        if(next>getSeasonLength(currentSeason)){ beginFinale(); return; }
+        sim.currentWeek=next; sim.viewingWeek=next; sim.pendingWeekAdvance=false; sim.evictionsThisWeek=0;
+        sim.currentEventIndex=0; sim.currentHOH=null; sim.currentNominees=[]; sim.currentPOVPlayers=[]; sim.currentPOVWinner=null; sim.currentEviction=null; sim.pendingEvictionId=null; sim.evictionVoteResult=null;
+        sim.currentPhase='week';
+        setText('current-week',next); updateSimulatorStatus(sim); resetGameChain(0);
+        showEvent(`Week ${next}`,'WEEK',`<p>Week ${next} is now beginning.</p>`,{skipHistory:true,week:next});
+        persistCurrentSeason(); return;
+    }
+
+    if (sim.currentPhase==='finale' || sim.finaleStarted) {
+        const chain=getFinaleChain(), index=Number(sim.currentEventIndex||0), event=chain[index];
+        if(!event){ beginFinale(); return; }
+        sim.renderingEventKey=event.key; sim.renderingEventLabel=event.label;
+        if(event.key==='final-hoh') runFinalHOHEvent();
+        else if(event.key==='jury-voting') runJuryVotingEvent();
+        else if(event.key==='finale-results') runFinaleResultsEvent();
+        persistCurrentSeason(); return;
+    }
+
+    const chain=getWeekEventChain(sim.currentWeek), index=Number(sim.currentEventIndex||0), event=chain[index];
+    if(!event){ sim.pendingWeekAdvance=true; runNextEvent(); return; }
+    sim.renderingEventKey=event.key; sim.renderingEventLabel=event.label;
+    switch(event.key){
+        case 'twist': runTwistEvent(event.twistId); break;
+        case 'hoh': runHOHEvent(); break;
+        case 'nominations': runNominationEvent(); break;
+        case 'pov-players': runPOVPlayersEvent(); break;
+        case 'pov': runPOVEvent(); break;
+        case 'veto-ceremony': runVetoCeremonyEvent(); break;
+        case 'custom-competition': runCustomCompetitionEvent(event.competitionId); break;
+        case 'eviction-voting': runEvictionVotingEvent(); break;
+        case 'eviction': runEvictionEvent(); break;
+        default: sim.currentEventIndex++; break;
+    }
+    persistCurrentSeason(); renderSimulationWeekNavigation();
+}
+
+function runTwistEvent(twistId) {
+    const sim=ensureFinaleState(currentSeason.simulation), twist=(currentSeason.twists||[]).find(t=>t.id===twistId);
+    sim.currentEventIndex++;
+    if(!twist){ showEvent('Twist','TWIST','<p>No twist information is available.</p>'); return; }
+    let holder=null;
+    const effect=twist.effectType||'display';
+    if(effect!=='display') {
+        const active=getActiveHouseguests();
+        holder=active[Math.floor(Math.random()*active.length)] || null;
+        if(holder){ sim.twistState[twist.id]={holderId:holder.id,used:false,awardedWeek:sim.currentWeek}; }
+    }
+    const powerLine=twist.power?`<p><strong>Power:</strong> ${escapeHTML(twist.power)}${twist.powerUntil?` (usable through Week ${twist.powerUntil})`:''}</p>`:'';
+    showEvent(twist.name||'Twist','TWIST',`<div class="twist-event-card"><h3>${escapeHTML(twist.name||'Twist')}</h3>${powerLine}${holder?`${simulationPortrait(holder,'large')}<p><strong>${escapeHTML(getHouseguestDisplayName(holder.id,currentSeason.houseguests))}</strong> received the power.</p>`:''}<p>${escapeHTML(twist.description||'')}</p></div>`);
+    resetGameChain(sim.currentEventIndex);
+}
+
+function beginFinale() {
+    const sim=ensureFinaleState(currentSeason.simulation);
+    sim.finaleStarted=true; sim.currentPhase='finale'; sim.currentEventIndex=0; sim.viewingWeek=getSeasonLength(currentSeason);
+    const active=getActiveHouseguests();
+    sim.finalists=active.map(p=>p.id);
+    sim.jury=getJuryMembers();
+    resetGameChain(0);
+    showEvent('Finale','FINALE',`<p>The regular season is complete.</p>${simulationPortraits(active.map(p=>p.id),'large')}<p><strong>${active.length} finalists remain.</strong> Press <strong>Proceed</strong> to continue to the finale.</p>`,{week:getSeasonLength(currentSeason)});
+    persistCurrentSeason();
+}
+
+function runFinalHOHEvent() {
+    const sim=ensureFinaleState(currentSeason.simulation), finalists=getFinalistsForFinale();
+    if(finalists.length<3){ sim.currentEventIndex++; resetGameChain(sim.currentEventIndex); showEvent('Final HOH','FINAL HOH',`<p>There are only two finalists, so the Final HOH competition is skipped.</p>`); return; }
+    const comp=(currentSeason.competitions?.finalHoh||[])[0] || null;
+    const winner=comp?chooseCompetitionWinnerByCustom(finalists,comp):chooseCompetitionWinner(finalists,'mental','social','general');
+    sim.finalHOH=winner.id; sim.currentEventIndex++;
+    resetGameChain(sim.currentEventIndex);
+    showEvent(comp?.name||'Final HOH','FINAL HOH',`${simulationPortrait(winner,'large')}<p><strong>${escapeHTML(getHouseguestDisplayName(winner.id,currentSeason.houseguests))}</strong> has won <strong>${escapeHTML(comp?.name||'Final HOH')}</strong>.</p><p>The Final HOH will determine the final two.</p>`);
+}
+
+function runJuryVotingEvent() {
+    const sim=ensureFinaleState(currentSeason.simulation);
+    let finalists=getFinalistsForFinale();
+    if(finalists.length>2){
+        const finalHOH=getHouseguestForSimulation(sim.finalHOH) || finalists[0];
+        const eligible=finalists.filter(p=>p.id!==finalHOH.id);
+        // Final HOH chooses the other finalist; for simulation purposes choose the strongest social bond.
+        const chosen=eligible.sort((a,b)=>allianceBond(finalHOH.id,b.id)-allianceBond(finalHOH.id,a.id))[0] || eligible[0];
+        const third=eligible.find(p=>p.id!==chosen.id);
+        if(third){ third.status='evicted'; third.placement=3; }
+        finalists=[finalHOH,chosen].filter(Boolean);
+        sim.finalists=finalists.map(p=>p.id);
+    }
+    if (!Array.isArray(sim.jury) || sim.jury.length === 0) sim.jury=getJuryMembers();
+    const votes=[];
+    sim.jury.forEach(jid=>{
+        const juror=getHouseguestForSimulation(jid); if(!juror) return;
+        const scored=finalists.map(f=>({f,score:Number(f.ratings?.social||0)*0.4+Number(f.ratings?.strategic||0)*0.35+Number(f.ratings?.general||0)*0.15+Number(f.ratings?.mental||0)*0.1+allianceBond(jid,f.id)*0.15+Math.random()*3})).sort((a,b)=>b.score-a.score);
+        votes.push({juror:jid,vote:scored[0]?.f.id||finalists[0]?.id});
+    });
+    const counts={}; finalists.forEach(f=>counts[f.id]=0); votes.forEach(v=>counts[v.vote]=(counts[v.vote]||0)+1);
+    sim.juryVotes=votes; sim.finaleVoteResults={votes,counts}; sim.currentEventIndex++;
+    resetGameChain(sim.currentEventIndex);
+    const rows=votes.map(v=>`<div class="jury-vote-row">${simulationPortrait(getHouseguestForSimulation(v.juror),'small')}<strong>${escapeHTML(getHouseguestDisplayName(v.juror,currentSeason.houseguests))}</strong><span>votes for</span><strong>${escapeHTML(getHouseguestDisplayName(v.vote,currentSeason.houseguests))}</strong></div>`).join('');
+    showEvent('Jury Voting','JURY VOTING',`<div class="jury-finalists">${simulationPortraits(finalists.map(p=>p.id),'large')}</div><h3>The Jury Votes</h3><div class="jury-vote-list">${rows||'<p>No jury members were eligible to vote.</p>'}</div>`);
+}
+
+function runFinaleResultsEvent() {
+    const sim=ensureFinaleState(currentSeason.simulation), finalists=(sim.finalists||[]).map(getHouseguestForSimulation).filter(Boolean), counts=sim.finaleVoteResults?.counts||{};
+    const ranked=finalists.slice().sort((a,b)=>(counts[b.id]||0)-(counts[a.id]||0));
+    const winner=ranked[0], runner=ranked[1];
+    sim.winner=winner?.id||null; sim.runnerUp=runner?.id||null; sim.completed=true;
+    if(winner) { winner.status='winner'; winner.placement=1; }
+    if(runner) { runner.status='runner-up'; runner.placement=2; }
+    const other=(currentSeason.houseguests||[]).filter(p=>p.status==='evicted').sort((a,b)=>Number(b.placement||0)-Number(a.placement||0));
+    sim.finalPlacements=[...(winner?[{id:winner.id,name:getHouseguestDisplayName(winner.id,currentSeason.houseguests),placement:1}]:[]),...(runner?[{id:runner.id,name:getHouseguestDisplayName(runner.id,currentSeason.houseguests),placement:2}]:[]),...other.map(p=>({id:p.id,name:getHouseguestDisplayName(p.id,currentSeason.houseguests),placement:Number(p.placement||0)})).sort((a,b)=>a.placement-b.placement)];
+    sim.currentEventIndex=0;
+    persistCurrentSeason();
+    showEvent('Final Results','FINAL RESULTS',`<div class="final-results-cards">${winner?`${simulationPortrait(winner,'large')}<h2>${escapeHTML(getHouseguestDisplayName(winner.id,currentSeason.houseguests))}</h2><p class="final-winner-label">WINNER — ${counts[winner.id]||0} JURY VOTES</p>`:''}${runner?`${simulationPortrait(runner,'large')}<p class="final-runner-label">RUNNER-UP — ${counts[runner.id]||0} JURY VOTES</p>`:''}</div><div class="final-jury-tally">${finalists.map(f=>`<div><strong>${escapeHTML(getHouseguestDisplayName(f.id,currentSeason.houseguests))}</strong><span>${counts[f.id]||0} vote${(counts[f.id]||0)===1?'':'s'}</span></div>`).join('')}</div><button type="button" class="primary-button" onclick="showResults()">View Full Results</button>`);
+}
+
+function finalizeSeason(finalists) {
+    // Finale is now an explicit event sequence. Do not jump straight to the results page.
+    const sim=ensureFinaleState(currentSeason.simulation);
+    if(sim.completed) return;
+    const active=finalists?.length?finalists:getActiveHouseguests();
+    sim.finalists=active.map(p=>p.id); sim.jury=getJuryMembers(); sim.finaleStarted=true; sim.currentPhase='finale'; sim.currentEventIndex=0; sim.viewingWeek=getSeasonLength(currentSeason);
+    renderSimulationWeekNavigation();
+    showEvent('Finale','FINALE',`<p>The final houseguests have reached the finale.</p>${simulationPortraits(active.map(p=>p.id),'large')}<p>Press <strong>Proceed</strong> to begin the finale.</p>`,{week:getSeasonLength(currentSeason)});
+    persistCurrentSeason();
+}
+
+function showResults() {
+    if(!currentSeason) return;
+    setText('results-season-name',currentSeason.name||'Big Brother');
+    const sim=ensureFinaleState(currentSeason.simulation);
+    const winner=getHouseguestForSimulation(sim.winner) || (currentSeason.houseguests||[]).find(p=>p.name===sim.winner);
+    setText('winner-name',winner?getHouseguestDisplayName(winner.id,currentSeason.houseguests):'—');
+    const runner=getHouseguestForSimulation(sim.runnerUp) || (currentSeason.houseguests||[]).find(p=>p.name===sim.runnerUp);
+    let runnerEl=document.getElementById('runner-up-name'); if(runnerEl) runnerEl.textContent=runner?getHouseguestDisplayName(runner.id,currentSeason.houseguests):'—';
+    renderFinalPlacements(); renderSeasonStatistics(); renderFinalJuryResults(); showPage('results-page');
+}
+
+function renderFinalJuryResults() {
+    const c=document.getElementById('final-jury-results'); if(!c) return;
+    const sim=ensureFinaleState(currentSeason?.simulation), results=sim.finaleVoteResults;
+    if(!results){c.innerHTML='<div class="empty-state"><p>No jury vote has been completed yet.</p></div>';return;}
+    const rows=(results.votes||[]).map(v=>`<div class="final-jury-row"><span>${escapeHTML(getHouseguestDisplayName(v.juror,currentSeason.houseguests))}</span><strong>→</strong><span>${escapeHTML(getHouseguestDisplayName(v.vote,currentSeason.houseguests))}</span></div>`).join('');
+    const tally=Object.entries(results.counts||{}).map(([id,n])=>`<div class="final-jury-tally-row"><span>${escapeHTML(getHouseguestDisplayName(id,currentSeason.houseguests))}</span><strong>${n}</strong></div>`).join('');
+    c.innerHTML=`<div class="final-jury-tally">${tally}</div><h3>Individual Jury Votes</h3><div class="final-jury-votes">${rows}</div>`;
+}
