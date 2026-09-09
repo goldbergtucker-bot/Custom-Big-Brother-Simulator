@@ -4981,334 +4981,7 @@ function showResults() {
     );
 
 
-    function renderFinalPlacements() {
-
-    const container =
-        document.getElementById("final-placements");
-
-    if (!container) {
-        return;
-    }
-
-    /*
-     * Get placements recorded by the simulation.
-     */
-    const recordedPlacements =
-        currentSeason?.simulation?.finalPlacements || [];
-
-    /*
-     * Use a Map so each houseguest can only appear
-     * once in the final results.
-     */
-    const placementMap = new Map();
-
-    /*
-     * First use the simulation's finalPlacements data.
-     */
-    recordedPlacements.forEach(placement => {
-
-        if (!placement || !placement.id) {
-            return;
-        }
-
-        const houseguest =
-            currentSeason?.houseguests?.find(
-                p => p.id === placement.id
-            );
-
-        placementMap.set(
-            placement.id,
-            {
-                id: placement.id,
-
-                name:
-                    placement.name ||
-                    houseguest?.name ||
-                    "Unknown",
-
-                placement:
-                    Number(placement.placement) || null,
-
-                image:
-                    houseguest?.image || ""
-            }
-        );
-    });
-
-    /*
-     * Also check every houseguest directly.
-     *
-     * This guarantees that anyone who has a
-     * placement recorded on their houseguest
-     * object will appear in the final grid.
-     */
-    (
-        currentSeason?.houseguests || []
-    ).forEach(houseguest => {
-
-        const placement =
-            Number(houseguest.placement);
-
-        if (
-            !Number.isFinite(placement) ||
-            placement <= 0
-        ) {
-            return;
-        }
-
-        const existing =
-            placementMap.get(houseguest.id);
-
-        if (!existing) {
-
-            placementMap.set(
-                houseguest.id,
-                {
-                    id: houseguest.id,
-
-                    name:
-                        houseguest.name ||
-                        "Unknown",
-
-                    placement: placement,
-
-                    image:
-                        houseguest.image || ""
-                }
-            );
-
-        } else {
-
-            existing.placement = placement;
-
-            existing.name =
-                houseguest.name ||
-                existing.name ||
-                "Unknown";
-
-            existing.image =
-                houseguest.image ||
-                existing.image ||
-                "";
-        }
-    });
-
-    /*
-     * Sort everyone by placement:
-     *
-     * 1st
-     * 2nd
-     * 3rd
-     * ...
-     * 16th
-     */
-    const placements =
-        Array.from(placementMap.values())
-            .filter(
-                placement =>
-                    Number.isFinite(
-                        Number(
-                            placement.placement
-                        )
-                    )
-            )
-            .sort(
-                (a, b) =>
-                    Number(a.placement) -
-                    Number(b.placement)
-            );
-
-    /*
-     * Nothing to display yet.
-     */
-    if (placements.length === 0) {
-
-        container.innerHTML = `
-
-            <div class="empty-state">
-
-                <h3>
-                    No Placements Yet
-                </h3>
-
-                <p>
-                    Finish the simulation to see
-                    final placements.
-                </p>
-
-            </div>
-
-        `;
-
-        return;
-    }
-
-    /*
-     * Build the individual placement cards.
-     */
-    const cards =
-        placements
-            .map(placement => {
-
-                const number =
-                    Number(
-                        placement.placement
-                    );
-
-                /*
-                 * Determine the special class and
-                 * label for each placement.
-                 */
-                let placementClass = "";
-                let placementLabel =
-                    `${number}TH PLACE`;
-
-                if (number === 1) {
-
-                    placementClass =
-                        "placement-winner";
-
-                    placementLabel =
-                        "WINNER";
-
-                } else if (number === 2) {
-
-                    placementClass =
-                        "placement-runner-up";
-
-                    placementLabel =
-                        "RUNNER-UP";
-
-                } else if (number === 3) {
-
-                    placementLabel =
-                        "3RD PLACE";
-                }
-
-                /*
-                 * Find the actual houseguest object
-                 * so their existing portrait is used.
-                 */
-                const houseguest =
-                    currentSeason?.houseguests?.find(
-                        p =>
-                            p.id === placement.id
-                    );
-
-                let portrait = "";
-
-                if (houseguest) {
-
-                    portrait =
-                        simulationPortrait(
-                            houseguest,
-                            "large"
-                        );
-
-                } else {
-
-                    /*
-                     * Fallback portrait if a placement
-                     * somehow exists without a matching
-                     * houseguest.
-                     */
-                    const initials =
-                        String(
-                            placement.name || "?"
-                        )
-                            .split(/\s+/)
-                            .filter(Boolean)
-                            .slice(0, 2)
-                            .map(
-                                x =>
-                                    x[0]
-                            )
-                            .join("")
-                            .toUpperCase();
-
-                    portrait = `
-
-                        <div class="
-                            sim-portrait
-                            sim-portrait-large
-                            no-image
-                        ">
-
-                            <div class="
-                                sim-portrait-placeholder
-                            ">
-                                ${escapeHTML(
-                                    initials || "?"
-                                )}
-                            </div>
-
-                            <span>
-                                ${escapeHTML(
-                                    placement.name ||
-                                    "Unknown"
-                                )}
-                            </span>
-
-                        </div>
-
-                    `;
-                }
-
-                return `
-
-                    <div class="
-                        final-placement-card
-                        ${placementClass}
-                    ">
-
-                        <div class="
-                            final-placement-number
-                        ">
-                            ${number}
-                        </div>
-
-                        <div class="
-                            final-placement-portrait
-                        ">
-                            ${portrait}
-                        </div>
-
-                        <div class="
-                            final-placement-name
-                        ">
-                            ${escapeHTML(
-                                placement.name ||
-                                "Unknown"
-                            )}
-                        </div>
-
-                        <div class="
-                            final-placement-label
-                        ">
-                            ${placementLabel}
-                        </div>
-
-                    </div>
-
-                `;
-            })
-            .join("");
-
-    /*
-     * Render the complete placement grid.
-     */
-    container.innerHTML = `
-
-        <div class="
-            final-placement-grid
-        ">
-
-            ${cards}
-
-        </div>
-
-    `;
-}
+    renderFinalPlacements();
 
     renderSeasonStatistics();
 
@@ -7579,168 +7252,29 @@ window.showResults = showResults;
         display(s,comp?.name||"Head of Household","HOH COMPETITION",content,"hoh");
     }
 
-   function runCleanNominations(){
-    const s = sim();
-    const pool = active().filter(p => p.id !== s.currentHOH);
-
-    let protectedIds = new Set();
-
-    getUsableTwistStates(s.currentWeek, "immunity").forEach(x => {
-        protectedIds.add(x.state.holderId);
-    });
-
-    const eligible = pool.filter(
-        p => !protectedIds.has(p.id)
-    );
-
-    let noms = [];
-
-    const hoh = player(s.currentHOH);
-
-    const ordered = eligible
-        .slice()
-        .sort(
-            (a, b) =>
-                allianceBond(s.currentHOH, b.id) -
-                allianceBond(s.currentHOH, a.id)
-        );
-
-    const ranked = ordered.sort(
-        (a, b) =>
-            (
-                allianceBond(s.currentHOH, a.id) +
-                Math.random() * 12
-            ) -
-            (
-                allianceBond(s.currentHOH, b.id) +
-                Math.random() * 12
-            )
-    );
-
-    noms = ranked
-        .slice(0, Math.min(2, ranked.length))
-        .map(p => p.id);
-
-    const voidPower =
-        getUsableTwistStates(
-            s.currentWeek,
-            "nominationVoid"
-        ).find(
-            x => noms.includes(x.state.holderId)
-        );
-
-    if (voidPower) {
-
-        voidPower.state.used = true;
-
-        const replacementPool =
-            eligible.filter(
-                p => !noms.includes(p.id)
-            );
-
-        noms = replacementPool
-            .sort(() => Math.random() - 0.5)
-            .slice(0, 2)
-            .map(p => p.id);
+    function runCleanNominations(){
+        const s=sim(), pool=active().filter(p=>p.id!==s.currentHOH);
+        let protectedIds=new Set();
+        getUsableTwistStates(s.currentWeek,"immunity").forEach(x=>protectedIds.add(x.state.holderId));
+        const eligible=pool.filter(p=>!protectedIds.has(p.id));
+        let noms=[];
+        const hoh=player(s.currentHOH);
+        const ordered=eligible.slice().sort((a,b)=>allianceBond(s.currentHOH,b.id)-allianceBond(s.currentHOH,a.id));
+        // Lower bond = more likely target, with a small random component.
+        const ranked=ordered.sort((a,b)=>(allianceBond(s.currentHOH,a.id)+Math.random()*12)-(allianceBond(s.currentHOH,b.id)+Math.random()*12));
+        noms=ranked.slice(0,Math.min(2,ranked.length)).map(p=>p.id);
+        // Nomination Void cancels the initial pair and forces replacements.
+        const voidPower=getUsableTwistStates(s.currentWeek,"nominationVoid").find(x=>noms.includes(x.state.holderId));
+        if(voidPower){
+            voidPower.state.used=true;
+            const replacementPool=eligible.filter(p=>!noms.includes(p.id));
+            noms=replacementPool.sort((a,b)=>Math.random()-.5).slice(0,2).map(p=>p.id);
+        }
+        s.currentNominees=noms;
+        const nomineeText=noms.map(id=>`<div class="nominee-card">${simulationPortrait(player(id),"large")}<strong>${escapeHTML(name(id))}</strong></div>`).join("");
+        const note=voidPower?`<p><strong>${escapeHTML(voidPower.twist.name)}</strong> was activated, so the original nominations were voided and replacement nominees were selected.</p>`:"";
+        display(s,"Nomination Ceremony","NOMINATION CEREMONY",`<div class="nomination-result">${simulationPortrait(hoh,"large")}<p><strong>${escapeHTML(name(s.currentHOH))}</strong> has nominated:</p><div class="nominee-grid">${nomineeText}</div>${note}</div>`,"nominations");
     }
-
-    s.currentNominees = noms;
-
-    /*
-     * Build the nominee cards.
-     * The portrait helper already includes
-     * the houseguest's name, so we do not
-     * add another name underneath it.
-     */
-    const nomineeCards = s.currentNominees
-        .map(id => {
-
-            const nominee = player(id);
-
-            if (!nominee) {
-                return "";
-            }
-
-            return `
-                <div class="nominee-card">
-
-                    <div class="nominee-placement">
-                        NOMINEE
-                    </div>
-
-                    ${simulationPortrait(
-                        nominee,
-                        "large"
-                    )}
-
-                </div>
-            `;
-        })
-        .join("");
-
-    const note = voidPower
-        ? `
-            <p class="nomination-twist-note">
-
-                <strong>
-                    ${escapeHTML(voidPower.twist.name)}
-                </strong>
-
-                was activated, so the original
-                nominations were voided and replacement
-                nominees were selected.
-
-            </p>
-        `
-        : "";
-
-    display(
-        s,
-        "Nomination Ceremony",
-        "NOMINATION CEREMONY",
-
-        `
-            <div class="nomination-result">
-
-                <div class="nomination-hoh">
-
-                    <div class="nomination-role">
-                        HEAD OF HOUSEHOLD
-                    </div>
-
-                    ${simulationPortrait(
-                        hoh,
-                        "large"
-                    )}
-
-                    <p class="nomination-hoh-text">
-
-                        <strong>
-                            ${escapeHTML(
-                                name(s.currentHOH)
-                            )}
-                        </strong>
-
-                        has nominated:
-
-                    </p>
-
-                </div>
-
-                <div class="nominee-grid">
-
-                    ${nomineeCards}
-
-                </div>
-
-                ${note}
-
-            </div>
-        `,
-
-        "nominations"
-    );
-}
 
     function runCleanPOVPlayers(){
         const s=sim();
@@ -7751,262 +7285,38 @@ window.showResults = showResults;
         display(s,"Power of Veto Players","VETO SELECTIONS",`<p>The following houseguests will compete:</p>${simulationPortraits(s.currentPOVPlayers,"medium")}<p><strong>${escapeHTML(selected.map(p=>name(p.id)).join(", "))}</strong></p>`,"pov-players");
     }
 
-   function runCleanVeto(){
-
-    const s = sim();
-
-    const veto = s.currentPOVWinner;
-
-    const original = [
-        ...(s.currentNominees || [])
-    ];
-
-    if (
-        currentSeason.rules?.vetoEnabled === false
-    ) {
-
-        display(
-            s,
-            "Veto Ceremony",
-            "VETO CEREMONY",
-            `
-                <p>
-                    The Power of Veto is disabled
-                    for this season.
-                </p>
-            `,
-            "veto-ceremony"
-        );
-
-        return;
+    function runCleanPOV(){
+        const s=sim();
+        if(currentSeason.rules?.vetoEnabled===false){s.currentPOVWinner=null;display(s,"Power of Veto Disabled","POV RESULTS","<p>The Power of Veto is disabled for this season.</p>","pov");return;}
+        const players=s.currentPOVPlayers.map(player).filter(Boolean);
+        const comp=chooseCustomCompetition("pov") || getCompetitionForWeekType(s.currentWeek,"pov");
+        const winner=chooseWinner(players,comp,"physical","mental");
+        s.currentPOVWinner=winner?.id||null;
+        if(winner) winner.povWins=Number(winner.povWins||0)+1;
+        display(s,comp?.name||"Power of Veto","POV RESULTS",winner?`${simulationPortrait(winner,"large")}<p><strong>${escapeHTML(name(winner.id))}</strong> has won <strong>${escapeHTML(comp?.name||"the Power of Veto")}</strong>.</p>${comp?.description?`<p class="event-description">${escapeHTML(comp.description)}</p>`:""}`:"<p>No eligible Power of Veto winner was available.</p>","pov");
     }
 
-    let used = false;
-    let replacement = null;
-    let note = "";
-
-    /*
-     * If the veto holder is nominated,
-     * determine the replacement nominee.
-     */
-    if (
-        veto &&
-        original.includes(veto)
-    ) {
-
-        const pool = active().filter(
-            p =>
-                p.id !== s.currentHOH &&
-                !original.includes(p.id)
-        );
-
-        if (pool.length) {
-
-            const diamond =
-                getUsableTwistStates(
-                    s.currentWeek,
-                    "diamondPOV"
-                ).find(
-                    x =>
-                        x.state.holderId === veto
-                );
-
-            replacement = diamond
-                ? pool
-                    .slice()
-                    .sort(
-                        (a, b) =>
-                            allianceBond(
-                                veto,
-                                a.id
-                            ) -
-                            allianceBond(
-                                veto,
-                                b.id
-                            )
-                    )[0]
-                : randomItem(pool);
-
-            if (diamond) {
-
-                diamond.state.used = true;
-
-                note = `
-                    <p class="veto-twist-note">
-
-                        <strong>
-                            ${escapeHTML(
-                                diamond.twist.name
-                            )}
-                        </strong>
-
-                        upgraded the veto to a
-                        Diamond Power of Veto,
-                        allowing the veto holder
-                        to choose the replacement.
-
-                    </p>
-                `;
-            }
-
-            const idx =
-                s.currentNominees.indexOf(veto);
-
-            if (
-                idx >= 0 &&
-                replacement
-            ) {
-
-                s.currentNominees[idx] =
-                    replacement.id;
-
-                used = true;
+    function runCleanVeto(){
+        const s=sim(), veto=s.currentPOVWinner, original=[...(s.currentNominees||[])];
+        if(currentSeason.rules?.vetoEnabled===false){display(s,"Veto Ceremony","VETO CEREMONY","<p>The Power of Veto is disabled for this season.</p>","veto-ceremony");return;}
+        let used=false,replacement=null,note="";
+        if(veto && original.includes(veto)){
+            const pool=active().filter(p=>p.id!==s.currentHOH&&!original.includes(p.id));
+            if(pool.length){
+                const diamond=getUsableTwistStates(s.currentWeek,"diamondPOV").find(x=>x.state.holderId===veto);
+                replacement=diamond?pool.slice().sort((a,b)=>allianceBond(veto,a.id)-allianceBond(veto,b.id))[0]:randomItem(pool);
+                if(diamond){diamond.state.used=true;note=`<p><strong>${escapeHTML(diamond.twist.name)}</strong> upgraded the veto to a Diamond Power of Veto, allowing the veto holder to choose the replacement.</p>`;}
+                const idx=s.currentNominees.indexOf(veto); if(idx>=0&&replacement){s.currentNominees[idx]=replacement.id;used=true;}
             }
         }
-    }
-
-    const nominees =
-        s.currentNominees
-            .map(player)
-            .filter(Boolean);
-
-    let statement =
-        "No Power of Veto holder was available.";
-
-    if (veto) {
-
-        if (used) {
-
-            statement = `
-                <strong>
-                    ${escapeHTML(
-                        name(veto)
-                    )}
-                </strong>
-
-                used the Power of Veto.
-
-                ${
-                    replacement
-                        ? `
-                            <strong>
-                                ${escapeHTML(
-                                    name(
-                                        replacement.id
-                                    )
-                                )}
-                            </strong>
-
-                            is the replacement nominee.
-                        `
-                        : ""
-                }
-            `;
-
-        } else {
-
-            statement = `
-                <strong>
-                    ${escapeHTML(
-                        name(veto)
-                    )}
-                </strong>
-
-                did not use the Power of Veto.
-            `;
+        const nominees=s.currentNominees.map(player).filter(Boolean);
+        let statement="No Power of Veto holder was available.";
+        if(veto){
+            statement=used ? `<strong>${escapeHTML(name(veto))}</strong> used the Power of Veto.${replacement ? ` <strong>${escapeHTML(name(replacement.id))}</strong> is the replacement nominee.` : ""}` : `<strong>${escapeHTML(name(veto))}</strong> did not use the Power of Veto.`;
         }
+        const content=`<div class="ceremony-leaders"><div class="ceremony-role-section"><h3>Head of Household</h3>${simulationPortrait(player(s.currentHOH),"large")}</div><div class="ceremony-role-section"><h3>Power of Veto Holder</h3>${simulationPortrait(player(veto),"large")}</div></div>${note}<p class="ceremony-statement">${statement}</p><div class="ceremony-role-section"><h3>Final Nominees</h3>${simulationPortraits(nominees.map(p=>p.id),"large")}</div>`;
+        display(s,"Veto Ceremony","VETO CEREMONY",content,"veto-ceremony");
     }
-
-    /*
-     * Build centered nominee cards.
-     */
-    const finalNomineeCards =
-        nominees
-            .map(nominee => {
-
-                return `
-                    <div class="nominee-card">
-
-                        <div class="nominee-placement">
-                            NOMINEE
-                        </div>
-
-                        ${simulationPortrait(
-                            nominee,
-                            "large"
-                        )}
-
-                    </div>
-                `;
-            })
-            .join("");
-
-    const content = `
-
-        <div class="ceremony-leaders">
-
-            <div class="ceremony-role-section">
-
-                <h3>
-                    Head of Household
-                </h3>
-
-                ${simulationPortrait(
-                    player(s.currentHOH),
-                    "large"
-                )}
-
-            </div>
-
-
-            <div class="ceremony-role-section">
-
-                <h3>
-                    Power of Veto Holder
-                </h3>
-
-                ${simulationPortrait(
-                    player(veto),
-                    "large"
-                )}
-
-            </div>
-
-        </div>
-
-
-        ${note}
-
-
-        <p class="ceremony-statement">
-            ${statement}
-        </p>
-
-
-        <div class="final-nominees-section">
-
-            <h3>
-                Final Nominees
-            </h3>
-
-            <div class="nominee-grid">
-
-                ${finalNomineeCards}
-
-            </div>
-
-        </div>
-
-    `;
-
-    display(
-        s,
-        "Veto Ceremony",
-        "VETO CEREMONY",
-        content,
-        "veto-ceremony"
-    );
-}
 
     function runCleanSpecial(compId){
         const s=sim(), players=active(), comp=getWeekCompetitions(s.currentWeek).find(c=>c.id===compId);
@@ -8178,3 +7488,71 @@ window.showResults = showResults;
     window.finalizeSeason=beginCleanFinale;
 })();
 
+/* =========================================================
+   FINAL STABILITY PATCH — 2026-09-09
+   Keeps the existing BrantSteele-style UI and simulation engine intact,
+   while making Proceed resilient to stale/partially-saved simulation state.
+   In particular, a completed Veto Player draw can never leave the game
+   stranded on the Veto Selections screen.
+   ========================================================= */
+(function installProceedRecoveryPatch(){
+    const originalProceed = window.runNextEvent;
+    if (typeof originalProceed !== "function") return;
+
+    function getSim(){
+        if (!window.currentSeason && typeof currentSeason !== "undefined") window.currentSeason = currentSeason;
+        const season = window.currentSeason || (typeof currentSeason !== "undefined" ? currentSeason : null);
+        if (!season) return null;
+        if (!season.simulation) season.simulation = createDefaultSimulation();
+        return ensureFinaleState(season.simulation);
+    }
+
+    function activeEvent(s){
+        if (!s) return null;
+        const chain = (typeof cycleChain === "function") ? cycleChain(s) : getWeekEventChain(s.currentWeek);
+        return chain[Number(s.currentEventIndex || 0)] || null;
+    }
+
+    window.runNextEvent = function(){
+        const s = getSim();
+        if (!s) return originalProceed();
+
+        /*
+         * Recovery for the exact reported failure:
+         * if Veto Selections has already successfully populated the six
+         * players but the event pointer is still sitting on that step,
+         * move the pointer to the POV competition before continuing.
+         */
+        const event = activeEvent(s);
+        if (event?.key === "pov-players" && Array.isArray(s.currentPOVPlayers) && s.currentPOVPlayers.length > 0){
+            s.currentEventIndex = Number(s.currentEventIndex || 0) + 1;
+            s.currentPhase = "week";
+            if (typeof resetGameChain === "function") resetGameChain(s.currentEventIndex);
+            if (typeof persistCurrentSeason === "function") persistCurrentSeason();
+        }
+
+        try {
+            return originalProceed();
+        } catch (error) {
+            console.error("Big Brother Simulator Proceed recovery:", error);
+
+            /*
+             * If the normal state machine throws while moving past Veto
+             * Selections, recover directly into the next event instead of
+             * leaving the interface frozen.
+             */
+            const current = getSim();
+            const next = activeEvent(current);
+            if (next?.key === "pov" && typeof window.runPOVEvent === "function") {
+                try {
+                    window.runPOVEvent();
+                    return;
+                } catch (recoveryError) {
+                    console.error("POV recovery failed:", recoveryError);
+                }
+            }
+
+            alert("The simulator encountered an error while advancing. The current game state was preserved. Please press Proceed again to continue.");
+        }
+    };
+})();
