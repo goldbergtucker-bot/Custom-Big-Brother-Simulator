@@ -7252,29 +7252,168 @@ window.showResults = showResults;
         display(s,comp?.name||"Head of Household","HOH COMPETITION",content,"hoh");
     }
 
-    function runCleanNominations(){
-        const s=sim(), pool=active().filter(p=>p.id!==s.currentHOH);
-        let protectedIds=new Set();
-        getUsableTwistStates(s.currentWeek,"immunity").forEach(x=>protectedIds.add(x.state.holderId));
-        const eligible=pool.filter(p=>!protectedIds.has(p.id));
-        let noms=[];
-        const hoh=player(s.currentHOH);
-        const ordered=eligible.slice().sort((a,b)=>allianceBond(s.currentHOH,b.id)-allianceBond(s.currentHOH,a.id));
-        // Lower bond = more likely target, with a small random component.
-        const ranked=ordered.sort((a,b)=>(allianceBond(s.currentHOH,a.id)+Math.random()*12)-(allianceBond(s.currentHOH,b.id)+Math.random()*12));
-        noms=ranked.slice(0,Math.min(2,ranked.length)).map(p=>p.id);
-        // Nomination Void cancels the initial pair and forces replacements.
-        const voidPower=getUsableTwistStates(s.currentWeek,"nominationVoid").find(x=>noms.includes(x.state.holderId));
-        if(voidPower){
-            voidPower.state.used=true;
-            const replacementPool=eligible.filter(p=>!noms.includes(p.id));
-            noms=replacementPool.sort((a,b)=>Math.random()-.5).slice(0,2).map(p=>p.id);
-        }
-        s.currentNominees=noms;
-        const nomineeText=noms.map(id=>`<div class="nominee-card">${simulationPortrait(player(id),"large")}<strong>${escapeHTML(name(id))}</strong></div>`).join("");
-        const note=voidPower?`<p><strong>${escapeHTML(voidPower.twist.name)}</strong> was activated, so the original nominations were voided and replacement nominees were selected.</p>`:"";
-        display(s,"Nomination Ceremony","NOMINATION CEREMONY",`<div class="nomination-result">${simulationPortrait(hoh,"large")}<p><strong>${escapeHTML(name(s.currentHOH))}</strong> has nominated:</p><div class="nominee-grid">${nomineeText}</div>${note}</div>`,"nominations");
+   function runCleanNominations(){
+    const s = sim();
+    const pool = active().filter(p => p.id !== s.currentHOH);
+
+    let protectedIds = new Set();
+
+    getUsableTwistStates(s.currentWeek, "immunity").forEach(x => {
+        protectedIds.add(x.state.holderId);
+    });
+
+    const eligible = pool.filter(
+        p => !protectedIds.has(p.id)
+    );
+
+    let noms = [];
+
+    const hoh = player(s.currentHOH);
+
+    const ordered = eligible
+        .slice()
+        .sort(
+            (a, b) =>
+                allianceBond(s.currentHOH, b.id) -
+                allianceBond(s.currentHOH, a.id)
+        );
+
+    const ranked = ordered.sort(
+        (a, b) =>
+            (
+                allianceBond(s.currentHOH, a.id) +
+                Math.random() * 12
+            ) -
+            (
+                allianceBond(s.currentHOH, b.id) +
+                Math.random() * 12
+            )
+    );
+
+    noms = ranked
+        .slice(0, Math.min(2, ranked.length))
+        .map(p => p.id);
+
+    const voidPower =
+        getUsableTwistStates(
+            s.currentWeek,
+            "nominationVoid"
+        ).find(
+            x => noms.includes(x.state.holderId)
+        );
+
+    if (voidPower) {
+
+        voidPower.state.used = true;
+
+        const replacementPool =
+            eligible.filter(
+                p => !noms.includes(p.id)
+            );
+
+        noms = replacementPool
+            .sort(() => Math.random() - 0.5)
+            .slice(0, 2)
+            .map(p => p.id);
     }
+
+    s.currentNominees = noms;
+
+    /*
+     * Build the nominee cards.
+     * The portrait helper already includes
+     * the houseguest's name, so we do not
+     * add another name underneath it.
+     */
+    const nomineeCards = s.currentNominees
+        .map(id => {
+
+            const nominee = player(id);
+
+            if (!nominee) {
+                return "";
+            }
+
+            return `
+                <div class="nominee-card">
+
+                    <div class="nominee-placement">
+                        NOMINEE
+                    </div>
+
+                    ${simulationPortrait(
+                        nominee,
+                        "large"
+                    )}
+
+                </div>
+            `;
+        })
+        .join("");
+
+    const note = voidPower
+        ? `
+            <p class="nomination-twist-note">
+
+                <strong>
+                    ${escapeHTML(voidPower.twist.name)}
+                </strong>
+
+                was activated, so the original
+                nominations were voided and replacement
+                nominees were selected.
+
+            </p>
+        `
+        : "";
+
+    display(
+        s,
+        "Nomination Ceremony",
+        "NOMINATION CEREMONY",
+
+        `
+            <div class="nomination-result">
+
+                <div class="nomination-hoh">
+
+                    <div class="nomination-role">
+                        HEAD OF HOUSEHOLD
+                    </div>
+
+                    ${simulationPortrait(
+                        hoh,
+                        "large"
+                    )}
+
+                    <p class="nomination-hoh-text">
+
+                        <strong>
+                            ${escapeHTML(
+                                name(s.currentHOH)
+                            )}
+                        </strong>
+
+                        has nominated:
+
+                    </p>
+
+                </div>
+
+                <div class="nominee-grid">
+
+                    ${nomineeCards}
+
+                </div>
+
+                ${note}
+
+            </div>
+        `,
+
+        "nominations"
+    );
+}
 
     function runCleanPOVPlayers(){
         const s=sim();
