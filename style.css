@@ -2269,3 +2269,84 @@ select {
     .sim-main-header { min-height: 62px; }
     .sim-main-header h1 { font-size: 17px; }
 }
+
+/* =========================================================
+   BRANTSTEELE EVENT VIEW — HISTORY + CEREMONY ALIGNMENT FIXES
+   ========================================================= */
+
+.sim-week-label {
+    width: 100%;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font-family: inherit;
+}
+
+.sim-week-label:hover,
+.sim-week-block.viewing .sim-week-label {
+    background: #3a3a3a;
+    color: #fff;
+}
+
+.sim-week-block.current .sim-week-label {
+    color: #fff;
+    font-weight: 900;
+}
+
+.sim-event-nav:is(button) {
+    width: 100%;
+    border: 0;
+    background: transparent;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.sim-event-nav:is(button):hover {
+    background: #373737;
+    color: #fff;
+}
+
+/* A lone portrait should be centered just like BrantSteele. */
+.sim-main-panel #event-content > .sim-portrait {
+    margin: 22px auto;
+}
+
+.sim-main-panel #event-content {
+    text-align: center;
+}
+
+.ceremony-leaders {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 42px;
+    margin: 18px auto 28px;
+}
+
+.ceremony-role-section {
+    text-align: center;
+    margin: 20px auto;
+}
+
+.ceremony-role-section h3 {
+    margin: 0 0 10px;
+    color: #d4d4d4;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+}
+
+.ceremony-role-section > .sim-portrait {
+    margin: 0 auto;
+}
+
+.ceremony-role-section .sim-portrait-grid {
+    justify-content: center;
+}
+
+.ceremony-statement {
+    max-width: 680px;
+    margin: 22px auto;
+    text-align: center;
+}
