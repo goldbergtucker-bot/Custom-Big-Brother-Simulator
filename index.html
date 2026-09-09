@@ -2,10 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>Big Brother Simulator</title>
 
@@ -14,46 +11,29 @@
 
 <body>
 
-    <!-- =====================================================
+    <!-- =========================================================
          HEADER
-         ===================================================== -->
+         ========================================================= -->
 
     <header class="site-header">
 
         <div class="header-inner">
 
-            <button
-                type="button"
-                class="brand"
-                onclick="showPage('home-page')"
-            >
-                <span class="brand-icon">BB</span>
-                <span class="brand-text">
-                    Big Brother Simulator
-                </span>
+            <button class="site-logo" onclick="showPage('home-page')">
+                BIG BROTHER
             </button>
-
 
             <nav class="main-nav">
 
-                <button
-                    type="button"
-                    onclick="showPage('home-page')"
-                >
+                <button onclick="showPage('home-page')">
                     Home
                 </button>
 
-                <button
-                    type="button"
-                    onclick="showPage('creator-page')"
-                >
+                <button onclick="showPage('creator-page')">
                     Create Season
                 </button>
 
-                <button
-                    type="button"
-                    onclick="showPage('home-page')"
-                >
+                <button onclick="showPage('home-page')">
                     Saved Seasons
                 </button>
 
@@ -64,46 +44,41 @@
     </header>
 
 
-    <!-- =====================================================
+    <!-- =========================================================
          MAIN CONTENT
-         ===================================================== -->
+         ========================================================= -->
 
     <main>
 
 
-        <!-- =================================================
+        <!-- =====================================================
              HOME PAGE
-             ================================================= -->
+             ===================================================== -->
 
-        <section
-            id="home-page"
-            class="page active-page"
-        >
+        <section id="home-page" class="page active">
 
             <div class="hero-section">
 
                 <div class="hero-content">
 
-                    <span class="hero-kicker">
+                    <span class="hero-label">
                         CUSTOM SEASON SIMULATOR
                     </span>
 
                     <h1>
-                        BIG BROTHER
-                        <span>SIMULATOR</span>
+                        BIG BROTHER<br>
+                        SIMULATOR
                     </h1>
 
                     <p>
-                        Create your own Big Brother seasons,
-                        customize the cast, rules, relationships,
-                        alliances, competitions, twists, and
-                        simulation settings.
+                        Create your own Big Brother season with custom
+                        houseguests, relationships, alliances, competitions,
+                        twists, rules, and simulation settings.
                     </p>
 
-                    <div class="hero-buttons">
+                    <div class="hero-actions">
 
                         <button
-                            type="button"
                             class="primary-button"
                             onclick="showPage('creator-page')"
                         >
@@ -111,7 +86,6 @@
                         </button>
 
                         <button
-                            type="button"
                             class="secondary-button"
                             onclick="document.getElementById('saved-seasons').scrollIntoView({ behavior: 'smooth' })"
                         >
@@ -125,66 +99,28 @@
             </div>
 
 
-            <!-- Saved Seasons -->
+            <!-- SAVED SEASONS -->
 
-            <section
-                id="saved-seasons"
-                class="home-section"
-            >
+            <section id="saved-seasons" class="content-section">
 
                 <div class="section-heading">
 
                     <div>
-
-                        <span class="section-kicker">
+                        <span class="section-label">
                             YOUR SEASONS
                         </span>
 
                         <h2>
                             Saved Seasons
                         </h2>
-
-                        <p>
-                            Continue a season you've already created
-                            or start something completely new.
-                        </p>
-
                     </div>
 
                 </div>
-
 
                 <div
                     id="saved-seasons-container"
                     class="saved-seasons-grid"
-                >
-
-                    <div class="empty-state">
-
-                        <div class="empty-state-icon">
-                            🏠
-                        </div>
-
-                        <h3>
-                            No Saved Seasons
-                        </h3>
-
-                        <p>
-                            Create your first Big Brother season
-                            to get started.
-                        </p>
-
-                        <button
-                            type="button"
-                            class="primary-button"
-                            onclick="showPage('creator-page')"
-                        >
-                            Create Season
-                        </button>
-
-                    </div>
-
-                </div>
+                ></div>
 
             </section>
 
@@ -192,20 +128,17 @@
 
 
 
-        <!-- =================================================
+        <!-- =====================================================
              SEASON CREATOR
-             ================================================= -->
+             ===================================================== -->
 
-        <section
-            id="creator-page"
-            class="page"
-        >
+        <section id="creator-page" class="page">
 
             <div class="page-header">
 
                 <div>
 
-                    <span class="section-kicker">
+                    <span class="section-label">
                         SEASON CREATOR
                     </span>
 
@@ -214,8 +147,7 @@
                     </h1>
 
                     <p>
-                        Build your own custom Big Brother season
-                        from the ground up.
+                        Build every part of your custom Big Brother season.
                     </p>
 
                 </div>
@@ -233,13 +165,13 @@
 
                     <div>
 
+                        <span class="section-label">
+                            STEP 1
+                        </span>
+
                         <h2>
                             Season Information
                         </h2>
-
-                        <p>
-                            Give your season its identity.
-                        </p>
 
                     </div>
 
@@ -272,30 +204,26 @@
                         <input
                             type="text"
                             id="season-theme"
-                            placeholder="Example: Summer of Secrets"
+                            placeholder="Example: Summer Vacation"
                         >
 
                     </div>
 
-                </div>
 
+                    <div class="form-group form-group-full">
 
-                <div class="form-group">
+                        <label for="season-description">
+                            Season Description
+                        </label>
 
-                    <label for="season-description">
-                        Season Description
-                    </label>
+                        <textarea
+                            id="season-description"
+                            rows="4"
+                            placeholder="Describe your season..."
+                        ></textarea>
 
-                    <textarea
-                        id="season-description"
-                        rows="4"
-                        placeholder="Describe your season..."
-                    ></textarea>
+                    </div>
 
-                </div>
-
-
-                <div class="form-grid">
 
                     <div class="form-group">
 
@@ -309,30 +237,13 @@
                             placeholder="https://..."
                         >
 
-                        <div
-                            id="season-logo-preview"
-                            class="image-preview"
-                        >
-
-                            <span>
-                                Logo preview
-                            </span>
-
-                            <img
-                                id="season-logo-preview-image"
-                                src=""
-                                alt="Season logo preview"
-                            >
-
-                        </div>
-
                     </div>
 
 
                     <div class="form-group">
 
                         <label for="season-background">
-                            Season Background URL
+                            Background Image URL
                         </label>
 
                         <input
@@ -342,6 +253,24 @@
                         >
 
                     </div>
+
+                </div>
+
+
+                <div
+                    id="season-logo-preview"
+                    class="image-preview"
+                >
+
+                    <span>
+                        Season logo preview
+                    </span>
+
+                    <img
+                        id="season-logo-preview-image"
+                        src=""
+                        alt="Season logo preview"
+                    >
 
                 </div>
 
@@ -359,13 +288,16 @@
 
                     <div>
 
+                        <span class="section-label">
+                            STEP 2
+                        </span>
+
                         <h2>
                             Houseguests
                         </h2>
 
                         <p>
-                            Create the cast that will compete in
-                            your season.
+                            Create the cast that will compete in your season.
                         </p>
 
                     </div>
@@ -373,7 +305,7 @@
                 </div>
 
 
-                <div class="houseguest-count-control">
+                <div class="houseguest-controls">
 
                     <div class="form-group">
 
@@ -397,14 +329,12 @@
                 <div
                     id="houseguest-editor"
                     class="houseguest-editor"
-                >
-                </div>
+                ></div>
 
 
                 <div class="add-houseguest-container">
 
                     <button
-                        type="button"
                         class="secondary-button"
                         onclick="addHouseguest()"
                     >
@@ -427,12 +357,17 @@
 
                     <div>
 
+                        <span class="section-label">
+                            STEP 3
+                        </span>
+
                         <h2>
-                            Season Rules &amp; Settings
+                            Season Rules & Settings
                         </h2>
 
                         <p>
-                            Customize how your season operates.
+                            Customize the basic rules that control how your
+                            season will operate.
                         </p>
 
                     </div>
@@ -440,15 +375,24 @@
                 </div>
 
 
-                <!-- Basic Rules -->
+                <div class="settings-grid">
 
-                <div class="settings-subsection">
 
-                    <h3>
-                        Basic Rules
-                    </h3>
+                    <!-- FINALISTS -->
 
-                    <div class="form-grid">
+                    <div class="setting-card">
+
+                        <div class="setting-card-header">
+
+                            <h3>
+                                Finalists
+                            </h3>
+
+                            <p>
+                                How many houseguests reach the finale?
+                            </p>
+
+                        </div>
 
                         <div class="form-group">
 
@@ -460,12 +404,30 @@
                                 type="number"
                                 id="rule-finalists"
                                 min="2"
-                                max="10"
+                                max="5"
                                 value="2"
                             >
 
                         </div>
 
+                    </div>
+
+
+                    <!-- JURY -->
+
+                    <div class="setting-card">
+
+                        <div class="setting-card-header">
+
+                            <h3>
+                                Jury
+                            </h3>
+
+                            <p>
+                                Configure the size of the jury.
+                            </p>
+
+                        </div>
 
                         <div class="form-group">
 
@@ -477,12 +439,159 @@
                                 type="number"
                                 id="rule-jury-size"
                                 min="0"
-                                max="50"
+                                max="20"
                                 value="7"
                             >
 
                         </div>
 
+                    </div>
+
+
+                    <!-- VETO -->
+
+                    <div class="setting-card">
+
+                        <div class="setting-card-header">
+
+                            <h3>
+                                Power of Veto
+                            </h3>
+
+                            <p>
+                                Enable or disable the Power of Veto.
+                            </p>
+
+                        </div>
+
+                        <label class="toggle-setting">
+
+                            <input
+                                type="checkbox"
+                                id="rule-veto-enabled"
+                                checked
+                            >
+
+                            <span>
+                                Enable Power of Veto
+                            </span>
+
+                        </label>
+
+                    </div>
+
+
+                    <!-- SAFETY -->
+
+                    <div class="setting-card">
+
+                        <div class="setting-card-header">
+
+                            <h3>
+                                Safety Competition
+                            </h3>
+
+                            <p>
+                                Add a separate safety competition.
+                            </p>
+
+                        </div>
+
+                        <label class="toggle-setting">
+
+                            <input
+                                type="checkbox"
+                                id="rule-safety-enabled"
+                            >
+
+                            <span>
+                                Enable Safety Competition
+                            </span>
+
+                        </label>
+
+                    </div>
+
+
+                    <!-- BATTLE BACK -->
+
+                    <div class="setting-card">
+
+                        <div class="setting-card-header">
+
+                            <h3>
+                                Battle Back
+                            </h3>
+
+                            <p>
+                                Allow an evicted houseguest to return.
+                            </p>
+
+                        </div>
+
+                        <label class="toggle-setting">
+
+                            <input
+                                type="checkbox"
+                                id="rule-battle-back"
+                            >
+
+                            <span>
+                                Enable Battle Back
+                            </span>
+
+                        </label>
+
+                    </div>
+
+
+                    <!-- DOUBLE EVICTION -->
+
+                    <div class="setting-card">
+
+                        <div class="setting-card-header">
+
+                            <h3>
+                                Double Eviction
+                            </h3>
+
+                            <p>
+                                Allow double eviction weeks.
+                            </p>
+
+                        </div>
+
+                        <label class="toggle-setting">
+
+                            <input
+                                type="checkbox"
+                                id="rule-double-eviction"
+                            >
+
+                            <span>
+                                Enable Double Eviction
+                            </span>
+
+                        </label>
+
+                    </div>
+
+
+                    <!-- NOMINEES -->
+
+                    <div class="setting-card">
+
+                        <div class="setting-card-header">
+
+                            <h3>
+                                Nominations
+                            </h3>
+
+                            <p>
+                                Choose how many houseguests are nominated.
+                            </p>
+
+                        </div>
 
                         <div class="form-group">
 
@@ -500,6 +609,10 @@
                                     3
                                 </option>
 
+                                <option value="4">
+                                    4
+                                </option>
+
                                 <option value="custom">
                                     Custom
                                 </option>
@@ -510,25 +623,47 @@
 
 
                         <div
-                            class="form-group"
                             id="custom-nominees-container"
+                            class="conditional-setting"
                             style="display: none;"
                         >
 
-                            <label for="rule-custom-nominees">
-                                Custom Number of Nominees
-                            </label>
+                            <div class="form-group">
 
-                            <input
-                                type="number"
-                                id="rule-custom-nominees"
-                                min="1"
-                                max="20"
-                                value="2"
-                            >
+                                <label for="rule-custom-nominees">
+                                    Custom Number
+                                </label>
+
+                                <input
+                                    type="number"
+                                    id="rule-custom-nominees"
+                                    min="1"
+                                    max="10"
+                                    value="2"
+                                >
+
+                            </div>
 
                         </div>
 
+                    </div>
+
+
+                    <!-- VETO PLAYERS -->
+
+                    <div class="setting-card">
+
+                        <div class="setting-card-header">
+
+                            <h3>
+                                Veto Players
+                            </h3>
+
+                            <p>
+                                Choose how many players compete in the POV.
+                            </p>
+
+                        </div>
 
                         <div class="form-group">
 
@@ -550,6 +685,10 @@
                                     4
                                 </option>
 
+                                <option value="3">
+                                    3
+                                </option>
+
                                 <option value="custom">
                                     Custom
                                 </option>
@@ -560,25 +699,47 @@
 
 
                         <div
-                            class="form-group"
                             id="custom-veto-players-container"
+                            class="conditional-setting"
                             style="display: none;"
                         >
 
-                            <label for="rule-custom-veto-players">
-                                Custom Veto Players
-                            </label>
+                            <div class="form-group">
 
-                            <input
-                                type="number"
-                                id="rule-custom-veto-players"
-                                min="2"
-                                max="20"
-                                value="6"
-                            >
+                                <label for="rule-custom-veto-players">
+                                    Custom Number
+                                </label>
+
+                                <input
+                                    type="number"
+                                    id="rule-custom-veto-players"
+                                    min="2"
+                                    max="20"
+                                    value="6"
+                                >
+
+                            </div>
 
                         </div>
 
+                    </div>
+
+
+                    <!-- EVICTION TYPE -->
+
+                    <div class="setting-card">
+
+                        <div class="setting-card-header">
+
+                            <h3>
+                                Eviction
+                            </h3>
+
+                            <p>
+                                Choose how the eviction is decided.
+                            </p>
+
+                        </div>
 
                         <div class="form-group">
 
@@ -596,8 +757,8 @@
                                     HOH Vote
                                 </option>
 
-                                <option value="custom">
-                                    Custom
+                                <option value="nominees">
+                                    Nominees Vote
                                 </option>
 
                             </select>
@@ -606,124 +767,27 @@
 
                     </div>
 
-                </div>
 
+                    <!-- STARTING HOH -->
 
-                <!-- Competition Rules -->
+                    <div class="setting-card">
 
-                <div class="settings-subsection">
+                        <div class="setting-card-header">
 
-                    <h3>
-                        Competition Rules
-                    </h3>
+                            <h3>
+                                Starting HOH
+                            </h3>
 
-                    <div class="settings-toggle-grid">
+                            <p>
+                                Decide who begins the season as HOH.
+                            </p>
 
-                        <label class="setting-toggle">
-
-                            <input
-                                type="checkbox"
-                                id="rule-veto-enabled"
-                                checked
-                            >
-
-                            <span>
-                                <strong>
-                                    Power of Veto
-                                </strong>
-
-                                <small>
-                                    Enable the Power of Veto
-                                    competition.
-                                </small>
-                            </span>
-
-                        </label>
-
-
-                        <label class="setting-toggle">
-
-                            <input
-                                type="checkbox"
-                                id="rule-safety-enabled"
-                            >
-
-                            <span>
-                                <strong>
-                                    Safety Competition
-                                </strong>
-
-                                <small>
-                                    Enable a weekly safety
-                                    competition.
-                                </small>
-
-                            </span>
-
-                        </label>
-
-
-                        <label class="setting-toggle">
-
-                            <input
-                                type="checkbox"
-                                id="rule-battle-back"
-                            >
-
-                            <span>
-                                <strong>
-                                    Battle Back
-                                </strong>
-
-                                <small>
-                                    Allow eliminated houseguests
-                                    to compete for re-entry.
-                                </small>
-
-                            </span>
-
-                        </label>
-
-
-                        <label class="setting-toggle">
-
-                            <input
-                                type="checkbox"
-                                id="rule-double-eviction"
-                            >
-
-                            <span>
-                                <strong>
-                                    Double Eviction
-                                </strong>
-
-                                <small>
-                                    Allow double eviction rounds.
-                                </small>
-
-                            </span>
-
-                        </label>
-
-                    </div>
-
-                </div>
-
-
-                <!-- Starting HOH -->
-
-                <div class="settings-subsection">
-
-                    <h3>
-                        Starting HOH
-                    </h3>
-
-                    <div class="form-grid">
+                        </div>
 
                         <div class="form-group">
 
                             <label for="rule-starting-hoh">
-                                Starting HOH Method
+                                Starting HOH
                             </label>
 
                             <select id="rule-starting-hoh">
@@ -742,60 +806,61 @@
 
 
                         <div
-                            class="form-group"
                             id="specific-hoh-container"
+                            class="conditional-setting"
                             style="display: none;"
                         >
 
-                            <label for="rule-specific-hoh">
-                                Starting HOH
-                            </label>
+                            <div class="form-group">
 
-                            <select id="rule-specific-hoh">
+                                <label for="rule-specific-hoh">
+                                    Houseguest
+                                </label>
 
-                                <option value="">
-                                    Select Houseguest
-                                </option>
+                                <select id="rule-specific-hoh">
+                                    <option value="">
+                                        Select Houseguest
+                                    </option>
+                                </select>
 
-                            </select>
+                            </div>
 
                         </div>
 
                     </div>
 
-                </div>
 
+                    <!-- JURY VOTING -->
 
-                <!-- Jury Voting -->
+                    <div class="setting-card">
 
-                <div class="settings-subsection">
+                        <div class="setting-card-header">
 
-                    <h3>
-                        Jury
-                    </h3>
-
-                    <label class="setting-toggle">
-
-                        <input
-                            type="checkbox"
-                            id="rule-jury-voting"
-                            checked
-                        >
-
-                        <span>
-
-                            <strong>
+                            <h3>
                                 Jury Voting
-                            </strong>
+                            </h3>
 
-                            <small>
-                                Allow the jury to select the winner
-                                at the finale.
-                            </small>
+                            <p>
+                                Allow the jury to vote for the winner.
+                            </p>
 
-                        </span>
+                        </div>
 
-                    </label>
+                        <label class="toggle-setting">
+
+                            <input
+                                type="checkbox"
+                                id="rule-jury-voting"
+                                checked
+                            >
+
+                            <span>
+                                Enable Jury Voting
+                            </span>
+
+                        </label>
+
+                    </div>
 
                 </div>
 
@@ -807,21 +872,25 @@
                  RELATIONSHIPS
                  ================================================= -->
 
-            <section class="creator-section relationships-section">
+            <section class="creator-section" id="relationships-section">
 
                 <div class="section-heading">
 
                     <div>
+
+                        <span class="section-label">
+                            STEP 4
+                        </span>
 
                         <h2>
                             Relationships
                         </h2>
 
                         <p>
-                            Define how each houseguest feels about
-                            the other houseguests. Relationships are
-                            directional, meaning each houseguest can
-                            have a different opinion of the other.
+                            Define how each houseguest feels about the other
+                            players in the house. Relationships are
+                            directional, meaning each houseguest can have
+                            different feelings toward another player.
                         </p>
 
                     </div>
@@ -829,19 +898,21 @@
                 </div>
 
 
+                <!-- RELATIONSHIP EDITOR -->
+
                 <div class="relationship-editor">
 
                     <div class="relationship-editor-header">
 
                         <div>
 
-                            <h3 id="relationship-form-title">
-                                Create Relationship
+                            <h3>
+                                Add Relationship
                             </h3>
 
                             <p>
-                                Select two houseguests and configure
-                                their relationship.
+                                Select the two houseguests and define their
+                                relationship.
                             </p>
 
                         </div>
@@ -849,9 +920,9 @@
                     </div>
 
 
-                    <!-- Houseguest Selection -->
+                    <div class="relationship-selection-grid">
 
-                    <div class="relationship-houseguest-row">
+                        <!-- HOUSEGUEST A -->
 
                         <div class="form-group">
 
@@ -867,13 +938,15 @@
 
                             </select>
 
+                            <small>
+                                This is the houseguest whose feelings are
+                                being defined.
+                            </small>
+
                         </div>
 
 
-                        <div class="relationship-direction">
-                            →
-                        </div>
-
+                        <!-- HOUSEGUEST B -->
 
                         <div class="form-group">
 
@@ -889,26 +962,40 @@
 
                             </select>
 
+                            <small>
+                                This is the houseguest receiving those
+                                feelings.
+                            </small>
+
                         </div>
 
                     </div>
 
 
-                    <!-- Relationship Metrics -->
+                    <!-- RELATIONSHIP RATINGS -->
 
-                    <div class="relationship-metrics">
+                    <div class="relationship-ratings">
 
-                        <!-- Friendship -->
+                        <div class="relationship-rating-card">
 
-                        <div class="relationship-metric">
+                            <div class="relationship-rating-header">
 
-                            <div class="relationship-metric-header">
+                                <div>
 
-                                <label for="relationship-friendship">
-                                    Friendship
-                                </label>
+                                    <h4>
+                                        Friendship
+                                    </h4>
 
-                                <span id="relationship-friendship-value">
+                                    <p>
+                                        How much A genuinely likes B.
+                                    </p>
+
+                                </div>
+
+                                <span
+                                    id="relationship-friendship-value"
+                                    class="rating-value"
+                                >
                                     5
                                 </span>
 
@@ -920,30 +1007,43 @@
                                 min="0"
                                 max="10"
                                 value="5"
-                                step="1"
                             >
 
-                            <div class="relationship-scale">
+                            <div class="range-labels">
 
-                                <span>0</span>
-                                <span>10</span>
+                                <span>
+                                    0 — Enemies
+                                </span>
+
+                                <span>
+                                    10 — Best Friends
+                                </span>
 
                             </div>
 
                         </div>
 
 
-                        <!-- Trust -->
+                        <div class="relationship-rating-card">
 
-                        <div class="relationship-metric">
+                            <div class="relationship-rating-header">
 
-                            <div class="relationship-metric-header">
+                                <div>
 
-                                <label for="relationship-trust">
-                                    Trust
-                                </label>
+                                    <h4>
+                                        Trust
+                                    </h4>
 
-                                <span id="relationship-trust-value">
+                                    <p>
+                                        How much A believes B can be trusted.
+                                    </p>
+
+                                </div>
+
+                                <span
+                                    id="relationship-trust-value"
+                                    class="rating-value"
+                                >
                                     5
                                 </span>
 
@@ -955,30 +1055,44 @@
                                 min="0"
                                 max="10"
                                 value="5"
-                                step="1"
                             >
 
-                            <div class="relationship-scale">
+                            <div class="range-labels">
 
-                                <span>0</span>
-                                <span>10</span>
+                                <span>
+                                    0 — No Trust
+                                </span>
+
+                                <span>
+                                    10 — Complete Trust
+                                </span>
 
                             </div>
 
                         </div>
 
 
-                        <!-- Loyalty -->
+                        <div class="relationship-rating-card">
 
-                        <div class="relationship-metric">
+                            <div class="relationship-rating-header">
 
-                            <div class="relationship-metric-header">
+                                <div>
 
-                                <label for="relationship-loyalty">
-                                    Loyalty
-                                </label>
+                                    <h4>
+                                        Loyalty
+                                    </h4>
 
-                                <span id="relationship-loyalty-value">
+                                    <p>
+                                        How willing A is to protect and work
+                                        with B.
+                                    </p>
+
+                                </div>
+
+                                <span
+                                    id="relationship-loyalty-value"
+                                    class="rating-value"
+                                >
                                     5
                                 </span>
 
@@ -990,30 +1104,43 @@
                                 min="0"
                                 max="10"
                                 value="5"
-                                step="1"
                             >
 
-                            <div class="relationship-scale">
+                            <div class="range-labels">
 
-                                <span>0</span>
-                                <span>10</span>
+                                <span>
+                                    0 — Will Betray
+                                </span>
+
+                                <span>
+                                    10 — Extremely Loyal
+                                </span>
 
                             </div>
 
                         </div>
 
 
-                        <!-- Rivalry -->
+                        <div class="relationship-rating-card">
 
-                        <div class="relationship-metric">
+                            <div class="relationship-rating-header">
 
-                            <div class="relationship-metric-header">
+                                <div>
 
-                                <label for="relationship-rivalry">
-                                    Rivalry
-                                </label>
+                                    <h4>
+                                        Rivalry
+                                    </h4>
 
-                                <span id="relationship-rivalry-value">
+                                    <p>
+                                        How strongly A opposes or dislikes B.
+                                    </p>
+
+                                </div>
+
+                                <span
+                                    id="relationship-rivalry-value"
+                                    class="rating-value"
+                                >
                                     0
                                 </span>
 
@@ -1025,65 +1152,44 @@
                                 min="0"
                                 max="10"
                                 value="0"
-                                step="1"
                             >
 
-                            <div class="relationship-scale">
+                            <div class="range-labels">
 
-                                <span>0</span>
-                                <span>10</span>
+                                <span>
+                                    0 — No Rivalry
+                                </span>
 
-                            </div>
-
-                        </div>
-
-
-                        <!-- Attraction -->
-
-                        <div class="relationship-metric">
-
-                            <div class="relationship-metric-header">
-
-                                <label for="relationship-attraction">
-                                    Attraction
-                                </label>
-
-                                <span id="relationship-attraction-value">
-                                    0
+                                <span>
+                                    10 — Major Rivalry
                                 </span>
 
                             </div>
 
-                            <input
-                                type="range"
-                                id="relationship-attraction"
-                                min="0"
-                                max="10"
-                                value="0"
-                                step="1"
-                            >
-
-                            <div class="relationship-scale">
-
-                                <span>0</span>
-                                <span>10</span>
-
-                            </div>
-
                         </div>
 
 
-                        <!-- Respect -->
+                        <div class="relationship-rating-card">
 
-                        <div class="relationship-metric">
+                            <div class="relationship-rating-header">
 
-                            <div class="relationship-metric-header">
+                                <div>
 
-                                <label for="relationship-respect">
-                                    Respect
-                                </label>
+                                    <h4>
+                                        Respect
+                                    </h4>
 
-                                <span id="relationship-respect-value">
+                                    <p>
+                                        How much A respects B's personality
+                                        and gameplay.
+                                    </p>
+
+                                </div>
+
+                                <span
+                                    id="relationship-respect-value"
+                                    class="rating-value"
+                                >
                                     5
                                 </span>
 
@@ -1095,13 +1201,66 @@
                                 min="0"
                                 max="10"
                                 value="5"
-                                step="1"
                             >
 
-                            <div class="relationship-scale">
+                            <div class="range-labels">
 
-                                <span>0</span>
-                                <span>10</span>
+                                <span>
+                                    0 — No Respect
+                                </span>
+
+                                <span>
+                                    10 — Deep Respect
+                                </span>
+
+                            </div>
+
+                        </div>
+
+
+                        <div class="relationship-rating-card">
+
+                            <div class="relationship-rating-header">
+
+                                <div>
+
+                                    <h4>
+                                        Attraction
+                                    </h4>
+
+                                    <p>
+                                        Optional rating for romantic
+                                        attraction or showmance potential.
+                                    </p>
+
+                                </div>
+
+                                <span
+                                    id="relationship-attraction-value"
+                                    class="rating-value"
+                                >
+                                    0
+                                </span>
+
+                            </div>
+
+                            <input
+                                type="range"
+                                id="relationship-attraction"
+                                min="0"
+                                max="10"
+                                value="0"
+                            >
+
+                            <div class="range-labels">
+
+                                <span>
+                                    0 — None
+                                </span>
+
+                                <span>
+                                    10 — Strong Attraction
+                                </span>
 
                             </div>
 
@@ -1110,354 +1269,73 @@
                     </div>
 
 
-                    <!-- Overall Relationship -->
+                    <!-- OVERALL RELATIONSHIP -->
 
-                    <div class="relationship-overall">
+                    <div class="relationship-overall-card">
 
-                        <div class="relationship-overall-header">
+                        <div>
 
-                            <span>
-                                Overall Relationship
+                            <span class="section-label">
+                                CALCULATED
                             </span>
 
-                            <strong id="relationship-overall">
-                                5.0 / 10
-                            </strong>
+                            <h3>
+                                Overall Relationship
+                            </h3>
+
+                            <p>
+                                This score is automatically calculated from
+                                the relationship ratings above.
+                            </p>
 
                         </div>
 
-
-                        <div class="relationship-overall-bar">
-
-                            <div
-                                id="relationship-overall-fill"
-                                class="relationship-overall-fill"
-                                style="width: 50%;"
-                            ></div>
-
+                        <div
+                            id="relationship-overall-value"
+                            class="relationship-overall-value"
+                        >
+                            5.0
                         </div>
-
-
-                        <p>
-                            Overall relationship strength is
-                            calculated automatically from the
-                            relationship metrics.
-                        </p>
 
                     </div>
 
 
-                    <!-- Form Buttons -->
+                    <!-- ADD BUTTON -->
 
-                    <div class="relationship-form-actions">
+                    <div class="relationship-actions">
 
                         <button
                             type="button"
                             class="primary-button"
-                            id="add-relationship-btn"
-                            onclick="saveRelationship()"
+                            onclick="addRelationship()"
                         >
                             Add Relationship
                         </button>
 
-                        <button
-                            type="button"
-                            class="secondary-button"
-                            id="cancel-relationship-btn"
-                            onclick="resetRelationshipForm()"
-                            style="display: none;"
-                        >
-                            Cancel
-                        </button>
-
                     </div>
 
                 </div>
 
 
-                <!-- Existing Relationships -->
+                <!-- SAVED RELATIONSHIPS -->
 
-                <div class="existing-relationships">
+                <div class="saved-relationships">
 
-                    <div class="section-subheading">
+                    <div class="section-heading">
 
                         <div>
 
-                            <h3>
-                                Existing Relationships
-                            </h3>
-
-                            <p>
-                                View and manage the relationships
-                                configured for this season.
-                            </p>
-
-                        </div>
-
-                    </div>
-
-
-                    <div
-                        id="relationships-list"
-                        class="relationships-list"
-                    >
-
-                        <div class="empty-state">
-
-                            <div class="empty-state-icon">
-                                ❤️
-                            </div>
-
-                            <h3>
-                                No Relationships Yet
-                            </h3>
-
-                            <p>
-                                Create your first relationship above.
-                            </p>
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-            </section>
-
-
-
-            <!-- =================================================
-                 ALLIANCES
-                 ================================================= -->
-
-            <section class="creator-section alliances-section">
-
-                <div class="section-heading">
-
-                    <div>
-
-                        <h2>
-                            Alliances
-                        </h2>
-
-                        <p>
-                            Create and manage alliances between your
-                            houseguests. Alliances can later influence
-                            nominations, strategy, voting, and other
-                            parts of the simulation.
-                        </p>
-
-                    </div>
-
-                </div>
-
-
-                <div class="alliance-editor">
-
-                    <div class="alliance-editor-header">
-
-                        <div>
-
-                            <h3 id="alliance-form-title">
-                                Create Alliance
-                            </h3>
-
-                            <p>
-                                Give your alliance a name and select
-                                the houseguests who belong to it.
-                            </p>
-
-                        </div>
-
-                    </div>
-
-
-                    <!-- Alliance Name -->
-
-                    <div class="form-group">
-
-                        <label for="alliance-name">
-                            Alliance Name
-                        </label>
-
-                        <input
-                            type="text"
-                            id="alliance-name"
-                            placeholder="Example: The Final Four"
-                            maxlength="50"
-                        >
-
-                    </div>
-
-
-                    <!-- Alliance Description -->
-
-                    <div class="form-group">
-
-                        <label for="alliance-description">
-                            Description
-                        </label>
-
-                        <textarea
-                            id="alliance-description"
-                            rows="3"
-                            maxlength="300"
-                            placeholder="Optional description of the alliance..."
-                        ></textarea>
-
-                    </div>
-
-
-                    <!-- Formation Week / Status -->
-
-                    <div class="alliance-form-row">
-
-                        <div class="form-group">
-
-                            <label for="alliance-formation-week">
-                                Formation Week
-                            </label>
-
-                            <input
-                                type="number"
-                                id="alliance-formation-week"
-                                min="1"
-                                value="1"
-                            >
-
-                        </div>
-
-
-                        <div class="form-group">
-
-                            <label for="alliance-status">
-                                Status
-                            </label>
-
-                            <select id="alliance-status">
-
-                                <option value="active">
-                                    Active
-                                </option>
-
-                                <option value="dissolved">
-                                    Dissolved
-                                </option>
-
-                            </select>
-
-                        </div>
-
-                    </div>
-
-
-                    <!-- Alliance Members -->
-
-                    <div class="form-group alliance-members-group">
-
-                        <label>
-                            Alliance Members
-                        </label>
-
-                        <p class="form-help">
-                            Select at least two houseguests.
-                        </p>
-
-
-                        <div
-                            id="alliance-members"
-                            class="alliance-members-grid"
-                        >
-
-                            <!--
-                                Houseguest checkboxes are generated
-                                by JavaScript.
-                            -->
-
-                        </div>
-
-                    </div>
-
-
-                    <!-- Alliance Strength -->
-
-                    <div class="alliance-strength-preview">
-
-                        <div class="alliance-strength-header">
-
-                            <span>
-                                Alliance Strength
+                            <span class="section-label">
+                                CURRENT SEASON
                             </span>
 
-                            <strong id="alliance-strength-value">
-                                0 / 10
-                            </strong>
-
-                        </div>
-
-
-                        <div class="alliance-strength-bar">
-
-                            <div
-                                id="alliance-strength-fill"
-                                class="alliance-strength-fill"
-                                style="width: 0%;"
-                            ></div>
-
-                        </div>
-
-
-                        <p>
-                            Alliance strength is calculated from
-                            the relationships between its members.
-                        </p>
-
-                    </div>
-
-
-                    <!-- Alliance Form Actions -->
-
-                    <div class="alliance-form-actions">
-
-                        <button
-                            type="button"
-                            class="primary-button"
-                            id="add-alliance-btn"
-                            onclick="saveAlliance()"
-                        >
-                            Add Alliance
-                        </button>
-
-                        <button
-                            type="button"
-                            class="secondary-button"
-                            id="cancel-alliance-btn"
-                            onclick="resetAllianceForm()"
-                            style="display: none;"
-                        >
-                            Cancel
-                        </button>
-
-                    </div>
-
-                </div>
-
-
-                <!-- Existing Alliances -->
-
-                <div class="existing-alliances">
-
-                    <div class="section-subheading">
-
-                        <div>
-
                             <h3>
-                                Existing Alliances
+                                Relationship Chart
                             </h3>
 
                             <p>
-                                Manage the alliances currently
-                                configured for this season.
+                                Relationships you've created for this season
+                                will appear here.
                             </p>
 
                         </div>
@@ -1466,22 +1344,23 @@
 
 
                     <div
-                        id="alliances-list"
-                        class="alliances-list"
+                        id="relationships-container"
+                        class="relationships-container"
                     >
 
                         <div class="empty-state">
 
                             <div class="empty-state-icon">
-                                🤝
+                                ♥
                             </div>
 
                             <h3>
-                                No Alliances Yet
+                                No Relationships Added
                             </h3>
 
                             <p>
-                                Create your first alliance above.
+                                Select two houseguests above to create the
+                                first relationship.
                             </p>
 
                         </div>
@@ -1504,17 +1383,17 @@
 
                     <div>
 
-                        <span class="section-kicker">
-                            COMING NEXT
+                        <span class="section-label">
+                            FUTURE CUSTOMIZATION
                         </span>
 
                         <h2>
-                            Season Customization
+                            More Season Systems
                         </h2>
 
                         <p>
-                            More advanced season customization
-                            will be added here.
+                            Additional season customization will be added
+                            here as the simulator develops.
                         </p>
 
                     </div>
@@ -1522,11 +1401,38 @@
                 </div>
 
 
-                <div class="feature-card-grid">
+                <div class="feature-grid">
+
+
+                    <!-- ALLIANCES -->
 
                     <div class="feature-card">
 
-                        <div class="feature-card-icon">
+                        <div class="feature-icon">
+                            👥
+                        </div>
+
+                        <h3>
+                            Alliances
+                        </h3>
+
+                        <p>
+                            Create alliances, define members, set loyalty,
+                            and track alliance history.
+                        </p>
+
+                        <span class="feature-status">
+                            Coming Next
+                        </span>
+
+                    </div>
+
+
+                    <!-- COMPETITIONS -->
+
+                    <div class="feature-card">
+
+                        <div class="feature-icon">
                             🏆
                         </div>
 
@@ -1535,16 +1441,22 @@
                         </h3>
 
                         <p>
-                            Create custom HOH, POV, Safety,
-                            Luxury, and Final HOH competitions.
+                            Create custom HOH, POV, Safety, Luxury, and Final
+                            HOH competitions.
                         </p>
+
+                        <span class="feature-status">
+                            Coming Soon
+                        </span>
 
                     </div>
 
 
+                    <!-- TWISTS -->
+
                     <div class="feature-card">
 
-                        <div class="feature-card-icon">
+                        <div class="feature-icon">
                             🎲
                         </div>
 
@@ -1553,16 +1465,22 @@
                         </h3>
 
                         <p>
-                            Add custom twists and special mechanics
-                            to your season.
+                            Add custom twists and special mechanics to your
+                            season.
                         </p>
+
+                        <span class="feature-status">
+                            Coming Soon
+                        </span>
 
                     </div>
 
 
+                    <!-- SIMULATION ENGINE -->
+
                     <div class="feature-card">
 
-                        <div class="feature-card-icon">
+                        <div class="feature-icon">
                             ⚙️
                         </div>
 
@@ -1571,10 +1489,13 @@
                         </h3>
 
                         <p>
-                            Customize how strategy, relationships,
-                            alliances, competitions, and voting
-                            affect the game.
+                            Configure how relationships, strategy,
+                            competitions, and decisions affect the game.
                         </p>
+
+                        <span class="feature-status">
+                            Coming Soon
+                        </span>
 
                     </div>
 
@@ -1588,42 +1509,23 @@
                  SAVE SEASON
                  ================================================= -->
 
-            <section class="creator-section save-season-section">
+            <section class="creator-section save-section">
 
                 <div class="save-season-container">
 
-                    <div>
+                    <button
+                        class="primary-button large-button"
+                        onclick="saveSeason()"
+                    >
+                        Save Season
+                    </button>
 
-                        <h2>
-                            Ready to Play?
-                        </h2>
-
-                        <p>
-                            Save your season and begin the simulation.
-                        </p>
-
-                    </div>
-
-
-                    <div class="save-season-actions">
-
-                        <button
-                            type="button"
-                            class="secondary-button"
-                            onclick="showPage('home-page')"
-                        >
-                            Cancel
-                        </button>
-
-                        <button
-                            type="button"
-                            class="primary-button"
-                            onclick="saveSeason()"
-                        >
-                            Save Season
-                        </button>
-
-                    </div>
+                    <button
+                        class="secondary-button"
+                        onclick="showPage('home-page')"
+                    >
+                        Cancel
+                    </button>
 
                 </div>
 
@@ -1633,21 +1535,18 @@
 
 
 
-        <!-- =================================================
+        <!-- =====================================================
              SIMULATOR PAGE
-             ================================================= -->
+             ===================================================== -->
 
-        <section
-            id="simulator-page"
-            class="page"
-        >
+        <section id="simulator-page" class="page">
 
             <div class="simulator-header">
 
                 <div>
 
-                    <span class="section-kicker">
-                        LIVE SIMULATION
+                    <span class="section-label">
+                        SIMULATION
                     </span>
 
                     <h1 id="simulator-season-name">
@@ -1659,7 +1558,6 @@
                     </p>
 
                 </div>
-
 
                 <div class="simulator-week">
 
@@ -1676,9 +1574,9 @@
             </div>
 
 
-            <!-- Current Status -->
+            <!-- STATUS -->
 
-            <div class="simulator-status-grid">
+            <div class="status-grid">
 
                 <div class="status-box">
 
@@ -1692,7 +1590,6 @@
 
                 </div>
 
-
                 <div class="status-box">
 
                     <strong>
@@ -1705,11 +1602,10 @@
 
                 </div>
 
-
                 <div class="status-box">
 
                     <strong>
-                        POV
+                        VETO
                     </strong>
 
                     <span id="current-veto">
@@ -1721,209 +1617,162 @@
             </div>
 
 
-            <!-- Game Chain -->
+            <!-- GAME CHAIN -->
 
-            <section class="game-chain-section">
+            <div class="game-chain">
 
-                <div class="section-heading">
+                <div class="chain-step active">
 
-                    <div>
+                    <span class="chain-number">
+                        1
+                    </span>
 
-                        <h2>
-                            Game Chain
-                        </h2>
-
-                        <p>
-                            Follow the season event by event.
-                        </p>
-
-                    </div>
-
-                </div>
-
-
-                <div class="game-chain">
-
-                    <div
-                        class="chain-step active"
-                        data-event="hoh"
-                    >
-
-                        <span class="chain-number">
-                            1
-                        </span>
-
-                        <span class="chain-label">
-                            HOH
-                        </span>
-
-                    </div>
-
-
-                    <div
-                        class="chain-step"
-                        data-event="nominations"
-                    >
-
-                        <span class="chain-number">
-                            2
-                        </span>
-
-                        <span class="chain-label">
-                            Nominations
-                        </span>
-
-                    </div>
-
-
-                    <div
-                        class="chain-step"
-                        data-event="pov-players"
-                    >
-
-                        <span class="chain-number">
-                            3
-                        </span>
-
-                        <span class="chain-label">
-                            POV Players
-                        </span>
-
-                    </div>
-
-
-                    <div
-                        class="chain-step"
-                        data-event="pov"
-                    >
-
-                        <span class="chain-number">
-                            4
-                        </span>
-
-                        <span class="chain-label">
-                            POV
-                        </span>
-
-                    </div>
-
-
-                    <div
-                        class="chain-step"
-                        data-event="veto-ceremony"
-                    >
-
-                        <span class="chain-number">
-                            5
-                        </span>
-
-                        <span class="chain-label">
-                            Veto Ceremony
-                        </span>
-
-                    </div>
-
-
-                    <div
-                        class="chain-step"
-                        data-event="eviction"
-                    >
-
-                        <span class="chain-number">
-                            6
-                        </span>
-
-                        <span class="chain-label">
-                            Eviction
-                        </span>
-
-                    </div>
-
-                </div>
-
-            </section>
-
-
-            <!-- Current Event -->
-
-            <section class="event-display">
-
-                <div class="event-display-header">
-
-                    <span id="event-type">
+                    <span>
                         HOH
                     </span>
 
-                    <h2 id="event-title">
-                        Head of Household
-                    </h2>
+                </div>
+
+                <div class="chain-line"></div>
+
+                <div class="chain-step">
+
+                    <span class="chain-number">
+                        2
+                    </span>
+
+                    <span>
+                        Nominations
+                    </span>
 
                 </div>
 
+                <div class="chain-line"></div>
 
-                <div
-                    id="event-content"
-                    class="event-content"
+                <div class="chain-step">
+
+                    <span class="chain-number">
+                        3
+                    </span>
+
+                    <span>
+                        POV Players
+                    </span>
+
+                </div>
+
+                <div class="chain-line"></div>
+
+                <div class="chain-step">
+
+                    <span class="chain-number">
+                        4
+                    </span>
+
+                    <span>
+                        POV
+                    </span>
+
+                </div>
+
+                <div class="chain-line"></div>
+
+                <div class="chain-step">
+
+                    <span class="chain-number">
+                        5
+                    </span>
+
+                    <span class="chain-number">
+                        5
+                    </span>
+
+                    <span>
+                        Veto Ceremony
+                    </span>
+
+                </div>
+
+                <div class="chain-line"></div>
+
+                <div class="chain-step">
+
+                    <span class="chain-number">
+                        6
+                    </span>
+
+                    <span>
+                        Eviction
+                    </span>
+
+                </div>
+
+            </div>
+
+
+            <!-- EVENT -->
+
+            <div class="event-display">
+
+                <span
+                    id="event-type"
+                    class="section-label"
                 >
+                    EVENT
+                </span>
+
+                <h2 id="event-title">
+                    Simulation Ready
+                </h2>
+
+                <div id="event-content">
 
                     <p>
-                        The simulation is ready to begin.
+                        Start the simulation to begin the season.
                     </p>
 
                 </div>
 
+            </div>
 
-                <div class="event-actions">
 
-                    <button
-                        type="button"
-                        class="primary-button"
-                        onclick="runNextEvent()"
-                    >
-                        Continue
-                    </button>
+            <div class="simulator-actions">
 
-                </div>
+                <button
+                    class="primary-button large-button"
+                    onclick="runNextEvent()"
+                >
+                    Continue
+                </button>
 
-            </section>
+            </div>
 
         </section>
 
 
 
-        <!-- =================================================
+        <!-- =====================================================
              RESULTS PAGE
-             ================================================= -->
+             ===================================================== -->
 
-        <section
-            id="results-page"
-            class="page"
-        >
+        <section id="results-page" class="page">
 
             <div class="results-header">
 
-                <span class="section-kicker">
+                <span class="section-label">
                     SEASON COMPLETE
                 </span>
 
-                <h1>
-                    <span id="results-season-name">
-                        Big Brother
-                    </span>
+                <h1 id="results-season-name">
+                    Big Brother
                 </h1>
-
-                <p>
-                    The season has come to an end.
-                </p>
 
             </div>
 
 
-            <!-- Winner -->
+            <div class="winner-card">
 
-            <section class="winner-section">
-
-                <span>
+                <span class="section-label">
                     WINNER
                 </span>
 
@@ -1931,75 +1780,53 @@
                     —
                 </h2>
 
-            </section>
-
-
-            <!-- Final Placements -->
-
-            <section class="results-section">
-
-                <div class="section-heading">
-
-                    <div>
-
-                        <h2>
-                            Final Placements
-                        </h2>
-
-                        <p>
-                            How the houseguests finished the season.
-                        </p>
-
-                    </div>
-
-                </div>
-
-
-                <div id="final-placements">
-                </div>
-
-            </section>
-
-
-            <!-- Season Statistics -->
-
-            <section class="results-section">
-
-                <div class="section-heading">
-
-                    <div>
-
-                        <h2>
-                            Season Statistics
-                        </h2>
-
-                        <p>
-                            A complete statistical overview of
-                            the season.
-                        </p>
-
-                    </div>
-
-                </div>
-
-
-                <div id="season-statistics">
-                </div>
-
-            </section>
-
-
-            <div class="results-actions">
-
-                <button
-                    type="button"
-                    class="secondary-button"
-                    onclick="showPage('home-page')"
-                >
-                    Back to Home
-                </button>
-
             </div>
+
+
+            <section class="results-section">
+
+                <div class="section-heading">
+
+                    <div>
+
+                        <span class="section-label">
+                            FINAL PLACEMENTS
+                        </span>
+
+                        <h2>
+                            Placements
+                        </h2>
+
+                    </div>
+
+                </div>
+
+                <div id="final-placements"></div>
+
+            </section>
+
+
+            <section class="results-section">
+
+                <div class="section-heading">
+
+                    <div>
+
+                        <span class="section-label">
+                            SEASON STATISTICS
+                        </span>
+
+                        <h2>
+                            Statistics
+                        </h2>
+
+                    </div>
+
+                </div>
+
+                <div id="season-statistics"></div>
+
+            </section>
 
         </section>
 
@@ -2007,36 +1834,27 @@
 
 
 
-    <!-- =====================================================
+    <!-- =========================================================
          MODAL
-         ===================================================== -->
+         ========================================================= -->
 
     <div
         id="modal"
         class="modal"
-        aria-hidden="true"
     >
 
         <div class="modal-overlay"></div>
 
-        <div
-            class="modal-content"
-            role="dialog"
-            aria-modal="true"
-        >
+        <div class="modal-content">
 
             <button
-                type="button"
                 class="modal-close"
                 onclick="closeModal()"
-                aria-label="Close"
             >
                 ×
             </button>
 
-
-            <div id="modal-body">
-            </div>
+            <div id="modal-body"></div>
 
         </div>
 
@@ -2044,9 +1862,9 @@
 
 
 
-    <!-- =====================================================
+    <!-- =========================================================
          JAVASCRIPT
-         ===================================================== -->
+         ========================================================= -->
 
     <script src="app.js"></script>
 
