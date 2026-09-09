@@ -1920,17 +1920,35 @@ select {
    ADVANCED SEASON SYSTEMS
    ========================================================= */
 .advanced-systems-section { margin-top: 28px; }
-.advanced-editor-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:22px; }
-.editor-panel { border:1px solid #ddd; border-radius:14px; padding:22px; background:#fff; }
-.editor-panel h3 { margin-top:0; }
+.advanced-systems-section .section-heading { margin-bottom: 18px; }
+.advanced-editor-grid { display:grid; grid-template-columns:minmax(320px, .9fr) minmax(0, 1.1fr); gap:20px; align-items:start; }
+.editor-panel { border:1px solid #2a2f3a; border-radius:16px; padding:22px; background:#11151d; box-shadow:0 10px 30px rgba(0,0,0,.16); min-width:0; }
+.editor-panel h3 { margin:0 0 18px; color:#fff; }
+.editor-panel .form-grid { margin-top:0; }
+.editor-panel input, .editor-panel select, .editor-panel textarea { background:#0c1017; color:#f5f7fa; border-color:#303642; }
+.editor-panel input:focus, .editor-panel select:focus, .editor-panel textarea:focus { border-color:#657083; box-shadow:0 0 0 3px rgba(255,255,255,.05); outline:none; }
 .editor-actions { display:flex; gap:10px; margin-top:18px; flex-wrap:wrap; }
-.advanced-list { display:grid; gap:14px; }
-.advanced-card { border:1px solid #e2e2e2; border-radius:12px; padding:16px; background:#fafafa; }
-.advanced-card-header { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; }
-.advanced-card-header h4 { margin:0 0 7px; font-size:17px; }
-.advanced-card-header p { margin:8px 0; }
-.advanced-card-actions { display:flex; gap:7px; }
-.advanced-card-actions button { border:1px solid #ccc; background:#fff; border-radius:7px; padding:7px 10px; cursor:pointer; }
-#alliance-members { width:100%; min-height:150px; }
-#alliance-members option { padding:5px; }
-@media (max-width: 850px) { .advanced-editor-grid { grid-template-columns:1fr; } }
+.advanced-list { display:grid; gap:12px; max-height:620px; overflow:auto; padding-right:3px; }
+.advanced-list::-webkit-scrollbar { width:8px; }
+.advanced-list::-webkit-scrollbar-thumb { background:#303642; border-radius:99px; }
+.advanced-card { border:1px solid #2b303b; border-radius:14px; padding:16px; background:#0d1118; transition:transform .15s ease,border-color .15s ease,background .15s ease; }
+.advanced-card:hover { transform:translateY(-1px); border-color:#414856; background:#11161f; }
+.advanced-card-header { display:flex; justify-content:space-between; gap:14px; align-items:flex-start; }
+.advanced-card-header h4 { margin:0 0 6px; font-size:17px; color:#fff; }
+.advanced-card p { margin:9px 0; color:#b5bcc8; font-size:14px; }
+.advanced-card small { color:#8e97a6; }
+.advanced-card strong { color:#e8ebf0; font-size:13px; }
+.advanced-card-actions { display:flex; gap:7px; flex-shrink:0; }
+.advanced-card-actions button { border:1px solid #343a46; background:#181d26; color:#e7eaf0; border-radius:8px; padding:7px 10px; cursor:pointer; transition:.15s ease; }
+.advanced-card-actions button:hover { background:#242a35; border-color:#4a5261; }
+.feature-status { display:inline-flex; align-items:center; border:1px solid #343a46; border-radius:999px; padding:3px 8px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#aeb6c4; }
+#alliance-members { width:100%; min-height:180px; }
+#alliance-members option { padding:7px 8px; }
+#alliance-members option:checked { background:#343b48 linear-gradient(0deg,#343b48,#343b48); color:#fff; }
+.field-hint { display:block; margin-top:7px; color:#8e97a6; font-size:12px; }
+.field-hint.is-valid { color:#bfc6d1; }
+.empty-state { border:1px dashed #303642; border-radius:12px; padding:28px 18px; text-align:center; color:#7f8897; background:#0c1016; }
+.empty-state p { margin:0; }
+@media (max-width: 950px) { .advanced-editor-grid { grid-template-columns:1fr; } .advanced-list { max-height:none; } }
+@media (max-width: 520px) { .advanced-card-header { flex-direction:column; } .advanced-card-actions { width:100%; } .advanced-card-actions button { flex:1; } .editor-panel { padding:17px; } }
+
