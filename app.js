@@ -6981,3 +6981,75 @@ function renderFinalJuryResults() {
     const tally=Object.entries(results.counts||{}).map(([id,n])=>`<div class="final-jury-tally-row"><span>${escapeHTML(getHouseguestDisplayName(id,currentSeason.houseguests))}</span><strong>${n}</strong></div>`).join('');
     c.innerHTML=`<div class="final-jury-tally">${tally}</div><h3>Individual Jury Votes</h3><div class="final-jury-votes">${rows}</div>`;
 }
+
+
+/* =========================================================
+   RE-SIMULATE FIX
+   Re-run the exact configured season without rebuilding it.
+   Configuration (cast, stats, relationships, alliances, twists,
+   competitions, rules) is preserved; only simulation/runtime
+   state and accumulated season results are reset.
+   ========================================================= */
+function resimulateSeason() {
+    if (!currentSeason) {
+        alert("Please create or load a season first.");
+        return;
+    }
+
+    const season = currentSeason;
+    const guests = Array.isArray(season.houseguests) ? season.houseguests : [];
+    if (!guests.length) {
+        alert("Please add Houseguests before re-simulating.");
+        return;
+    }
+
+    if (!confirm("Re-simulate this season with the same setup and a new randomized outcome?")) return;
+
+    // Preserve the season definition. Reset only values that the simulation
+    // changes while keeping each Houseguest's identity, ratings and image.
+    season.houseguests = guests.map(player => {
+        const copy = deepClone(player);
+        copy.status = "active";
+        copy.placement = null;
+        copy.hohWins = 0;
+        copy.povWins = 0;
+        copy.safetyWins = 0;
+        copy.luxuryWins = 0;
+        copy.finalHohWins = 0;
+        copy.evictionVotes = 0;
+        copy.nominationCount = 0;
+        copy.vetoCount = 0;
+        copy.juryVotes = 0;
+        return copy;
+    });
+
+    // Keep all user-created season configuration intact, but create a fresh
+    // simulation runtime so the new run starts from Week 1.
+    season.simulation = createDefaultSimulation();
+    ensureFinaleState(season.simulation);
+    season.simulation.started = true;
+    season.simulation.currentPhase = "week";
+    season.simulation.currentWeek = 1;
+    season.simulation.viewingWeek = 1;
+
+    currentSeason = season;
+    persistCurrentSeason();
+
+    // Refresh every simulation-facing view without touching the setup data.
+    setText("current-week", 1);
+    setText("simulator-season-name", season.name || "Big Brother");
+    setText("simulator-season-theme", season.theme || "Custom Season");
+    setText("sim-season-length", getSeasonLength(season));
+    setText("sim-jury-size", season.rules?.jurySize ?? 7);
+    updateSimulatorStatus(season.simulation);
+    renderSimulationWeekNavigation();
+    renderMemoryWallMini();
+    resetGameChain(0);
+    showPage("game-page");
+    showEvent(
+        "Week 1",
+        "SIMULATION RESTARTED",
+        `<p>The season has been re-simulated using the same cast, relationships, alliances, twists, competitions and rules.</p><p>Press <strong>Proceed</strong> to begin the new randomized season.</p>`,
+        {skipHistory:true, week:1}
+    );
+}
