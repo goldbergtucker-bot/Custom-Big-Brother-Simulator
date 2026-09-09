@@ -1515,126 +1515,55 @@
 
         <section id="simulator-page" class="page">
 
-            <div class="simulator-header">
+            <div class="brantsteele-sim-layout">
 
-                <div>
+                <aside class="sim-sidebar sim-left-sidebar">
+                    <div class="sim-brand-card">
+                        <div class="sim-brand-mark">BIG<br><span>BROTHER</span></div>
+                    </div>
+                    <div class="sim-season-title">
+                        <strong id="simulator-season-name">Big Brother</strong>
+                        <span id="simulator-season-theme">Season Theme</span>
+                    </div>
+                    <div id="sim-week-navigation" class="sim-week-navigation"></div>
+                </aside>
 
-                    <span class="section-label">
-                        SIMULATION
-                    </span>
+                <main class="sim-main-panel">
+                    <div class="sim-main-header">
+                        <div>
+                            <span class="section-label">WEEK <span id="current-week">1</span></span>
+                            <h1 id="simulator-event-week-title">Simulation</h1>
+                        </div>
+                        <div class="sim-proceed-wrap">
+                            <button class="primary-button large-button sim-proceed-button" onclick="runNextEvent()">Proceed</button>
+                        </div>
+                    </div>
 
-                    <h1 id="simulator-season-name">
-                        Big Brother
-                    </h1>
+                    <div id="event-display" class="event-display">
+                        <span id="event-type" class="section-label">EVENT</span>
+                        <h2 id="event-title">Simulation Ready</h2>
+                        <div id="event-content"><p>Start the simulation to begin the season.</p></div>
+                    </div>
+                </main>
 
-                    <p id="simulator-season-theme">
-                        Season Theme
-                    </p>
-
-                </div>
-
-                <div class="simulator-week">
-
-                    <span>
-                        WEEK
-                    </span>
-
-                    <strong id="current-week">
-                        1
-                    </strong>
-
-                </div>
-
-            </div>
-
-
-            <!-- STATUS -->
-
-            <div class="status-grid">
-
-                <div class="status-box">
-
-                    <strong>
-                        HOH
-                    </strong>
-
-                    <span id="current-hoh">
-                        —
-                    </span>
-
-                </div>
-
-                <div class="status-box">
-
-                    <strong>
-                        NOMINEES
-                    </strong>
-
-                    <span id="current-nominees">
-                        —
-                    </span>
-
-                </div>
-
-                <div class="status-box">
-
-                    <strong>
-                        VETO
-                    </strong>
-
-                    <span id="current-veto">
-                        —
-                    </span>
-
-                </div>
-
-            </div>
-
-
-            <!-- GAME CHAIN -->
-
-            <div id="game-chain" class="game-chain"></div>
-
-
-            <!-- EVENT -->
-
-            <div class="event-display">
-
-                <span
-                    id="event-type"
-                    class="section-label"
-                >
-                    EVENT
-                </span>
-
-                <h2 id="event-title">
-                    Simulation Ready
-                </h2>
-
-                <div id="event-content">
-
-                    <p>
-                        Start the simulation to begin the season.
-                    </p>
-
-                </div>
-
-            </div>
-
-
-            <div class="simulator-actions">
-
-                <button
-                    class="primary-button large-button"
-                    onclick="runNextEvent()"
-                >
-                    Continue
-                </button>
+                <aside class="sim-sidebar sim-right-sidebar">
+                    <div class="sim-right-brand">BrantSteele-style<br><span>Custom Simulator</span></div>
+                    <div class="sim-side-card">
+                        <div class="sim-side-card-title">HOUSE STATUS</div>
+                        <div class="sim-status-row"><span>HOH</span><strong id="current-hoh">—</strong></div>
+                        <div class="sim-status-row"><span>NOMINEES</span><strong id="current-nominees">—</strong></div>
+                        <div class="sim-status-row"><span>VETO</span><strong id="current-veto">—</strong></div>
+                    </div>
+                    <div class="sim-side-card">
+                        <div class="sim-side-card-title">SEASON INFO</div>
+                        <div class="sim-status-row"><span>WEEKS</span><strong id="sim-season-length">—</strong></div>
+                        <div class="sim-status-row"><span>JURY</span><strong id="sim-jury-size">—</strong></div>
+                    </div>
+                </aside>
 
             </div>
 
         </section>
-
 
 
         <!-- =====================================================
