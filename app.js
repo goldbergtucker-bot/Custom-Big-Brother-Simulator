@@ -67,6 +67,8 @@ let currentHouseguestId = 0;
 
 let editingRelationshipId = null;
 
+let editingAllianceId = null;
+
 
 /* =========================================================
    INITIALIZATION
@@ -81,6 +83,8 @@ document.addEventListener("DOMContentLoaded", () => {
     setupRuleControls();
 
     setupRelationshipControls();
+
+    setupAllianceControls();
 
     initializeHouseguestCount();
 
@@ -695,6 +699,7 @@ function removeHouseguest(id) {
     card.remove();
 
     cleanupRelationshipsForHouseguest(id);
+    cleanupAllianceForHouseguest(id);
 
     updateHouseguestNumbers();
 
@@ -2862,6 +2867,217 @@ function generateRelationshipId() {
 }
 
 
+
+/* =========================================================
+   ALLIANCES
+   ========================================================= */
+
+function ensureAllianceState() {
+    if (!currentSeason) {
+        currentSeason = { alliances: [] };
+    }
+    if (!Array.isArray(currentSeason.alliances)) {
+        currentSeason.alliances = [];
+    }
+}
+
+function generateAllianceId() {
+    return `alliance-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function setupAllianceControls() {
+    const status = document.getElementById("alliance-status");
+    const members = document.getElementById("alliance-members");
+    if (members) {
+        members.addEventListener("change", renderAllianceSelectionCount);
+    }
+    if (status) status.value = status.value || "active";
+    resetAllianceEditor();
+}
+
+function refreshAllianceHouseguestOptions(selectedIds = []) {
+    const select = document.getElementById("alliance-members");
+    if (!select) return;
+
+    const selected = new Set(selectedIds.map(String));
+    const houseguests = currentSeason && Array.isArray(currentSeason.houseguests)
+        ? currentSeason.houseguests
+        : collectHouseguests();
+
+    select.innerHTML = "";
+    houseguests.forEach(hg => {
+        const option = document.createElement("option");
+        option.value = hg.id;
+        option.textContent = hg.name || "Unnamed Houseguest";
+        option.selected = selected.has(String(hg.id));
+        select.appendChild(option);
+    });
+    renderAllianceSelectionCount();
+}
+
+function getSelectedAllianceMembers() {
+    const select = document.getElementById("alliance-members");
+    if (!select) return [];
+    return Array.from(select.selectedOptions).map(option => option.value);
+}
+
+function renderAllianceSelectionCount() {
+    const count = document.getElementById("alliance-member-count");
+    if (!count) return;
+    const n = getSelectedAllianceMembers().length;
+    count.textContent = `${n} member${n === 1 ? "" : "s"} selected`;
+}
+
+function resetAllianceEditor() {
+    editingAllianceId = null;
+    setValue("alliance-name", "");
+    setValue("alliance-description", "");
+    setValue("alliance-status", "active");
+    refreshAllianceHouseguestOptions([]);
+    const title = document.getElementById("alliance-form-title");
+    if (title) title.textContent = "Create Alliance";
+    const button = document.getElementById("alliance-save-button");
+    if (button) button.textContent = "Add Alliance";
+    renderAllianceSelectionCount();
+}
+
+function saveAlliance() {
+    ensureAllianceState();
+
+    const name = getValue("alliance-name").trim();
+    const description = getValue("alliance-description").trim();
+    const status = getValue("alliance-status") || "active";
+    const members = getSelectedAllianceMembers();
+
+    if (!name) {
+        alert("Please enter an alliance name.");
+        return;
+    }
+    if (members.length < 2) {
+        alert("An alliance must have at least two houseguests.");
+        return;
+    }
+
+    const duplicate = currentSeason.alliances.find(a =>
+        String(a.name || "").trim().toLowerCase() === name.toLowerCase() &&
+        a.id !== editingAllianceId
+    );
+    if (duplicate) {
+        alert("An alliance with that name already exists.");
+        return;
+    }
+
+    const alliance = {
+        id: editingAllianceId || generateAllianceId(),
+        name,
+        description,
+        members,
+        status
+    };
+
+    const index = currentSeason.alliances.findIndex(a => a.id === alliance.id);
+    if (index >= 0) currentSeason.alliances[index] = alliance;
+    else currentSeason.alliances.push(alliance);
+
+    persistCurrentSeason();
+    renderAlliances();
+    resetAllianceEditor();
+}
+
+function editAlliance(id) {
+    ensureAllianceState();
+    const alliance = currentSeason.alliances.find(a => a.id === id);
+    if (!alliance) return;
+
+    editingAllianceId = id;
+    setValue("alliance-name", alliance.name || "");
+    setValue("alliance-description", alliance.description || "");
+    setValue("alliance-status", alliance.status || "active");
+    refreshAllianceHouseguestOptions(alliance.members || []);
+
+    const title = document.getElementById("alliance-form-title");
+    if (title) title.textContent = "Edit Alliance";
+    const button = document.getElementById("alliance-save-button");
+    if (button) button.textContent = "Save Changes";
+}
+
+function deleteAlliance(id) {
+    ensureAllianceState();
+    const alliance = currentSeason.alliances.find(a => a.id === id);
+    if (!alliance) return;
+    if (!confirm(`Delete alliance "${alliance.name}"?`)) return;
+
+    currentSeason.alliances = currentSeason.alliances.filter(a => a.id !== id);
+    if (editingAllianceId === id) resetAllianceEditor();
+    persistCurrentSeason();
+    renderAlliances();
+}
+
+function cleanupAllianceForHouseguest(id) {
+    if (!currentSeason || !Array.isArray(currentSeason.alliances)) return;
+    currentSeason.alliances.forEach(alliance => {
+        alliance.members = (alliance.members || []).filter(memberId => memberId !== id);
+    });
+    renderAlliances();
+}
+
+function renderAlliances() {
+    ensureAllianceState();
+    const container = document.getElementById("alliances-container");
+    if (!container) return;
+
+    const houseguests = currentSeason && Array.isArray(currentSeason.houseguests)
+        ? currentSeason.houseguests
+        : collectHouseguests();
+    const names = new Map(houseguests.map(hg => [hg.id, hg.name || "Unnamed Houseguest"]));
+
+    if (currentSeason.alliances.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">👥</div>
+                <h3>No Alliances Added</h3>
+                <p>Create your first alliance above.</p>
+            </div>`;
+        return;
+    }
+
+    container.innerHTML = currentSeason.alliances.map(alliance => {
+        const memberNames = (alliance.members || []).map(id => names.get(id) || "Removed Houseguest");
+        const status = alliance.status === "inactive" ? "Inactive" : "Active";
+        return `
+            <div class="alliance-card">
+                <div class="alliance-card-header">
+                    <div>
+                        <span class="alliance-status ${alliance.status === "inactive" ? "inactive" : "active"}">${status}</span>
+                        <h3>${escapeHTML(alliance.name)}</h3>
+                    </div>
+                    <div class="alliance-actions">
+                        <button type="button" class="secondary-button" onclick="editAlliance('${escapeAttribute(alliance.id)}')">Edit</button>
+                        <button type="button" class="secondary-button" onclick="deleteAlliance('${escapeAttribute(alliance.id)}')">Delete</button>
+                    </div>
+                </div>
+                ${alliance.description ? `<p class="alliance-description">${escapeHTML(alliance.description)}</p>` : ""}
+                <div class="alliance-members">
+                    ${memberNames.map(name => `<span class="alliance-member-chip">${escapeHTML(name)}</span>`).join("")}
+                </div>
+                <div class="alliance-member-total">${memberNames.length} member${memberNames.length === 1 ? "" : "s"}</div>
+            </div>`;
+    }).join("");
+}
+
+function loadAlliances(alliances = []) {
+    ensureAllianceState();
+    currentSeason.alliances = Array.isArray(alliances) ? deepClone(alliances) : [];
+    resetAllianceEditor();
+    refreshAllianceHouseguestOptions([]);
+    renderAlliances();
+}
+
+function collectAlliances() {
+    ensureAllianceState();
+    return deepClone(currentSeason.alliances);
+}
+
 /* =========================================================
    SAVE SEASON
    ========================================================= */
@@ -2972,8 +3188,11 @@ function saveSeason() {
         houseguests,
 
         alliances:
-            existingSeason?.alliances ||
-            [],
+            (existingSeason && Array.isArray(existingSeason.alliances))
+                ? existingSeason.alliances
+                : (currentSeason && Array.isArray(currentSeason.alliances)
+                    ? currentSeason.alliances
+                    : []),
 
         relationships:
             existingRelationships,
@@ -3191,6 +3410,7 @@ function loadSeasonIntoCreator(
 
     renderRelationships();
 
+    loadAlliances(season.alliances || []);
 
     updateSeasonLogoPreview();
 
@@ -3251,6 +3471,7 @@ function loadHouseguests(
     updateHouseguestNumbers();
 
     populateRelationshipHouseguestOptions();
+    refreshAllianceHouseguestOptions(currentSeason?.alliances?.[0]?.members || []);
 }
 
 
@@ -5145,3 +5366,10 @@ window.deleteRelationship =
 
 window.updateRelationshipDisplay =
     updateRelationshipDisplay;
+
+window.saveAlliance = saveAlliance;
+window.editAlliance = editAlliance;
+window.deleteAlliance = deleteAlliance;
+window.resetAllianceEditor = resetAllianceEditor;
+window.renderAlliances = renderAlliances;
+
