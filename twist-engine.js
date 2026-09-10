@@ -73,12 +73,18 @@
         if (!s) return;
         if (window.setText) window.setText("current-week", s.currentWeek || 1);
         if (window.updateSimulatorStatus) window.updateSimulatorStatus(s);
+        renderGameChain();
         renderNavigation();
         if (window.renderMemoryWallMini) window.renderMemoryWallMini();
         if (window.updateProceedButtonForViewMode) window.updateProceedButtonForViewMode();
     }
 
     function show(title, type, content, options) {
+        const s = simulation();
+        if (s && !(options && options.skipHistory)) {
+            s.isViewingHistory = false;
+            s.viewingWeek = Number(s.currentWeek || 1);
+        }
         if (window.showEvent) {
             window.showEvent(title, type, content, Object.assign({ week: simulation()?.currentWeek }, options || {}));
         }
@@ -321,6 +327,7 @@
             target = options[Math.floor(Math.random() * options.length)] || tied[0];
             tieBreak = { voter: s.currentHOH, target: target.id };
             votes.push(tieBreak);
+            counts[target.id] = Number(counts[target.id] || 0) + 1;
         }
 
         s.pendingEvictionId = target.id;
@@ -538,57 +545,285 @@
         show("Jury Voting", "JURY VOTING", `<div class="stable-jury-voting">${portraits(finalists.map(p => p.id), "large")}<h3>The Jury Votes</h3><div>${rows || "<p>No jury members were eligible to vote.</p>"}</div></div>`);
     }
 
+    function ordinal(n) {
+        const v = Number(n);
+        const mod100 = v % 100;
+        if (mod100 >= 11 && mod100 <= 13) return `${v}TH`;
+        const mod10 = v % 10;
+        if (mod10 === 1) return `${v}ST`;
+        if (mod10 === 2) return `${v}ND`;
+        if (mod10 === 3) return `${v}RD`;
+        return `${v}TH`;
+    }
+
     function runFinalResults() {
         const s = simulation();
+        const all = season()?.houseguests || [];
         const finalists = (s.finalists || []).map(byId).filter(Boolean);
         const counts = s.finaleVoteResults?.counts || {};
-        const ranked = finalists.slice().sort((a, b) => (counts[b.id] || 0) - (counts[a.id] || 0));
+
+        const ranked = finalists.slice().sort(
+            (a, b) => Number(counts[b.id] || 0) - Number(counts[a.id] || 0)
+        );
+
         const winner = ranked[0] || null;
         const runner = ranked[1] || null;
-        if (winner) { winner.status = "winner"; winner.placement = 1; }
-        if (runner) { runner.status = "runner-up"; runner.placement = 2; }
 
-        const all = season().houseguests || [];
-        const used = new Set([1, 2]);
-        const known = [];
+        if (winner) {
+            winner.status = "winner";
+            winner.placement = 1;
+            s.winner = winner.id;
+        }
+
+        if (runner) {
+            runner.status = "runner-up";
+            runner.placement = 2;
+            s.runnerUp = runner.id;
+        }
+
+        /*
+         * Every non-finalist should already have a placement from
+         * the eviction engine. If an old save is missing one, fill
+         * the remaining slots from the actual eviction order rather
+         * than leaving holes in the memory wall.
+         */
+        const placementMap = new Map();
+
         all.forEach(p => {
             if (p.placement != null && Number(p.placement) >= 3) {
-                known.push({ id: p.id, name: p.name, placement: Number(p.placement) });
-                used.add(Number(p.placement));
+                placementMap.set(p.id, {
+                    id: p.id,
+                    name: p.name,
+                    placement: Number(p.placement)
+                });
             }
         });
 
-        /* Fill any missing placement slots deterministically. */
-        let next = all.length;
-        const missingPlayers = all.filter(p => p.id !== winner?.id && p.id !== runner?.id && p.placement == null);
-        missingPlayers.forEach(p => {
-            while (used.has(next) && next > 0) next--;
-            p.placement = next;
-            p.status = "evicted";
-            used.add(next);
-            known.push({ id: p.id, name: p.name, placement: next });
-            next--;
+        let nextPlacement = all.length;
+        all.forEach(p => {
+            if (
+                p.id !== winner?.id &&
+                p.id !== runner?.id &&
+                p.placement == null
+            ) {
+                while (
+                    [...placementMap.values()].some(
+                        x => x.placement === nextPlacement
+                    ) ||
+                    nextPlacement === 1 ||
+                    nextPlacement === 2
+                ) {
+                    nextPlacement--;
+                }
+
+                p.placement = nextPlacement;
+                p.status = "evicted";
+
+                placementMap.set(p.id, {
+                    id: p.id,
+                    name: p.name,
+                    placement: nextPlacement
+                });
+
+                nextPlacement--;
+            }
         });
 
         const placements = [];
-        if (winner) placements.push({ id: winner.id, name: winner.name, placement: 1 });
-        if (runner) placements.push({ id: runner.id, name: runner.name, placement: 2 });
-        known.forEach(x => { if (!placements.some(p => p.id === x.id)) placements.push(x); });
-        placements.sort((a, b) => a.placement - b.placement);
+
+        if (winner) {
+            placements.push({
+                id: winner.id,
+                name: winner.name,
+                placement: 1
+            });
+        }
+
+        if (runner) {
+            placements.push({
+                id: runner.id,
+                name: runner.name,
+                placement: 2
+            });
+        }
+
+        placementMap.forEach(value => {
+            if (!placements.some(p => p.id === value.id)) {
+                placements.push(value);
+            }
+        });
+
+        placements.sort(
+            (a, b) => Number(a.placement) - Number(b.placement)
+        );
+
         s.finalPlacements = placements;
         s.completed = true;
-        s.currentEventIndex++;
         s.currentPhase = "complete";
         s.pendingCycle = null;
         s.pendingWeekAdvance = false;
+        s.currentEventIndex++;
 
-        show("Final Results", "FINAL RESULTS", `
-            <div class="stable-final-results">
-                ${winner ? `${portrait(winner, "large")}<h2>${esc(displayName(winner.id))}</h2><p><strong>WINNER</strong> — ${counts[winner.id] || 0} jury vote${(counts[winner.id] || 0) === 1 ? "" : "s"}</p>` : ""}
-                ${runner ? `<p><strong>RUNNER-UP:</strong> ${esc(displayName(runner.id))}</p>` : ""}
-                <button type="button" class="primary-button" onclick="showResults()">View Full Results</button>
+        const wall = `
+            <div class="bb-final-memory-wall stable-inline-memory-wall">
+                ${placements.map(item => {
+                    const hg = byId(item.id);
+                    return `
+                        <div class="bb-final-memory-card ${Number(item.placement) === 1 ? "winner" : ""}">
+                            <div class="bb-final-place">${ordinal(item.placement)}</div>
+                            ${portrait(hg, "medium")}
+                            <div class="bb-final-name">${esc(displayName(item.id))}</div>
+                            <div class="bb-final-placement">${ordinal(item.placement)} PLACE</div>
+                        </div>
+                    `;
+                }).join("")}
             </div>
-        `);
+        `;
+
+        show(
+            "Final Results",
+            "FINAL RESULTS",
+            `
+                <div class="stable-final-results">
+                    ${winner ? `
+                        ${portrait(winner, "large")}
+                        <h2>${esc(displayName(winner.id))}</h2>
+                        <p><strong>WINNER</strong> — ${counts[winner.id] || 0} jury vote${Number(counts[winner.id] || 0) === 1 ? "" : "s"}</p>
+                    ` : ""}
+                    ${runner ? `<p><strong>RUNNER-UP:</strong> ${esc(displayName(runner.id))}</p>` : ""}
+
+                    <h3 class="stable-results-wall-title">Final Placements</h3>
+                    ${wall}
+
+                    <button type="button" class="primary-button" onclick="showResults()">
+                        View Full Results
+                    </button>
+                </div>
+            `
+        );
+
+        save();
+    }
+
+    /* ---------------------------------------------------------
+       Top event chain
+       --------------------------------------------------------- */
+    function renderGameChain() {
+        const container = document.getElementById("game-chain");
+        const s = simulation();
+        if (!container || !s) return;
+
+        const chain = getEventChain(Number(s.currentWeek || 1));
+        const index = Number(s.currentEventIndex || 0);
+
+        container.innerHTML = chain.map((event, i) => {
+            const state =
+                i < index ? "completed" :
+                i === index ? "active" : "pending";
+
+            return `
+                <div class="chain-step ${state}">
+                    <span class="chain-number">${i + 1}</span>
+                    <span>${esc(event.label)}</span>
+                </div>
+                ${i < chain.length - 1 ? '<div class="chain-line"></div>' : ''}
+            `;
+        }).join("");
+    }
+
+    function stableViewSimulationWeek(week) {
+        const s = simulation();
+        if (!s) return;
+
+        const target = Math.max(1, Math.min(
+            seasonWeeks(),
+            Number(week) || 1
+        ));
+
+        const items = (s.history || [])
+            .filter(h => Number(h.week) === target)
+            .sort((a, b) => Number(a.sequence || 0) - Number(b.sequence || 0));
+
+        s.viewingWeek = target;
+
+        if (items.length) {
+            s.isViewingHistory = true;
+            const item = items[items.length - 1];
+            if (window.showEvent) {
+                window.showEvent(
+                    item.title || item.label || "Event",
+                    item.type || "EVENT",
+                    item.content || "",
+                    {
+                        skipHistory: true,
+                        skipLiveView: true,
+                        week: target
+                    }
+                );
+            }
+        } else if (target === Number(s.currentWeek || 1)) {
+            s.isViewingHistory = false;
+            s.viewingWeek = Number(s.currentWeek || 1);
+            if (s.liveView && window.showEvent) {
+                window.showEvent(
+                    s.liveView.title || "Current Event",
+                    s.liveView.type || "EVENT",
+                    s.liveView.content || "",
+                    {
+                        skipHistory: true,
+                        skipLiveView: true,
+                        week: s.liveView.week || s.currentWeek
+                    }
+                );
+            }
+        } else {
+            s.isViewingHistory = true;
+            if (window.showEvent) {
+                window.showEvent(
+                    `Week ${target}`,
+                    "WEEK",
+                    `<p>No events have been played for Week ${target} yet.</p>`,
+                    {
+                        skipHistory: true,
+                        skipLiveView: true,
+                        week: target
+                    }
+                );
+            }
+        }
+
+        refresh();
+        save();
+    }
+
+    function stableViewHistoryEvent(week, sequence) {
+        const s = simulation();
+        if (!s) return;
+
+        const item = (s.history || [])
+            .filter(h => Number(h.week) === Number(week))
+            .sort((a, b) => Number(a.sequence || 0) - Number(b.sequence || 0))
+            [Number(sequence)];
+
+        if (!item) return;
+
+        s.isViewingHistory = true;
+        s.viewingWeek = Number(item.week || s.currentWeek || 1);
+
+        if (window.showEvent) {
+            window.showEvent(
+                item.title || item.label || "Event",
+                item.type || "EVENT",
+                item.content || "",
+                {
+                    skipHistory: true,
+                    skipLiveView: true,
+                    week: item.week
+                }
+            );
+        }
+
+        refresh();
         save();
     }
 
@@ -924,6 +1159,9 @@
     window.runNextEvent = nextEvent;
     window.runEvictionVotingEvent = runEvictionVoting;
     window.renderSimulationWeekNavigation = renderNavigation;
+    window.renderDynamicGameChain = renderGameChain;
+    window.viewSimulationWeek = stableViewSimulationWeek;
+    window.viewSimulationHistoryEvent = stableViewHistoryEvent;
     window.resimulateSeason = resimulateSeason;
     window.renderFinalPlacements = renderFinalPlacements;
     window.showResults = showResultsStable;
