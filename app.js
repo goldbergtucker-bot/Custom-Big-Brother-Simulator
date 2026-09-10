@@ -3994,9 +3994,31 @@ function getWeekEventChain(week = currentSeason?.simulation?.currentWeek || 1) {
 function renderDynamicGameChain() {
     const container = document.getElementById("game-chain");
     if (!container) return;
+
+    /*
+     * The stable engine is loaded after app.js. If it has supplied
+     * a stable chain renderer, use it. This prevents the old
+     * lexical event chain from overwriting the visible chain after
+     * an event runs.
+     */
+    if (
+        typeof window.renderDynamicGameChain === "function" &&
+        window.renderDynamicGameChain !== renderDynamicGameChain
+    ) {
+        window.renderDynamicGameChain();
+        return;
+    }
+
     const chain = getWeekEventChain();
     const active = Number(currentSeason?.simulation?.currentEventIndex || 0);
-    container.innerHTML = chain.map((item,i) => `<div class="chain-step ${i===active?"active":""}"><span class="chain-number">${i+1}</span><span>${escapeHTML(item.label)}</span></div>${i<chain.length-1?'<div class="chain-line"></div>':''}`).join("");
+
+    container.innerHTML = chain.map((item, i) =>
+        `<div class="chain-step ${i === active ? "active" : i < active ? "completed" : "pending"}">
+            <span class="chain-number">${i + 1}</span>
+            <span>${escapeHTML(item.label)}</span>
+        </div>` +
+        (i < chain.length - 1 ? '<div class="chain-line"></div>' : '')
+    ).join("");
 }
 
 function resetGameChain(activeIndex = 0) {
