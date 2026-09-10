@@ -1,2732 +1,396 @@
 /*
- * BIG BROTHER SIMULATOR — TWIST / EVENT ENGINE OVERRIDE
+ * =========================================================
+ * BIG BROTHER SIMULATOR
+ * STABLE SIMULATION ENGINE
+ * =========================================================
  *
- * Load AFTER app.js.
+ * This file loads AFTER app.js.
  *
- * Fixes:
- * - persistent one-time twist awards
- * - no re-rolls while viewing history
- * - display-only twists never receive a holder
- * - twist powers expire at powerUntil
- * - twist effects consume exactly once
- * - legacy twist/twistWeeks data is normalized
- * - safety competition is actually inserted into the event chain
- * - re-simulation resets player state and simulation state
+ * Responsibilities:
  *
- * This intentionally overrides the unstable duplicate implementations
- * at the end of the existing app.js without replacing the rest of the
- * simulator engine.
+ * - Stable week/event progression
+ * - Safety/Tropical Immunity before nominations
+ * - BrantSteele-style event chain
+ * - Portrait-based eviction voting
+ * - Voting does NOT reveal eviction result
+ * - Separate eviction event
+ * - Double eviction support
+ * - Week-to-week progression
+ * - Finale progression
+ * - History navigation
+ * - Re-simulation compatibility
+ *
+ * =========================================================
  */
 
 (function () {
+
     "use strict";
 
-    const EFFECT_LABELS = {
-        display: "Display / Story Only",
-        nominationVoid: "Nomination Void",
-        diamondPOV: "Diamond POV Upgrade",
-        haltingHex: "Halting Hex",
-        immunity: "Immunity / Safety"
-    };
+    console.log("Stable Big Brother simulation engine loaded.");
 
-    const EFFECT_TYPES = new Set(Object.keys(EFFECT_LABELS));
+    /*
+     * =========================================================
+     * HELPERS
+     * =========================================================
+     */
 
-    function clone(value) {
-        if (typeof deepClone === "function") return deepClone(value);
-        return value == null ? value : JSON.parse(JSON.stringify(value));
+    function sim() {
+        if (!window.currentSeason) {
+            return null;
+        }
+
+        if (!window.currentSeason.simulation) {
+            window.currentSeason.simulation =
+                window.createDefaultSimulation();
+        }
+
+        return window.currentSeason.simulation;
+    }
+
+    function activePlayers() {
+        return window.getActiveHouseguests
+            ? window.getActiveHouseguests()
+            : [];
     }
 
     function seasonLength() {
-        return Math.max(
-            1,
-            Math.min(30, Number(currentSeason?.rules?.seasonWeeks || 30))
+        return Number(
+            window.getSeasonLength(window.currentSeason) || 1
         );
     }
 
-    function normalizeTwist(raw, fallbackWeek = 1) {
-        const t = raw && typeof raw === "object" ? raw : {};
+    function player(id) {
+        if (!id) return null;
 
-        const start = Math.max(
-            1,
-            Math.min(
-                seasonLength(),
-                Number(t.startWeek || t.week || fallbackWeek) || fallbackWeek
-            )
-        );
-
-        const end = Math.max(
-            start,
-            Math.min(
-                seasonLength(),
-                Number(t.endWeek || start) || start
-            )
-        );
-
-        const powerUntil = Math.max(
-            start,
-            Math.min(
-                seasonLength(),
-                Number(t.powerUntil || end) || end
-            )
-        );
-
-        return {
-            ...clone(t),
-            id: t.id || uid("twist"),
-            name: String(t.name || "Untitled Twist").trim(),
-            startWeek: start,
-            endWeek: end,
-            week: start,
-            power: String(t.power || "").trim(),
-            effectType: EFFECT_TYPES.has(t.effectType)
-                ? t.effectType
-                : "display",
-            powerUntil,
-            description: String(t.description || "").trim(),
-            timing:
-                start === end
-                    ? `week${start}`
-                    : `weeks${start}-${end}`,
-            active: t.active !== false,
-
-            // Existing twists are one-time. A saved twist may explicitly
-            // set repeatable:true if repeat behavior is desired later.
-            repeatable: t.repeatable === true
-        };
-    }
-
-    function ensureTwistData() {
-        if (!currentSeason) return [];
-
-        if (!Array.isArray(currentSeason.twists)) {
-            currentSeason.twists = [];
-        }
-
-        if (
-            !currentSeason.twistWeeks ||
-            typeof currentSeason.twistWeeks !== "object"
-        ) {
-            currentSeason.twistWeeks = {};
-        }
-
-        const source = currentSeason.twists.length
-            ? currentSeason.twists
-            : Object.values(currentSeason.twistWeeks).flat();
-
-        const byId = new Map();
-
-        source.forEach(raw => {
-            if (!raw) return;
-
-            const normalized = normalizeTwist(
-                raw,
-                raw.week || 1
-            );
-
-            if (!byId.has(normalized.id)) {
-                byId.set(normalized.id, normalized);
-            }
-        });
-
-        currentSeason.twists = [...byId.values()];
-
-        const rebuiltWeeks = {};
-
-        currentSeason.twists.forEach(twist => {
-            for (
-                let week = twist.startWeek;
-                week <= twist.endWeek;
-                week++
-            ) {
-                (rebuiltWeeks[String(week)] ||= []).push({
-                    ...clone(twist),
-                    week
-                });
-            }
-        });
-
-        currentSeason.twistWeeks = rebuiltWeeks;
-
-        return currentSeason.twists;
-    }
-
-    function ensureSimState() {
-        if (!currentSeason) return null;
-
-        if (!currentSeason.simulation) {
-            currentSeason.simulation =
-                typeof createDefaultSimulation === "function"
-                    ? createDefaultSimulation()
-                    : {};
-        }
-
-        const sim = currentSeason.simulation;
-
-        if (!Array.isArray(sim.history)) sim.history = [];
-
-        if (
-            !sim.twistState ||
-            typeof sim.twistState !== "object"
-        ) {
-            sim.twistState = {};
-        }
-
-        if (!Array.isArray(sim.lastVetoDrawnIds)) {
-            sim.lastVetoDrawnIds = [];
-        }
-
-        if (
-            !sim.vetoDrawCounts ||
-            typeof sim.vetoDrawCounts !== "object"
-        ) {
-            sim.vetoDrawCounts = {};
-        }
-
-        if (typeof sim.isViewingHistory !== "boolean") {
-            sim.isViewingHistory = false;
-        }
-
-        if (!sim.liveView || typeof sim.liveView !== "object") {
-            sim.liveView = null;
-        }
-
-        return sim;
-    }
-
-    function activeTwistsForWeek(week) {
-        const w = Number(week || 1);
-
-        return ensureTwistData().filter(twist => {
-            if (!twist.active) return false;
-
-            return (
-                w >= twist.startWeek &&
-                w <= twist.endWeek
-            );
-        });
-    }
-
-    function twistWasShown(sim, twist, week) {
-        const state = sim.twistState[twist.id];
-
-        if (!state) return false;
-
-        if (twist.repeatable) {
-            return (
-                Number(state.lastShownWeek) ===
-                Number(week)
-            );
-        }
-
-        return state.eventShown === true;
-    }
-
-    function getScheduledTwistsForWeekFixed(week) {
-        const sim = ensureSimState();
-
-        if (!sim) return [];
-
-        return activeTwistsForWeek(week).filter(twist => {
-            return !twistWasShown(
-                sim,
-                twist,
-                week
-            );
-        });
-    }
-
-    function getUsableTwistStatesFixed(
-        week,
-        effectType
-    ) {
-        const sim = ensureSimState();
-
-        if (!sim) return [];
-
-        const w = Number(
-            week ||
-            sim.currentWeek ||
-            1
-        );
-
-        return ensureTwistData()
-            .map(twist => ({
-                twist,
-                state: sim.twistState[twist.id]
-            }))
-            .filter(({ twist, state }) => {
-                if (!state || !state.holderId) return false;
-                if (state.used) return false;
-                if (!twist.active) return false;
-
-                const start = Number(
-                    twist.startWeek ||
-                    twist.week ||
-                    1
-                );
-
-                const end = Number(
-                    twist.endWeek ||
-                    start
-                );
-
-                const until = Number(
-                    twist.powerUntil ||
-                    end
-                );
-
-                return (
-                    w >= start &&
-                    w <= end &&
-                    w <= until &&
-                    (twist.effectType || "display") ===
-                        effectType
-                );
-            });
-    }
-
-    function getTwistById(id) {
         return (
-            ensureTwistData().find(
-                twist => twist.id === id
-            ) || null
-        );
+            window.currentSeason?.houseguests || []
+        ).find(h => h.id === id) || null;
     }
 
-    function getOrCreateTwistState(twist) {
-        const sim = ensureSimState();
+    function playerName(id) {
+        if (!id) return "Unknown";
 
-        if (!sim.twistState[twist.id]) {
-            sim.twistState[twist.id] = {
-                holderId: null,
-                used: false,
-                awardedWeek: null,
-                eventShown: false,
-                lastShownWeek: null
-            };
-        }
-
-        return sim.twistState[twist.id];
+        return window.getHouseguestDisplayName
+            ? window.getHouseguestDisplayName(
+                id,
+                window.currentSeason?.houseguests || []
+            )
+            : (player(id)?.name || "Unknown");
     }
 
-    function awardTwistIfNeeded(twist, week) {
-        const sim = ensureSimState();
-        const state = getOrCreateTwistState(twist);
-
-        /*
-         * Display/story twists have no simulator power and therefore
-         * never get a random holder.
-         */
-        if (
-            twist.effectType === "display" ||
-            !twist.power
-        ) {
-            return state;
-        }
-
-        /*
-         * Normal twists are awarded once for the entire simulation.
-         */
-        if (
-            !twist.repeatable &&
-            state.holderId
-        ) {
-            return state;
-        }
-
-        /*
-         * Explicitly repeatable twists may receive a new holder
-         * when they activate in a new week.
-         */
-        if (
-            twist.repeatable &&
-            Number(state.lastShownWeek) !==
-                Number(week)
-        ) {
-            state.holderId = null;
-            state.used = false;
-        }
-
-        if (!state.holderId) {
-            const active =
-                typeof getActiveHouseguests ===
-                "function"
-                    ? getActiveHouseguests()
-                    : [];
-
-            const holder = active.length
-                ? active[
-                      Math.floor(
-                          Math.random() *
-                              active.length
-                      )
-                  ]
-                : null;
-
-            if (holder) {
-                state.holderId = holder.id;
-                state.awardedWeek =
-                    Number(week);
-                state.used = false;
-            }
-        }
-
-        sim.twistState[twist.id] = state;
-
-        return state;
+    function escape(value) {
+        return window.escapeHTML
+            ? window.escapeHTML(String(value ?? ""))
+            : String(value ?? "");
     }
 
-    function runTwistEventFixed(twistId) {
-        const sim = ensureSimState();
-        const twist = getTwistById(twistId);
-
-        if (!sim) return;
-
-        if (!twist) {
-            sim.currentEventIndex =
-                Number(
-                    sim.currentEventIndex || 0
-                ) + 1;
-
-            showEvent(
-                "Twist",
-                "TWIST",
-                "<p>No twist information is available.</p>"
-            );
-
-            return;
+    function save() {
+        if (window.persistCurrentSeason) {
+            window.persistCurrentSeason();
         }
+    }
 
-        const week = Number(
-            sim.currentWeek || 1
-        );
+    function refreshUI() {
 
-        const state =
-            awardTwistIfNeeded(
-                twist,
-                week
-            );
+        const s = sim();
 
-        /*
-         * Mark the twist event as seen before rendering it.
-         * This is the important part that prevents history navigation
-         * or chain re-rendering from awarding it again.
-         */
-        state.eventShown = true;
-        state.lastShownWeek = week;
+        if (!s) return;
 
-        const holder =
-            state.holderId &&
-            typeof getHouseguestForSimulation ===
-                "function"
-                ? getHouseguestForSimulation(
-                      state.holderId
-                  )
-                : null;
-
-        const start = Number(
-            twist.startWeek ||
-            twist.week ||
-            1
-        );
-
-        const end = Number(
-            twist.endWeek ||
-            start
-        );
-
-        const until = Number(
-            twist.powerUntil ||
-            end
-        );
-
-        const effect =
-            twist.effectType ||
-            "display";
-
-        const powerLine = twist.power
-            ? `
-                <p>
-                    <strong>Power:</strong>
-                    ${escapeHTML(twist.power)}
-                    · usable through Week ${until}
-                </p>
-                <p>
-                    <strong>Simulator effect:</strong>
-                    ${escapeHTML(
-                        EFFECT_LABELS[effect] ||
-                        EFFECT_LABELS.display
-                    )}
-                </p>
-              `
-            : "";
-
-        const holderBlock = holder
-            ? `
-                <div class="twist-power-holder">
-                    <h3>Power Holder</h3>
-                    ${simulationPortrait(
-                        holder,
-                        "large"
-                    )}
-                </div>
-              `
-            : "";
-
-        sim.currentEventIndex =
-            Number(
-                sim.currentEventIndex || 0
-            ) + 1;
-
-        if (
-            typeof resetGameChain ===
-            "function"
-        ) {
-            resetGameChain(
-                sim.currentEventIndex
+        if (window.setText) {
+            window.setText(
+                "current-week",
+                s.currentWeek || 1
             );
         }
 
-        showEvent(
-            twist.name,
-            "TWIST",
-            `
-                <div class="twist-event-card">
-                    <h3>
-                        ${escapeHTML(
-                            twist.name
-                        )}
-                    </h3>
+        if (window.updateSimulatorStatus) {
+            window.updateSimulatorStatus(s);
+        }
 
-                    <p>
-                        ${escapeHTML(
-                            twist.description ||
-                                "A twist is active this week."
-                        )}
-                    </p>
+        if (window.renderSimulationWeekNavigation) {
+            window.renderSimulationWeekNavigation();
+        }
 
-                    <p>
-                        <strong>Active:</strong>
-                        Week ${start}
-                        ${
-                            end !== start
-                                ? ` through Week ${end}`
-                                : ""
-                        }
-                    </p>
-
-                    ${powerLine}
-
-                    ${holderBlock}
-                </div>
-            `
-        );
+        if (window.renderDynamicGameChain) {
+            window.renderDynamicGameChain();
+        }
     }
 
-    function getWeekEventChainFixed(week) {
-        const sim = ensureSimState();
 
-        if (!sim) return [];
+    /*
+     * =========================================================
+     * SAFETY / IMMUNITY DETECTION
+     * =========================================================
+     */
+
+    function getSafetyCompetitions(week) {
+
+        if (!window.getWeekCompetitions) {
+            return [];
+        }
+
+        return window.getWeekCompetitions(week)
+            .filter(c =>
+                c &&
+                String(c.type || "").toLowerCase() === "safety"
+            );
+    }
+
+
+    function hasSafetyCompetition(week) {
+
+        return getSafetyCompetitions(week).length > 0;
+    }
+
+
+    /*
+     * =========================================================
+     * STABLE EVENT CHAIN
+     *
+     * IMPORTANT:
+     *
+     * Safety happens BEFORE nominations.
+     * =========================================================
+     */
+
+    function stableWeekEventChain(week) {
+
+        const s = sim();
+
+        if (!s) return [];
+
+        /*
+         * Finale
+         */
 
         if (
-            sim.currentPhase ===
-                "finale" ||
-            sim.finaleStarted
+            s.currentPhase === "finale" ||
+            s.finaleStarted
         ) {
-            return typeof getFinaleChain ===
-                "function"
-                ? getFinaleChain()
+
+            return window.getFinaleChain
+                ? window.getFinaleChain()
                 : [];
+
         }
 
-        const w = Number(
-            week ||
-            sim.currentWeek ||
-            1
-        );
 
         const chain = [];
 
-        getScheduledTwistsForWeekFixed(
-            w
-        ).forEach(twist => {
-            chain.push({
-                key: "twist",
-                label:
-                    twist.name ||
-                    "Twist",
-                twistId: twist.id
-            });
-        });
-
-        const hoh =
-            typeof getCompetitionForWeekType ===
-            "function"
-                ? getCompetitionForWeekType(
-                      w,
-                      "hoh"
-                  )
-                : null;
-
-        chain.push({
-            key: "hoh",
-            label:
-                hoh?.name ||
-                "HOH Competition"
-        });
 
         /*
-         * Safety is a real event now. If the user enabled the
-         * season-wide safety setting but did not create a custom
-         * Safety competition, a built-in Safety Competition is used.
+         * Scheduled twists
          */
-        const safetyEnabled =
-            currentSeason?.rules
-                ?.safetyCompetitionEnabled ===
-            true;
 
-        const safetyCompetitions =
-            typeof getWeekCompetitions ===
-            "function"
-                ? getWeekCompetitions(
-                      w
-                  ).filter(
-                      c =>
-                          c.type ===
-                          "safety"
-                  )
-                : [];
+        if (window.getScheduledTwistsForWeek) {
 
-        if (
-            safetyEnabled ||
-            safetyCompetitions.length
-        ) {
-            if (
-                safetyCompetitions.length
-            ) {
-                safetyCompetitions.forEach(
-                    comp => {
-                        chain.push({
-                            key:
-                                "custom-competition",
-                            label:
-                                comp.name ||
-                                "Safety Competition",
-                            competitionId:
-                                comp.id
-                        });
-                    }
-                );
-            } else {
+            const twists =
+                window.getScheduledTwistsForWeek(week) || [];
+
+            twists.forEach(twist => {
+
                 chain.push({
-                    key:
-                        "built-in-safety",
-                    label:
-                        "Safety Competition"
+                    key: "twist",
+                    label: twist.name || "Twist",
+                    twistId: twist.id
                 });
-            }
-        }
 
-        chain.push({
-            key: "nominations",
-            label:
-                "Nomination Ceremony"
-        });
-
-        chain.push({
-            key: "pov-players",
-            label:
-                "Veto Selections"
-        });
-
-        const pov =
-            typeof getCompetitionForWeekType ===
-            "function"
-                ? getCompetitionForWeekType(
-                      w,
-                      "pov"
-                  )
-                : null;
-
-        chain.push({
-            key: "pov",
-            label:
-                pov?.name ||
-                "POV Competition"
-        });
-
-        chain.push({
-            key:
-                "veto-ceremony",
-            label:
-                "Veto Ceremony"
-        });
-
-        const otherCompetitions =
-            typeof getWeekCompetitions ===
-            "function"
-                ? getWeekCompetitions(
-                      w
-                  ).filter(
-                      c =>
-                          c.type ===
-                              "special" ||
-                          c.type ===
-                              "luxury"
-                  )
-                : [];
-
-        otherCompetitions.forEach(
-            comp => {
-                chain.push({
-                    key:
-                        "custom-competition",
-                    label:
-                        comp.name ||
-                        "Special Competition",
-                    competitionId:
-                        comp.id
-                });
-            }
-        );
-
-        chain.push(
-            {
-                key:
-                    "eviction-voting",
-                label:
-                    "Eviction Voting"
-            },
-            {
-                key:
-                    "eviction",
-                label:
-                    "Eviction"
-            }
-        );
-
-        return chain;
-    }
-
-    function runBuiltInSafetyEvent() {
-        const sim = ensureSimState();
-
-        const active =
-            typeof getActiveHouseguests ===
-            "function"
-                ? getActiveHouseguests()
-                : [];
-
-        if (!active.length) {
-            sim.currentEventIndex++;
-            return;
-        }
-
-        const winner =
-            typeof chooseCompetitionWinner ===
-            "function"
-                ? chooseCompetitionWinner(
-                      active,
-                      "physical",
-                      "mental",
-                      "general"
-                  )
-                : active[
-                      Math.floor(
-                          Math.random() *
-                              active.length
-                      )
-                  ];
-
-        sim.currentSafetyWinner =
-            winner?.id || null;
-
-        if (winner) {
-            winner.safetyWins =
-                Number(
-                    winner.safetyWins || 0
-                ) + 1;
-        }
-
-        sim.currentEventIndex++;
-
-        if (
-            typeof updateSimulatorStatus ===
-            "function"
-        ) {
-            updateSimulatorStatus(
-                sim
-            );
-        }
-
-        if (
-            typeof resetGameChain ===
-            "function"
-        ) {
-            resetGameChain(
-                sim.currentEventIndex
-            );
-        }
-
-        showEvent(
-            "Safety Competition",
-            "SAFETY COMPETITION",
-            `
-                ${simulationPortrait(
-                    winner,
-                    "large"
-                )}
-
-                <p>
-                    <strong>
-                        ${escapeHTML(
-                            getHouseguestDisplayName(
-                                winner?.id,
-                                currentSeason.houseguests
-                            )
-                        )}
-                    </strong>
-                    has won the Safety Competition.
-                </p>
-
-                <p>
-                    This player is safe from
-                    this week's nominations.
-                </p>
-            `
-        );
-    }
-
-    function runCustomCompetitionEventFixed(
-        competitionId
-    ) {
-        const sim = ensureSimState();
-
-        const players =
-            getActiveHouseguests();
-
-        const comp =
-            getWeekCompetitions(
-                sim.currentWeek
-            ).find(
-                c =>
-                    c.id ===
-                    competitionId
-            );
-
-        if (
-            !comp ||
-            !players.length
-        ) {
-            sim.currentEventIndex++;
-            return;
-        }
-
-        const winner =
-            chooseCompetitionWinnerByCustom(
-                players,
-                comp
-            );
-
-        if (
-            comp.type ===
-            "safety"
-        ) {
-            sim.currentSafetyWinner =
-                winner?.id || null;
-
-            if (winner) {
-                winner.safetyWins =
-                    Number(
-                        winner.safetyWins ||
-                            0
-                    ) + 1;
-            }
-        }
-
-        sim.currentEventIndex++;
-
-        updateSimulatorStatus(
-            sim
-        );
-
-        resetGameChain(
-            sim.currentEventIndex
-        );
-
-        showEvent(
-            comp.name ||
-                "Special Competition",
-            comp.type ===
-                "safety"
-                ? "SAFETY COMPETITION"
-                : "SPECIAL COMPETITION",
-            `
-                ${simulationPortrait(
-                    winner,
-                    "large"
-                )}
-
-                <p>
-                    <strong>
-                        ${escapeHTML(
-                            getHouseguestDisplayName(
-                                winner?.id,
-                                currentSeason.houseguests
-                            )
-                        )}
-                    </strong>
-                    has won
-                    <strong>
-                        ${escapeHTML(
-                            comp.name ||
-                                "the competition"
-                        )}
-                    </strong>.
-                </p>
-
-                ${
-                    comp.description
-                        ? `<p class="event-description">${escapeHTML(
-                              comp.description
-                          )}</p>`
-                        : ""
-                }
-            `
-        );
-    }
-
-    function applySafetyProtection(
-        eligible,
-        week
-    ) {
-        const sim = ensureSimState();
-        const protectedIds =
-            new Set();
-
-        if (
-            sim.currentSafetyWinner
-        ) {
-            protectedIds.add(
-                sim.currentSafetyWinner
-            );
-        }
-
-        getUsableTwistStatesFixed(
-            week,
-            "immunity"
-        ).forEach(
-            ({ state }) => {
-                if (
-                    state.holderId
-                ) {
-                    protectedIds.add(
-                        state.holderId
-                    );
-                }
-            }
-        );
-
-        return eligible.filter(
-            player =>
-                !protectedIds.has(
-                    player.id
-                )
-        );
-    }
-
-    function runNominationEventFixed() {
-        const sim = ensureSimState();
-
-        const active =
-            getActiveHouseguests();
-
-        const hohId =
-            sim.currentHOH;
-
-        let eligible =
-            active.filter(
-                p =>
-                    p.id !==
-                    hohId
-            );
-
-        eligible =
-            applySafetyProtection(
-                eligible,
-                Number(
-                    sim.currentWeek ||
-                        1
-                )
-            );
-
-        const nomineeCount =
-            Math.min(
-                Number(
-                    currentSeason
-                        .rules
-                        ?.nomineesPerWeek ||
-                        2
-                ),
-                eligible.length
-            );
-
-        let nominees =
-            chooseRandomPlayers(
-                eligible,
-                nomineeCount
-            );
-
-        let twistNote = "";
-
-        const voidPower =
-            getUsableTwistStatesFixed(
-                sim.currentWeek,
-                "nominationVoid"
-            ).find(
-                ({ state }) =>
-                    nominees.some(
-                        p =>
-                            p.id ===
-                            state.holderId
-                    )
-            );
-
-        if (voidPower) {
-            const originalIds =
-                nominees.map(
-                    p => p.id
-                );
-
-            voidPower.state.used =
-                true;
-
-            const rerollPool =
-                eligible.filter(
-                    p =>
-                        !originalIds.includes(
-                            p.id
-                        )
-                );
-
-            const replacements =
-                chooseRandomPlayers(
-                    rerollPool,
-                    Math.min(
-                        nomineeCount,
-                        rerollPool.length
-                    )
-                );
-
-            if (
-                replacements.length ===
-                nomineeCount
-            ) {
-                nominees =
-                    replacements;
-            }
-
-            twistNote = `
-                <p class="ceremony-statement">
-                    <strong>
-                        ${escapeHTML(
-                            voidPower.twist.power ||
-                                voidPower.twist.name
-                        )}
-                    </strong>
-                    was used. The original
-                    nominations were voided.
-                </p>
-            `;
-        }
-
-        sim.currentNominees =
-            nominees.map(
-                p => p.id
-            );
-
-        nominees.forEach(p => {
-            p.nominationCount =
-                Number(
-                    p.nominationCount ||
-                        0
-                ) + 1;
-        });
-
-        sim.currentEventIndex++;
-
-        updateSimulatorStatus(
-            sim
-        );
-
-        resetGameChain(
-            sim.currentEventIndex
-        );
-
-        const hohPlayer =
-            getHouseguestForSimulation(
-                sim.currentHOH
-            );
-
-        showEvent(
-            "Nomination Ceremony",
-            "NOMINATION CEREMONY",
-            `
-                <div class="ceremony-role-section">
-                    <h3>
-                        Head of Household
-                    </h3>
-                    ${simulationPortrait(
-                        hohPlayer,
-                        "large"
-                    )}
-                </div>
-
-                ${twistNote}
-
-                <p class="ceremony-statement">
-                    <strong>
-                        ${escapeHTML(
-                            getHouseguestDisplayName(
-                                sim.currentHOH,
-                                active
-                            )
-                        )}
-                    </strong>
-                    has nominated:
-                </p>
-
-                <div class="ceremony-role-section">
-                    <h3>
-                        Nominees
-                    </h3>
-                    ${simulationPortraits(
-                        nominees.map(
-                            p => p.id
-                        ),
-                        "large"
-                    )}
-                </div>
-            `
-        );
-    }
-
-    function runVetoCeremonyEventFixed() {
-        const sim =
-            ensureSimState();
-
-        if (
-            currentSeason.rules
-                ?.vetoEnabled ===
-            false
-        ) {
-            sim.currentEventIndex++;
-
-            resetGameChain(
-                sim.currentEventIndex
-            );
-
-            showEvent(
-                "Veto Ceremony",
-                "VETO CEREMONY",
-                "<p>The Power of Veto is not enabled for this season.</p>"
-            );
-
-            return;
-        }
-
-        const vetoWinner =
-            sim.currentPOVWinner;
-
-        const originalNominees =
-            [
-                ...(sim.currentNominees ||
-                    [])
-            ];
-
-        let vetoUsed = false;
-        let replacementId =
-            null;
-
-        let diamondNote =
-            "";
-
-        if (
-            vetoWinner &&
-            originalNominees.includes(
-                vetoWinner
-            )
-        ) {
-            const remaining =
-                getActiveHouseguests().filter(
-                    p =>
-                        p.id !==
-                            sim.currentHOH &&
-                        !originalNominees.includes(
-                            p.id
-                        )
-                );
-
-            if (
-                remaining.length
-            ) {
-                const diamond =
-                    getUsableTwistStatesFixed(
-                        sim.currentWeek,
-                        "diamondPOV"
-                    ).find(
-                        ({ state }) =>
-                            state.holderId ===
-                            vetoWinner
-                    );
-
-                let replacement;
-
-                if (diamond) {
-                    replacement =
-                        remaining
-                            .slice()
-                            .sort(
-                                (a, b) =>
-                                    allianceBond(
-                                        vetoWinner,
-                                        a.id
-                                    ) -
-                                    allianceBond(
-                                        vetoWinner,
-                                        b.id
-                                    )
-                            )[0] ||
-                        randomItem(
-                            remaining
-                        );
-
-                    diamond.state.used =
-                        true;
-
-                    diamondNote = `
-                        <p class="ceremony-statement">
-                            <strong>
-                                ${escapeHTML(
-                                    diamond.twist.power ||
-                                        diamond.twist.name
-                                )}
-                            </strong>
-                            upgraded the veto to
-                            a Diamond POV.
-                        </p>
-                    `;
-                } else {
-                    replacement =
-                        randomItem(
-                            remaining
-                        );
-                }
-
-                const index =
-                    sim.currentNominees.indexOf(
-                        vetoWinner
-                    );
-
-                if (
-                    index >= 0 &&
-                    replacement
-                ) {
-                    sim.currentNominees[
-                        index
-                    ] =
-                        replacement.id;
-
-                    replacementId =
-                        replacement.id;
-
-                    vetoUsed =
-                        true;
-                }
-            }
-        }
-
-        sim.currentEventIndex++;
-
-        updateSimulatorStatus(
-            sim
-        );
-
-        resetGameChain(
-            sim.currentEventIndex
-        );
-
-        showEvent(
-            "Veto Ceremony",
-            "VETO CEREMONY",
-            `
-                <div class="ceremony-leaders">
-
-                    <div class="ceremony-role-section">
-                        <h3>
-                            Head of Household
-                        </h3>
-                        ${simulationPortrait(
-                            getHouseguestForSimulation(
-                                sim.currentHOH
-                            ),
-                            "large"
-                        )}
-                    </div>
-
-                    <div class="ceremony-role-section">
-                        <h3>
-                            Power of Veto Holder
-                        </h3>
-                        ${simulationPortrait(
-                            getHouseguestForSimulation(
-                                vetoWinner
-                            ),
-                            "large"
-                        )}
-                    </div>
-
-                </div>
-
-                ${diamondNote}
-
-                <p class="ceremony-statement">
-                    ${
-                        vetoUsed
-                            ? `
-                                <strong>
-                                    ${escapeHTML(
-                                        getHouseguestDisplayName(
-                                            vetoWinner,
-                                            currentSeason.houseguests
-                                        )
-                                    )}
-                                </strong>
-                                used the Power of Veto.
-
-                                ${
-                                    replacementId
-                                        ? `
-                                            <strong>
-                                                ${escapeHTML(
-                                                    getHouseguestDisplayName(
-                                                        replacementId,
-                                                        currentSeason.houseguests
-                                                    )
-                                                )}
-                                            </strong>
-                                            was named as the
-                                            replacement nominee.
-                                          `
-                                        : ""
-                                }
-                              `
-                            : vetoWinner
-                                ? `
-                                    <strong>
-                                        ${escapeHTML(
-                                            getHouseguestDisplayName(
-                                                vetoWinner,
-                                                currentSeason.houseguests
-                                            )
-                                        )}
-                                    </strong>
-                                    did not use the
-                                    Power of Veto.
-                                  `
-                                : "No Power of Veto holder was available."
-                    }
-                </p>
-
-                <div class="ceremony-role-section">
-                    <h3>
-                        Final Nominees
-                    </h3>
-                    ${simulationPortraits(
-                        sim.currentNominees,
-                        "large"
-                    )}
-                </div>
-            `
-        );
-    }
-
-    /*
-     * Halting Hex is handled here, then the original eviction engine is
-     * allowed to handle ordinary evictions. This prevents unrelated
-     * eviction logic from being rewritten.
-     */
-    const legacyEvictionEvent =
-        window.runEvictionEvent;
-
-    function runEvictionEventFixed() {
-        const sim =
-            ensureSimState();
-
-        const nominees =
-            sim.currentNominees ||
-            [];
-
-        const week =
-            Number(
-                sim.currentWeek ||
-                    1
-            );
-
-        const hex =
-            getUsableTwistStatesFixed(
-                week,
-                "haltingHex"
-            ).find(
-                ({ state }) =>
-                    nominees.includes(
-                        state.holderId
-                    )
-            );
-
-        if (hex) {
-            hex.state.used =
-                true;
-
-            sim.currentEventIndex =
-                getWeekEventChainFixed(
-                    week
-                ).length;
-
-            sim.pendingEvictionId =
-                null;
-
-            sim.evictionVoteResult =
-                null;
-
-            sim.pendingWeekAdvance =
-                true;
-
-            sim.pendingCycle =
-                "nextWeek";
-
-            resetGameChain(
-                sim.currentEventIndex
-            );
-
-            const holder =
-                getHouseguestForSimulation(
-                    hex.state.holderId
-                );
-
-            showEvent(
-                "Halting Hex",
-                "EVICTION HALTED",
-                `
-                    ${simulationPortrait(
-                        holder,
-                        "large"
-                    )}
-
-                    <p>
-                        <strong>
-                            ${escapeHTML(
-                                hex.twist.power ||
-                                    hex.twist.name
-                            )}
-                        </strong>
-                        has been used.
-                    </p>
-
-                    <p>
-                        The Week ${week}
-                        eviction is cancelled.
-                        Nobody is evicted.
-                    </p>
-
-                    <p>
-                        Press
-                        <strong>
-                            Proceed
-                        </strong>
-                        to begin the next week.
-                    </p>
-                `
-            );
-
-            return;
-        }
-
-        if (
-            typeof legacyEvictionEvent ===
-            "function"
-        ) {
-            return legacyEvictionEvent();
-        }
-    }
-
-    function saveTwistFixed() {
-        const s =
-            getAdvancedArrays();
-
-        if (!Array.isArray(s.twists)) {
-            s.twists = [];
-        }
-
-        if (
-            !s.twistWeeks ||
-            typeof s.twistWeeks !==
-                "object"
-        ) {
-            s.twistWeeks = {};
-        }
-
-        const name =
-            getInputValue(
-                "twist-name"
-            ).trim();
-
-        if (!name) {
-            alert(
-                "Please enter a twist name."
-            );
-            return;
-        }
-
-        const maxWeeks =
-            seasonLength();
-
-        const startWeek =
-            Math.min(
-                maxWeeks,
-                Math.max(
-                    1,
-                    getWeekNumber(
-                        getValue(
-                            "twist-start-week"
-                        ) || 1
-                    )
-                )
-            );
-
-        const endWeek =
-            Math.max(
-                startWeek,
-                Math.min(
-                    maxWeeks,
-                    getWeekNumber(
-                        getValue(
-                            "twist-end-week"
-                        ) ||
-                            startWeek
-                    )
-                )
-            );
-
-        const powerUntil =
-            Math.max(
-                startWeek,
-                Math.min(
-                    maxWeeks,
-                    getWeekNumber(
-                        getValue(
-                            "twist-power-until"
-                        ) ||
-                            endWeek
-                    )
-                )
-            );
-
-        const obj =
-            normalizeTwist({
-                id:
-                    editingTwistId ||
-                    uid("twist"),
-
-                name,
-
-                startWeek,
-
-                endWeek,
-
-                week: startWeek,
-
-                power:
-                    getInputValue(
-                        "twist-power"
-                    ).trim(),
-
-                effectType:
-                    getValue(
-                        "twist-effect-type"
-                    ) ||
-                    "display",
-
-                powerUntil,
-
-                description:
-                    getInputValue(
-                        "twist-description"
-                    ).trim(),
-
-                timing:
-                    startWeek ===
-                    endWeek
-                        ? `week${startWeek}`
-                        : `weeks${startWeek}-${endWeek}`,
-
-                active:
-                    getChecked(
-                        "twist-active"
-                    )
             });
 
-        const index =
-            s.twists.findIndex(
-                t =>
-                    t.id ===
-                    obj.id
-            );
-
-        if (index >= 0) {
-            s.twists[index] =
-                obj;
-        } else {
-            s.twists.push(
-                obj
-            );
         }
 
-        ensureTwistData();
-
-        editingTwistId =
-            null;
-
-        resetTwistEditorFixed();
-        renderTwistsFixed();
-
-        if (
-            typeof persistCurrentSeasonIfSaved ===
-            "function"
-        ) {
-            persistCurrentSeasonIfSaved();
-        }
-    }
-
-    function resetTwistEditorFixed() {
-        editingTwistId =
-            null;
-
-        setValue(
-            "twist-name",
-            ""
-        );
-
-        setValue(
-            "twist-start-week",
-            "1"
-        );
-
-        setValue(
-            "twist-end-week",
-            "1"
-        );
-
-        setValue(
-            "twist-power",
-            ""
-        );
-
-        setValue(
-            "twist-effect-type",
-            "display"
-        );
-
-        setValue(
-            "twist-power-until",
-            "1"
-        );
-
-        setValue(
-            "twist-description",
-            ""
-        );
-
-        setChecked(
-            "twist-active",
-            true
-        );
-
-        setText(
-            "twist-form-title",
-            "Create Twist"
-        );
-
-        setText(
-            "save-twist-btn",
-            "Add Twist"
-        );
-    }
-
-    function editTwistFixed(id) {
-        const twist =
-            getTwistById(id);
-
-        if (!twist) return;
-
-        editingTwistId =
-            id;
-
-        setValue(
-            "twist-name",
-            twist.name
-        );
-
-        setValue(
-            "twist-start-week",
-            twist.startWeek
-        );
-
-        setValue(
-            "twist-end-week",
-            twist.endWeek
-        );
-
-        setValue(
-            "twist-power",
-            twist.power ||
-                ""
-        );
-
-        setValue(
-            "twist-effect-type",
-            twist.effectType ||
-                "display"
-        );
-
-        setValue(
-            "twist-power-until",
-            twist.powerUntil ||
-                twist.endWeek
-        );
-
-        setValue(
-            "twist-description",
-            twist.description ||
-                ""
-        );
-
-        setChecked(
-            "twist-active",
-            twist.active !==
-                false
-        );
-
-        setText(
-            "twist-form-title",
-            "Edit Twist"
-        );
-
-        setText(
-            "save-twist-btn",
-            "Save Twist"
-        );
-
-        document
-            .getElementById(
-                "twist-name"
-            )
-            ?.scrollIntoView({
-                behavior:
-                    "smooth",
-                block:
-                    "center"
-            });
-    }
-
-    function deleteTwistFixed(id) {
-        if (
-            !confirm(
-                "Delete this twist?"
-            )
-        ) {
-            return;
-        }
-
-        currentSeason.twists =
-            (
-                currentSeason.twists ||
-                []
-            ).filter(
-                t =>
-                    t.id !==
-                    id
-            );
-
-        ensureTwistData();
-
-        const sim =
-            ensureSimState();
-
-        if (
-            sim?.twistState
-        ) {
-            delete sim.twistState[
-                id
-            ];
-        }
-
-        renderTwistsFixed();
-
-        if (
-            typeof persistCurrentSeasonIfSaved ===
-            "function"
-        ) {
-            persistCurrentSeasonIfSaved();
-        }
-    }
-
-    function renderTwistsFixed() {
-        const container =
-            document.getElementById(
-                "twists-container"
-            );
-
-        if (!container)
-            return;
-
-        const twists =
-            ensureTwistData()
-                .slice()
-                .sort(
-                    (a, b) =>
-                        a.startWeek -
-                        b.startWeek
-                );
-
-        if (!twists.length) {
-            container.innerHTML =
-                '<div class="empty-state"><p>No weekly twists created yet. Add a twist above if applicable.</p></div>';
-
-            return;
-        }
-
-        container.innerHTML =
-            twists
-                .map(
-                    twist => {
-                        const range =
-                            twist.startWeek ===
-                            twist.endWeek
-                                ? `Week ${twist.startWeek}`
-                                : `Weeks ${twist.startWeek}–${twist.endWeek}`;
-
-                        const effect =
-                            EFFECT_LABELS[
-                                twist.effectType ||
-                                    "display"
-                            ] ||
-                            EFFECT_LABELS.display;
-
-                        return `
-                            <div class="week-editor-card">
-
-                                <div class="week-editor-header">
-
-                                    <div>
-                                        <span class="section-label">
-                                            ${escapeHTML(
-                                                range.toUpperCase()
-                                            )}
-                                        </span>
-
-                                        <h4>
-                                            ${escapeHTML(
-                                                twist.name
-                                            )}
-                                        </h4>
-                                    </div>
-
-                                    <span class="feature-status">
-                                        ${
-                                            twist.active ===
-                                            false
-                                                ? "Inactive"
-                                                : "Active"
-                                        }
-                                    </span>
-
-                                </div>
-
-                                <div class="week-item-list">
-
-                                    <div class="week-item">
-
-                                        <div>
-
-                                            <p>
-                                                ${escapeHTML(
-                                                    twist.description ||
-                                                        "No description."
-                                                )}
-                                            </p>
-
-                                            <small>
-                                                <strong>
-                                                    Active period:
-                                                </strong>
-                                                ${escapeHTML(
-                                                    range
-                                                )}
-                                            </small>
-
-                                            <small>
-                                                <strong>
-                                                    Simulator effect:
-                                                </strong>
-                                                ${escapeHTML(
-                                                    effect
-                                                )}
-                                            </small>
-
-                                            ${
-                                                twist.power
-                                                    ? `
-                                                        <small>
-                                                            <strong>
-                                                                Power:
-                                                            </strong>
-                                                            ${escapeHTML(
-                                                                twist.power
-                                                            )}
-                                                            · Usable through
-                                                            Week
-                                                            ${twist.powerUntil}
-                                                        </small>
-                                                      `
-                                                    : ""
-                                            }
-
-                                        </div>
-
-                                        <div class="advanced-card-actions">
-
-                                            <button
-                                                type="button"
-                                                onclick="editTwist('${escapeAttribute(
-                                                    twist.id
-                                                )}')"
-                                            >
-                                                Edit
-                                            </button>
-
-                                            <button
-                                                type="button"
-                                                onclick="deleteTwist('${escapeAttribute(
-                                                    twist.id
-                                                )}')"
-                                            >
-                                                Delete
-                                            </button>
-
-                                        </div>
-
-                                    </div>
-
-                                </div>
-
-                            </div>
-                        `;
-                    }
-                )
-                .join("");
-    }
-
-    function loadTwistsFixed(data) {
-        const s =
-            getAdvancedArrays();
-
-        const incoming =
-            data &&
-            typeof data ===
-                "object" &&
-            !Array.isArray(data)
-                ? data.twists
-                : data;
-
-        s.twists =
-            Array.isArray(
-                incoming
-            )
-                ? clone(
-                      incoming
-                  ).map(
-                      t =>
-                          normalizeTwist(
-                              t
-                          )
-                  )
-                : [];
 
         /*
-         * Old saved seasons may have only twistWeeks.
-         * Convert those into canonical twists.
-         */
-        if (
-            !s.twists.length &&
-            data?.twistWeeks
-        ) {
-            s.twists =
-                Object.values(
-                    data.twistWeeks
-                )
-                    .flat()
-                    .map(
-                        t =>
-                            normalizeTwist(
-                                t
-                            )
-                    );
-        }
-
-        const unique =
-            new Map();
-
-        s.twists.forEach(
-            twist => {
-                if (
-                    !unique.has(
-                        twist.id
-                    )
-                ) {
-                    unique.set(
-                        twist.id,
-                        twist
-                    );
-                }
-            }
-        );
-
-        s.twists =
-            [...unique.values()];
-
-        ensureTwistData();
-
-        if (
-            typeof populateWeekSelectors ===
-            "function"
-        ) {
-            populateWeekSelectors(
-                seasonLength()
-            );
-        }
-
-        resetTwistEditorFixed();
-        renderTwistsFixed();
-    }
-
-    function resimulateSeasonFixed() {
-        if (!currentSeason) {
-            alert(
-                "Please open a saved season first."
-            );
-            return;
-        }
-
-        if (
-            !confirm(
-                "Re-simulate this season from the beginning? The current simulation results will be replaced."
-            )
-        ) {
-            return;
-        }
-
-        /*
-         * Reset only mutable simulation/player fields.
-         * Images, names, ratings, relationships, alliances,
-         * competitions, and twists remain intact.
-         */
-        (
-            currentSeason.houseguests ||
-            []
-        ).forEach(
-            player => {
-                player.status =
-                    "active";
-
-                player.placement =
-                    null;
-
-                player.weeksInGame =
-                    0;
-
-                player.hohWins =
-                    0;
-
-                player.povWins =
-                    0;
-
-                player.safetyWins =
-                    0;
-
-                player.nominationCount =
-                    0;
-
-                player.vetoUsedOn =
-                    [];
-
-                player.evictionVotesReceived =
-                    0;
-            }
-        );
-
-        const sim =
-            typeof createDefaultSimulation ===
-            "function"
-                ? createDefaultSimulation()
-                : {};
-
-        sim.started =
-            false;
-
-        sim.completed =
-            false;
-
-        sim.currentWeek =
-            1;
-
-        sim.currentPhase =
-            "week";
-
-        sim.currentEventIndex =
-            0;
-
-        sim.history =
-            [];
-
-        sim.weekHistory =
-            [];
-
-        sim.finalPlacements =
-            [];
-
-        sim.winner =
-            null;
-
-        sim.runnerUp =
-            null;
-
-        sim.jury =
-            [];
-
-        sim.finalists =
-            [];
-
-        sim.currentHOH =
-            null;
-
-        sim.currentNominees =
-            [];
-
-        sim.currentPOVPlayers =
-            [];
-
-        sim.currentPOVWinner =
-            null;
-
-        sim.currentSafetyWinner =
-            null;
-
-        sim.currentEviction =
-            null;
-
-        sim.pendingEvictionId =
-            null;
-
-        sim.evictionVoteResult =
-            null;
-
-        sim.evictionsThisWeek =
-            0;
-
-        sim.pendingWeekAdvance =
-            false;
-
-        sim.pendingCycle =
-            null;
-
-        sim.viewingWeek =
-            1;
-
-        sim.isViewingHistory =
-            false;
-
-        sim.liveView =
-            null;
-
-        sim.vetoDrawCounts =
-            {};
-
-        sim.lastVetoDrawnIds =
-            [];
-
-        sim.twistState =
-            {};
-
-        currentSeason.simulation =
-            sim;
-
-        ensureTwistData();
-
-        if (
-            typeof initializeSimulator ===
-            "function"
-        ) {
-            initializeSimulator(
-                currentSeason
-            );
-        }
-
-        if (
-            typeof persistCurrentSeason ===
-            "function"
-        ) {
-            persistCurrentSeason();
-        }
-
-        showPage(
-            "simulator-page"
-        );
-    }
-
-    function ensureResimulationButton() {
-        const results =
-            document.getElementById(
-                "results-page"
-            );
-
-        if (!results) return;
-
-        if (
-            document.getElementById(
-                "resimulate-season-button"
-            )
-        ) {
-            return;
-        }
-
-        const button =
-            document.createElement(
-                "button"
-            );
-
-        button.type =
-            "button";
-
-        button.id =
-            "resimulate-season-button";
-
-        button.className =
-            "primary-button large-button";
-
-        button.textContent =
-            "RE-SIMULATE SEASON";
-
-        button.addEventListener(
-            "click",
-            resimulateSeasonFixed
-        );
-
-        const header =
-            results.querySelector(
-                ".results-header"
-            );
-
-        if (header) {
-            header.appendChild(
-                button
-            );
-        } else {
-            results.insertBefore(
-                button,
-                results.firstChild
-            );
-        }
-    }
-
-    /*
-     * Install the stable implementations.
-     */
-    window.getScheduledTwistsForWeek =
-        getScheduledTwistsForWeekFixed;
-
-    window.getUsableTwistStates =
-        getUsableTwistStatesFixed;
-
-    window.getWeekEventChain =
-        getWeekEventChainFixed;
-
-    window.runTwistEvent =
-        runTwistEventFixed;
-
-    window.runNominationEvent =
-        runNominationEventFixed;
-
-    window.runVetoCeremonyEvent =
-        runVetoCeremonyEventFixed;
-
-    window.runEvictionEvent =
-        runEvictionEventFixed;
-
-    window.runCustomCompetitionEvent =
-        runCustomCompetitionEventFixed;
-
-    window.saveTwist =
-        saveTwistFixed;
-
-    window.resetTwistEditor =
-        resetTwistEditorFixed;
-
-    window.editTwist =
-        editTwistFixed;
-
-    window.deleteTwist =
-        deleteTwistFixed;
-
-    window.renderTwists =
-        renderTwistsFixed;
-
-    window.loadTwists =
-        loadTwistsFixed;
-
-    window.resimulateSeason =
-        resimulateSeasonFixed;
-
-    /*
-     * Wrap the existing runNextEvent so the normal HOH/POV/eviction/
-     * finale engine remains intact. Only the new built-in safety event
-     * needs its own dispatcher.
-     */
-    const legacyRunNextEvent =
-        window.runNextEvent;
-
-    window.runNextEvent =
-        function () {
-            const sim =
-                ensureSimState();
-
-            if (
-                !sim ||
-                !currentSeason
-            ) {
-                if (
-                    typeof legacyRunNextEvent ===
-                    "function"
-                ) {
-                    return legacyRunNextEvent();
-                }
-
-                return;
-            }
-
-            if (
-                sim.isViewingHistory
-            ) {
-                if (
-                    typeof returnToCurrentSimulation ===
-                    "function"
-                ) {
-                    return returnToCurrentSimulation();
-                }
-
-                return;
-            }
-
-            if (
-                sim.pendingWeekAdvance ||
-                sim.pendingCycle ===
-                    "nextWeek" ||
-                sim.pendingCycle ===
-                    "double"
-            ) {
-                return legacyRunNextEvent();
-            }
-
-            const chain =
-                getWeekEventChainFixed(
-                    sim.currentWeek
-                );
-
-            const index =
-                Number(
-                    sim.currentEventIndex ||
-                        0
-                );
-
-            const event =
-                chain[index];
-
-            if (!event) {
-                return legacyRunNextEvent();
-            }
-
-            sim.renderingEventKey =
-                event.key;
-
-            sim.renderingEventLabel =
-                event.label;
-
-            if (
-                event.key ===
-                "built-in-safety"
-            ) {
-                runBuiltInSafetyEvent();
-
-                if (
-                    typeof persistCurrentSeason ===
-                    "function"
-                ) {
-                    persistCurrentSeason();
-                }
-
-                if (
-                    typeof renderSimulationWeekNavigation ===
-                    "function"
-                ) {
-                    renderSimulationWeekNavigation();
-                }
-
-                if (
-                    typeof renderMemoryWallMini ===
-                    "function"
-                ) {
-                    renderMemoryWallMini();
-                }
-
-                return;
-            }
-
-            return legacyRunNextEvent();
-        };
-
-    window.runBuiltInSafetyEvent =
-        runBuiltInSafetyEvent;
-
-    document.addEventListener(
-        "DOMContentLoaded",
-        () => {
-            try {
-                ensureTwistData();
-
-                const saveButton =
-                    document.getElementById(
-                        "save-twist-btn"
-                    );
-
-                const clearButton =
-                    document.getElementById(
-                        "cancel-twist-btn"
-                    );
-
-                if (saveButton) {
-                    saveButton.onclick =
-                        saveTwistFixed;
-                }
-
-                if (clearButton) {
-                    clearButton.onclick =
-                        resetTwistEditorFixed;
-                }
-
-                ensureResimulationButton();
-            } catch (error) {
-                console.error(
-                    "Twist engine initialization failed:",
-                    error
-                );
-            }
-        }
-    );
-})();
-
-/*
- * =========================================================
- * FINAL SIMULATION ENGINE OVERRIDE
- * =========================================================
- *
- * This is intentionally placed LAST in twist-engine.js.
- *
- * It fixes:
- *   1. Safety/Tropical Immunity occurring after POV
- *   2. Special competitions occurring after POV
- *   3. Eviction voting displaying the eviction result too early
- *   4. Eviction voting portraits
- *   5. Portrait centering
- *   6. The old app.js event chain being re-used accidentally
- *
- * The existing app.js remains responsible for the individual
- * competition/event mechanics.
- * This block is the ONE owner of event order.
- */
-
-(function () {
-    "use strict";
-
-    function engineState() {
-        if (!currentSeason) return null;
-
-        if (!currentSeason.simulation) {
-            currentSeason.simulation =
-                typeof createDefaultSimulation === "function"
-                    ? createDefaultSimulation()
-                    : {};
-        }
-
-        return currentSeason.simulation;
-    }
-
-    function engineChain(week) {
-        const sim = engineState();
-
-        if (!sim) return [];
-
-        const w = Number(
-            week || sim.currentWeek || 1
-        );
-
-        /*
-         * Finale is handled separately.
-         */
-        if (
-            sim.currentPhase === "finale" ||
-            sim.finaleStarted
-        ) {
-            return typeof getFinaleChain === "function"
-                ? getFinaleChain()
-                : [];
-        }
-
-        const chain = [];
-
-        /*
-         * -----------------------------------------------------
-         * TWISTS
-         * -----------------------------------------------------
-         */
-        if (
-            typeof getScheduledTwistsForWeekFixed ===
-            "function"
-        ) {
-            getScheduledTwistsForWeekFixed(w).forEach(
-                twist => {
-                    chain.push({
-                        key: "twist",
-                        label:
-                            twist.name || "Twist",
-                        twistId: twist.id
-                    });
-                }
-            );
-        }
-
-        /*
-         * -----------------------------------------------------
          * HOH
-         * -----------------------------------------------------
          */
-        const hoh =
-            typeof getCompetitionForWeekType ===
-            "function"
-                ? getCompetitionForWeekType(w, "hoh")
+
+        const hohCompetition =
+            window.getCompetitionForWeekType
+                ? window.getCompetitionForWeekType(
+                    week,
+                    "hoh"
+                )
                 : null;
 
         chain.push({
             key: "hoh",
             label:
-                hoh?.name ||
-                "HOH Competition"
+                hohCompetition?.name ||
+                "Head of Household"
         });
 
+
         /*
-         * -----------------------------------------------------
          * SAFETY / TROPICAL IMMUNITY
          *
-         * THIS MUST HAPPEN BEFORE NOMINATIONS.
-         * -----------------------------------------------------
+         * THIS IS INTENTIONALLY BEFORE NOMINATIONS.
          */
+
         const safetyCompetitions =
-            typeof getWeekCompetitions === "function"
-                ? getWeekCompetitions(w).filter(
-                      c => c && c.type === "safety"
-                  )
-                : [];
+            getSafetyCompetitions(week);
 
-        const safetyEnabled =
-            currentSeason?.rules
-                ?.safetyCompetitionEnabled === true;
+        safetyCompetitions.forEach(comp => {
 
-        if (
-            safetyEnabled ||
-            safetyCompetitions.length
-        ) {
-            if (safetyCompetitions.length) {
-                safetyCompetitions.forEach(comp => {
-                    chain.push({
-                        key: "custom-competition",
-                        label:
-                            comp.name ||
-                            "Safety Competition",
-                        competitionId: comp.id,
-                        competitionType: "safety"
-                    });
-                });
-            } else {
-                chain.push({
-                    key: "built-in-safety",
-                    label: "Safety Competition"
-                });
-            }
-        }
+            chain.push({
+                key: "safety",
+                label:
+                    comp.name ||
+                    "Safety Competition",
+                competitionId: comp.id
+            });
+
+        });
+
 
         /*
-         * -----------------------------------------------------
          * NOMINATIONS
-         * -----------------------------------------------------
          */
+
         chain.push({
             key: "nominations",
             label: "Nomination Ceremony"
         });
 
-        /*
-         * -----------------------------------------------------
-         * VETO PLAYER SELECTION
-         * -----------------------------------------------------
-         */
-        chain.push({
-            key: "pov-players",
-            label: "Veto Selections"
-        });
 
         /*
-         * -----------------------------------------------------
          * POV
-         * -----------------------------------------------------
          */
-        const pov =
-            typeof getCompetitionForWeekType ===
-            "function"
-                ? getCompetitionForWeekType(w, "pov")
+
+        const vetoEnabled =
+            window.currentSeason?.rules?.vetoEnabled !== false;
+
+        const povCompetition =
+            window.getCompetitionForWeekType
+                ? window.getCompetitionForWeekType(
+                    week,
+                    "pov"
+                )
                 : null;
 
-        chain.push({
-            key: "pov",
-            label:
-                pov?.name ||
-                "POV Competition"
-        });
+        if (vetoEnabled) {
 
-        /*
-         * -----------------------------------------------------
-         * VETO CEREMONY
-         * -----------------------------------------------------
-         */
-        chain.push({
-            key: "veto-ceremony",
-            label: "Veto Ceremony"
-        });
-
-        /*
-         * -----------------------------------------------------
-         * OTHER CUSTOM COMPETITIONS
-         *
-         * Safety competitions are deliberately excluded here
-         * because they were already inserted above.
-         * -----------------------------------------------------
-         */
-        const otherCompetitions =
-            typeof getWeekCompetitions === "function"
-                ? getWeekCompetitions(w).filter(
-                      c =>
-                          c &&
-                          (
-                              c.type === "special" ||
-                              c.type === "luxury"
-                          )
-                  )
-                : [];
-
-        otherCompetitions.forEach(comp => {
             chain.push({
-                key: "custom-competition",
-                label:
-                    comp.name ||
-                    "Special Competition",
-                competitionId: comp.id,
-                competitionType: comp.type
+                key: "pov-players",
+                label: "Veto Selections"
             });
-        });
+
+            chain.push({
+                key: "pov",
+                label:
+                    povCompetition?.name ||
+                    "Power of Veto"
+            });
+
+            chain.push({
+                key: "veto-ceremony",
+                label: "Veto Ceremony"
+            });
+
+        }
+
 
         /*
-         * -----------------------------------------------------
-         * EVICTION VOTING
-         * -----------------------------------------------------
+         * SPECIAL / LUXURY COMPETITIONS
+         *
+         * Safety competitions are excluded because
+         * they were already placed before nominations.
          */
+
+        if (window.getWeekCompetitions) {
+
+            window.getWeekCompetitions(week)
+                .filter(c =>
+                    c &&
+                    (
+                        c.type === "special" ||
+                        c.type === "luxury"
+                    )
+                )
+                .forEach(comp => {
+
+                    chain.push({
+                        key: "custom-competition",
+                        label:
+                            comp.name ||
+                            "Special Competition",
+                        competitionId: comp.id
+                    });
+
+                });
+
+        }
+
+
+        /*
+         * EVICTION VOTING
+         */
+
         chain.push({
             key: "eviction-voting",
             label: "Eviction Voting"
         });
 
+
         /*
-         * -----------------------------------------------------
-         * EVICTION RESULT
-         * -----------------------------------------------------
+         * EVICTION
          */
+
         chain.push({
             key: "eviction",
             label: "Eviction"
         });
 
+
         return chain;
     }
 
-    /*
-     * ---------------------------------------------------------
-     * EVICITON VOTING DISPLAY
-     * ---------------------------------------------------------
-     *
-     * Calculate votes here, but DO NOT announce who is evicted.
-     *
-     * The actual eviction result is displayed by the next
-     * "Eviction" event.
-     */
-    function runEvictionVotingPortraitEvent() {
-        const sim = engineState();
 
-        if (!sim) return;
+    /*
+     * =========================================================
+     * PORTRAIT-BASED VOTING
+     * =========================================================
+     *
+     * The voting event ONLY shows votes.
+     *
+     * It does NOT say:
+     *
+     * "X will be evicted."
+     *
+     * The next event handles that.
+     * =========================================================
+     */
+
+    function runStableEvictionVotingEvent() {
+
+        const s = sim();
+
+        if (!s) return;
+
 
         const active =
-            typeof getActiveHouseguests === "function"
-                ? getActiveHouseguests()
-                : [];
+            activePlayers();
+
 
         const nominees =
-            (sim.currentNominees || [])
-                .map(id =>
-                    active.find(
-                        p => p.id === id
-                    )
-                )
+            (s.currentNominees || [])
+                .map(id => player(id))
                 .filter(Boolean);
 
+
+        /*
+         * Not enough nominees.
+         */
+
         if (nominees.length < 2) {
-            sim.currentEventIndex++;
 
-            if (
-                typeof resetGameChain ===
-                "function"
-            ) {
-                resetGameChain(
-                    sim.currentEventIndex
-                );
-            }
+            s.pendingEvictionId = null;
 
-            showEvent(
+            s.evictionVoteResult = null;
+
+            s.currentEventIndex++;
+
+            window.showEvent(
                 "Eviction Voting",
                 "EVICTION VOTING",
                 `
@@ -2737,81 +401,103 @@
                 `
             );
 
+            refreshUI();
+            save();
+
             return;
         }
 
+
+        /*
+         * Eligible voters:
+         *
+         * HOH does not vote.
+         * Nominees do not vote.
+         */
+
         const voters =
-            active.filter(
-                voter =>
-                    voter.id !== sim.currentHOH &&
-                    !nominees.some(
-                        nominee =>
-                            nominee.id === voter.id
-                    )
+            active.filter(h =>
+                h.id !== s.currentHOH &&
+                !nominees.some(n => n.id === h.id)
             );
+
 
         const votes = [];
 
-        voters.forEach(voter => {
-            const scores =
-                nominees
-                    .map(target => {
-                        const bond =
-                            typeof allianceBond ===
-                            "function"
-                                ? allianceBond(
-                                      voter.id,
-                                      target.id
-                                  )
-                                : 0;
 
-                        return {
-                            target,
-                            score:
-                                Math.max(
-                                    0.1,
-                                    10 -
-                                        bond +
-                                        Math.random() * 5
-                                )
-                        };
-                    })
-                    .sort(
-                        (a, b) =>
-                            b.score -
-                            a.score
-                    );
+        voters.forEach(voter => {
+
+            const scored =
+                nominees.map(target => {
+
+                    const bond =
+                        window.allianceBond
+                            ? window.allianceBond(
+                                voter.id,
+                                target.id
+                            )
+                            : 0;
+
+                    return {
+                        target,
+                        score:
+                            Math.max(
+                                0.1,
+                                10 - bond +
+                                Math.random() * 5
+                            )
+                    };
+
+                })
+                .sort(
+                    (a, b) =>
+                        b.score - a.score
+                );
+
 
             const target =
-                scores[0]?.target;
+                scored[0]?.target;
+
 
             if (target) {
+
                 votes.push({
                     voter: voter.id,
                     target: target.id
                 });
+
             }
+
         });
+
+
+        /*
+         * Count votes.
+         */
 
         const counts = {};
 
-        nominees.forEach(
-            nominee => {
-                counts[nominee.id] = 0;
-            }
-        );
-
-        votes.forEach(vote => {
-            counts[vote.target] =
-                Number(
-                    counts[vote.target] || 0
-                ) + 1;
+        nominees.forEach(n => {
+            counts[n.id] = 0;
         });
 
+
+        votes.forEach(vote => {
+
+            counts[vote.target] =
+                (counts[vote.target] || 0) + 1;
+
+        });
+
+
         /*
-         * Store the vote result for the NEXT event.
-         * Do not display the result here.
+         * Determine target privately.
+         *
+         * We store it now.
+         *
+         * We DO NOT display it as the eviction result.
          */
+
         const sorted =
             nominees
                 .slice()
@@ -2821,289 +507,934 @@
                         (counts[a.id] || 0)
                 );
 
+
         const target =
-            sorted[0];
+            sorted[0] || null;
 
         const other =
-            sorted[1];
+            sorted[1] || null;
 
-        sim.pendingEvictionId =
+
+        s.pendingEvictionId =
             target?.id || null;
 
-        sim.evictionVoteResult = {
+
+        s.evictionVoteResult = {
+
             target:
                 target?.id || null,
+
             targetVotes:
                 target
                     ? counts[target.id] || 0
                     : 0,
+
             other:
                 other?.id || null,
+
             otherVotes:
                 other
                     ? counts[other.id] || 0
                     : 0,
+
             totalVotes:
                 votes.length,
-            votes
+
+            votes:
+                votes
+
         };
 
-        /*
-         * Advance to the actual Eviction event.
-         */
-        sim.currentEventIndex++;
-
-        if (
-            typeof updateSimulatorStatus ===
-            "function"
-        ) {
-            updateSimulatorStatus(sim);
-        }
-
-        if (
-            typeof resetGameChain ===
-            "function"
-        ) {
-            resetGameChain(
-                sim.currentEventIndex
-            );
-        }
 
         /*
-         * -----------------------------------------------------
-         * PORTRAIT-BASED VOTE DISPLAY
-         * -----------------------------------------------------
+         * Advance to the separate Eviction event.
          */
+
+        s.currentEventIndex++;
+
+
+        /*
+         * Build portrait voting rows.
+         */
+
         const voteRows =
             votes.map(vote => {
+
                 const voter =
-                    typeof getHouseguestForSimulation ===
-                    "function"
-                        ? getHouseguestForSimulation(
-                              vote.voter
-                          )
-                        : null;
+                    player(vote.voter);
 
-                const voted =
-                    typeof getHouseguestForSimulation ===
-                    "function"
-                        ? getHouseguestForSimulation(
-                              vote.target
-                          )
-                        : null;
+                const votedFor =
+                    player(vote.target);
 
-                if (!voter || !voted) {
-                    return "";
-                }
+
+                const voterPortrait =
+                    window.simulationPortrait
+                        ? window.simulationPortrait(
+                            voter,
+                            "medium"
+                        )
+                        : "";
+
+
+                const targetPortrait =
+                    window.simulationPortrait
+                        ? window.simulationPortrait(
+                            votedFor,
+                            "medium"
+                        )
+                        : "";
+
 
                 return `
-                    <div class="eviction-vote-card">
+                    <div class="bb-vote-card">
 
-                        <div class="eviction-voter">
-                            ${simulationPortrait(
-                                voter,
-                                "medium"
-                            )}
+                        <div class="bb-vote-person">
+
+                            ${voterPortrait}
+
+                            <strong>
+                                ${escape(
+                                    playerName(voter?.id)
+                                )}
+                            </strong>
+
                         </div>
 
-                        <div class="eviction-vote-arrow">
-                            <span>VOTES TO EVICT</span>
+
+                        <div class="bb-vote-arrow">
+
+                            <span>
+                                votes to evict
+                            </span>
+
                             <strong>→</strong>
+
                         </div>
 
-                        <div class="eviction-target">
-                            ${simulationPortrait(
-                                voted,
-                                "medium"
-                            )}
+
+                        <div class="bb-vote-person">
+
+                            ${targetPortrait}
+
+                            <strong>
+                                ${escape(
+                                    playerName(votedFor?.id)
+                                )}
+                            </strong>
+
                         </div>
 
                     </div>
                 `;
+
             }).join("");
 
-        showEvent(
+
+        /*
+         * IMPORTANT:
+         *
+         * No "will be evicted" text.
+         *
+         * No final vote-result announcement.
+         */
+
+        window.showEvent(
             "Eviction Voting",
             "EVICTION VOTING",
             `
-                <div class="eviction-voting-intro">
+                <div class="bb-voting-header">
 
                     <h3>
-                        The Houseguests Cast Their Votes
+                        The Houseguests Have Voted
                     </h3>
 
-                    <div class="eviction-nominees">
-                        ${simulationPortraits(
-                            nominees.map(
-                                nominee =>
-                                    nominee.id
-                            ),
-                            "large"
-                        )}
+                    <p>
+                        Each eligible Houseguest has
+                        cast their vote to evict.
+                    </p>
+
+                </div>
+
+                <div class="bb-vote-list">
+
+                    ${voteRows ||
+                        "<p>No eligible voters.</p>"
+                    }
+
+                </div>
+
+                <div class="bb-vote-counts">
+
+                    <div>
+                        <strong>
+                            ${escape(
+                                playerName(target?.id)
+                            )}
+                        </strong>
+
+                        <span>
+                            ${target
+                                ? counts[target.id] || 0
+                                : 0
+                            } vote(s)
+                        </span>
+
+                    </div>
+
+
+                    <div>
+                        <strong>
+                            ${escape(
+                                playerName(other?.id)
+                            )}
+                        </strong>
+
+                        <span>
+                            ${other
+                                ? counts[other.id] || 0
+                                : 0
+                            } vote(s)
+                        </span>
+
                     </div>
 
                 </div>
 
-                <div class="eviction-live-votes">
-                    ${voteRows ||
-                    "<p>No eligible voters.</p>"}
+                <p class="bb-voting-complete">
+                    The vote has been recorded.
+                    Press <strong>Proceed</strong>
+                    to reveal the eviction.
+                </p>
+            `
+        );
+
+
+        refreshUI();
+        save();
+
+    }
+
+
+    /*
+     * =========================================================
+     * SAFETY COMPETITION
+     * =========================================================
+     */
+
+    function runStableSafetyEvent(competitionId) {
+
+        const s = sim();
+
+        if (!s) return;
+
+
+        const active =
+            activePlayers();
+
+
+        const comp =
+            window.getWeekCompetitions
+                ? window.getWeekCompetitions(
+                    s.currentWeek
+                ).find(
+                    c => c.id === competitionId
+                )
+                : null;
+
+
+        if (!comp || !active.length) {
+
+            s.currentEventIndex++;
+
+            window.showEvent(
+                "Safety Competition",
+                "SAFETY COMPETITION",
+                "<p>No safety competition was available.</p>"
+            );
+
+            refreshUI();
+            save();
+
+            return;
+        }
+
+
+        /*
+         * Pick winner using the same custom
+         * competition system already used by
+         * the simulator.
+         */
+
+        let winner = null;
+
+
+        if (
+            window.chooseCompetitionWinnerByCustom
+        ) {
+
+            winner =
+                window.chooseCompetitionWinnerByCustom(
+                    active,
+                    comp
+                );
+
+        }
+
+
+        if (!winner) {
+
+            winner =
+                window.chooseCompetitionWinner
+                    ? window.chooseCompetitionWinner(
+                        active,
+                        "physical",
+                        "mental",
+                        "general"
+                    )
+                    : active[
+                        Math.floor(
+                            Math.random() *
+                            active.length
+                        )
+                    ];
+
+        }
+
+
+        /*
+         * Store the safety winner.
+         */
+
+        s.currentSafetyWinner =
+            winner?.id || null;
+
+
+        s.safetyWinner =
+            winner?.id || null;
+
+
+        if (winner) {
+
+            winner.safetyWins =
+                Number(
+                    winner.safetyWins || 0
+                ) + 1;
+
+        }
+
+
+        s.currentEventIndex++;
+
+
+        window.showEvent(
+            comp.name ||
+                "Safety Competition",
+            "SAFETY COMPETITION",
+            `
+                ${
+                    window.simulationPortrait
+                        ? window.simulationPortrait(
+                            winner,
+                            "large"
+                        )
+                        : ""
+                }
+
+                <p>
+
+                    <strong>
+                        ${escape(
+                            playerName(
+                                winner?.id
+                            )
+                        )}
+                    </strong>
+
+                    has won
+
+                    <strong>
+                        ${escape(
+                            comp.name ||
+                            "Safety"
+                        )}
+                    </strong>.
+
+                </p>
+
+                <p>
+                    This Houseguest is safe
+                    from nomination this week.
+                </p>
+
+                ${
+                    comp.description
+                        ? `<p class="event-description">
+                            ${escape(
+                                comp.description
+                            )}
+                           </p>`
+                        : ""
+                }
+            `
+        );
+
+
+        refreshUI();
+        save();
+
+    }
+
+
+    /*
+     * =========================================================
+     * NOMINATION OVERRIDE
+     *
+     * Makes the Safety winner ineligible.
+     * =========================================================
+     */
+
+    function runStableNominationEvent() {
+
+        const s = sim();
+
+        if (!s) return;
+
+
+        const active =
+            activePlayers();
+
+
+        const hohId =
+            s.currentHOH;
+
+
+        const safetyWinner =
+            s.currentSafetyWinner ||
+            s.safetyWinner ||
+            null;
+
+
+        /*
+         * Safety winner cannot be nominated.
+         */
+
+        const eligible =
+            active.filter(
+                houseguest =>
+                    houseguest.id !== hohId &&
+                    houseguest.id !== safetyWinner
+            );
+
+
+        const nomineeCount =
+            Math.min(
+                Number(
+                    window.currentSeason
+                        ?.rules
+                        ?.nomineesPerWeek || 2
+                ),
+                eligible.length
+            );
+
+
+        let nominees =
+            window.chooseRandomPlayers
+                ? window.chooseRandomPlayers(
+                    eligible,
+                    nomineeCount
+                )
+                : eligible.slice(
+                    0,
+                    nomineeCount
+                );
+
+
+        /*
+         * Store nominees.
+         */
+
+        s.currentNominees =
+            nominees.map(
+                h => h.id
+            );
+
+
+        nominees.forEach(nominee => {
+
+            nominee.nominationCount =
+                Number(
+                    nominee.nominationCount || 0
+                ) + 1;
+
+        });
+
+
+        s.currentEventIndex++;
+
+
+        refreshUI();
+
+
+        const hohPlayer =
+            player(hohId);
+
+
+        window.showEvent(
+            "Nomination Ceremony",
+            "NOMINATION CEREMONY",
+            `
+                <div class="ceremony-role-section">
+
+                    <h3>
+                        Head of Household
+                    </h3>
+
+                    ${
+                        window.simulationPortrait
+                            ? window.simulationPortrait(
+                                hohPlayer,
+                                "large"
+                            )
+                            : ""
+                    }
+
+                </div>
+
+
+                ${
+                    safetyWinner
+                        ? `
+                            <div class="ceremony-role-section">
+
+                                <h3>
+                                    Safety
+                                </h3>
+
+                                ${
+                                    window.simulationPortrait
+                                        ? window.simulationPortrait(
+                                            player(
+                                                safetyWinner
+                                            ),
+                                            "large"
+                                        )
+                                        : ""
+                                }
+
+                                <p>
+                                    <strong>
+                                        ${escape(
+                                            playerName(
+                                                safetyWinner
+                                            )
+                                        )}
+                                    </strong>
+                                    is safe and
+                                    cannot be nominated.
+                                </p>
+
+                            </div>
+                        `
+                        : ""
+                }
+
+
+                <p class="ceremony-statement">
+
+                    <strong>
+                        ${escape(
+                            playerName(
+                                hohId
+                            )
+                        )}
+                    </strong>
+
+                    has nominated:
+
+                </p>
+
+
+                <div class="ceremony-role-section">
+
+                    <h3>
+                        Nominees
+                    </h3>
+
+                    ${
+                        window.simulationPortraits
+                            ? window.simulationPortraits(
+                                s.currentNominees,
+                                "large"
+                            )
+                            : ""
+                    }
+
                 </div>
             `
         );
+
+
+        save();
+
     }
 
+
     /*
-     * ---------------------------------------------------------
-     * FINAL EVENT DISPATCHER
-     * ---------------------------------------------------------
+     * =========================================================
+     * WEEK NAVIGATION
+     * =========================================================
      *
-     * IMPORTANT:
-     *
-     * We DO NOT call the old runNextEvent here.
-     *
-     * That was the source of the safety-order bug because the
-     * old function calls the old app.js getWeekEventChain().
+     * This is deliberately rendered by the new engine so
+     * the sidebar uses the same event chain as Proceed.
+     * =========================================================
      */
-    function runNextEventClean() {
-        if (!currentSeason) {
+
+    function renderStableWeekNavigation() {
+
+        const container =
+            document.getElementById(
+                "sim-week-navigation"
+            );
+
+
+        const season =
+            window.currentSeason;
+
+
+        if (!container || !season) {
+            return;
+        }
+
+
+        const s =
+            season.simulation;
+
+
+        const maxWeeks =
+            seasonLength();
+
+
+        const currentWeek =
+            Number(
+                s.currentWeek || 1
+            );
+
+
+        const viewingWeek =
+            Number(
+                s.viewingWeek ||
+                currentWeek
+            );
+
+
+        const history =
+            Array.isArray(s.history)
+                ? s.history
+                : [];
+
+
+        const html = [];
+
+
+        for (
+            let week = 1;
+            week <= maxWeeks;
+            week++
+        ) {
+
+            const isCurrent =
+                week === currentWeek;
+
+            const isViewing =
+                week === viewingWeek;
+
+            const items =
+                history.filter(
+                    item =>
+                        Number(item.week) === week
+                );
+
+
+            html.push(`
+                <div class="sim-week-block
+                    ${isCurrent ? "current" : ""}
+                    ${isViewing ? "viewing" : ""}
+                    ${week < currentWeek ? "past" : ""}
+                ">
+            `);
+
+
+            html.push(`
+                <button
+                    type="button"
+                    class="sim-week-label"
+                    onclick="viewSimulationWeek(${week})"
+                >
+                    Week ${week}
+                </button>
+            `);
+
+
+            if (isViewing) {
+
+                html.push(`
+                    <div class="sim-event-list">
+                `);
+
+
+                items.forEach(
+                    (item, index) => {
+
+                        html.push(`
+                            <button
+                                type="button"
+                                class="sim-event-nav completed"
+                                onclick="
+                                    viewSimulationHistoryEvent(
+                                        ${week},
+                                        ${index}
+                                    )
+                                "
+                            >
+                                <span>
+                                    ${escape(
+                                        item.label ||
+                                        item.title ||
+                                        "Event"
+                                    )}
+                                </span>
+                            </button>
+                        `);
+
+                    }
+                );
+
+
+                /*
+                 * Pending current events.
+                 */
+
+                if (
+                    isCurrent &&
+                    !s.isViewingHistory &&
+                    !s.pendingWeekAdvance &&
+                    !s.pendingCycle &&
+                    s.currentPhase !== "finale"
+                ) {
+
+                    const chain =
+                        stableWeekEventChain(
+                            currentWeek
+                        );
+
+
+                    const index =
+                        Number(
+                            s.engineEventIndex ??
+                            s.currentEventIndex ??
+                            0
+                        );
+
+
+                    chain
+                        .slice(index)
+                        .forEach(
+                            (event, offset) => {
+
+                                html.push(`
+                                    <div
+                                        class="sim-event-nav
+                                        ${
+                                            offset === 0
+                                                ? "active"
+                                                : "pending"
+                                        }"
+                                    >
+                                        <span>
+                                            ${escape(
+                                                event.label
+                                            )}
+                                        </span>
+                                    </div>
+                                `);
+
+                            }
+                        );
+
+                }
+
+
+                html.push(`
+                    </div>
+                `);
+
+            }
+
+
+            html.push(`
+                </div>
+            `);
+
+        }
+
+
+        container.innerHTML =
+            html.join("");
+
+    }
+
+
+    /*
+     * =========================================================
+     * STABLE PROCEED BUTTON
+     * =========================================================
+     */
+
+    function runStableNextEvent() {
+
+        const season =
+            window.currentSeason;
+
+
+        if (!season) {
+
             alert(
                 "Please open a saved season first."
             );
+
             return;
+
         }
 
-        const sim =
-            engineState();
 
-        if (!sim) return;
+        const s =
+            sim();
+
 
         /*
-         * History mode does not alter the simulation.
+         * History mode.
          */
-        if (
-            sim.isViewingHistory
-        ) {
+
+        if (s.isViewingHistory) {
+
             if (
-                typeof returnToCurrentSimulation ===
-                "function"
+                window.returnToCurrentSimulation
             ) {
-                returnToCurrentSimulation();
+
+                window.returnToCurrentSimulation();
+
             }
 
             return;
+
         }
 
+
         /*
-         * Start the next week only after the current eviction
-         * screen has already been displayed.
+         * =====================================================
+         * START NEXT WEEK
+         * =====================================================
          */
-        if (
-            sim.pendingWeekAdvance
-        ) {
+
+        if (s.pendingWeekAdvance) {
+
             const nextWeek =
                 Number(
-                    sim.currentWeek || 1
+                    s.currentWeek || 1
                 ) + 1;
+
+
+            /*
+             * End of regular season.
+             */
 
             if (
                 nextWeek >
-                getSeasonLength(
-                    currentSeason
-                )
+                seasonLength()
             ) {
+
                 if (
-                    typeof beginFinale ===
-                    "function"
+                    window.beginFinale
                 ) {
-                    beginFinale();
+
+                    window.beginFinale();
+
                 } else if (
-                    typeof finalizeSeason ===
-                    "function"
+                    window.finalizeSeason
                 ) {
-                    finalizeSeason(
-                        getActiveHouseguests()
+
+                    window.finalizeSeason(
+                        activePlayers()
                     );
+
                 }
 
                 return;
+
             }
 
-            if (
-                typeof resetCycleForNewHOH ===
-                "function"
-            ) {
-                resetCycleForNewHOH(
-                    sim,
-                    nextWeek
-                );
-            } else {
-                sim.currentWeek =
-                    nextWeek;
 
-                sim.viewingWeek =
-                    nextWeek;
+            /*
+             * Reset weekly runtime.
+             */
 
-                sim.pendingWeekAdvance =
-                    false;
+            s.currentWeek =
+                nextWeek;
 
-                sim.pendingCycle =
-                    null;
+            s.viewingWeek =
+                nextWeek;
 
-                sim.currentEventIndex =
-                    0;
+            s.pendingWeekAdvance =
+                false;
 
-                sim.currentHOH =
-                    null;
+            s.pendingCycle =
+                false;
 
-                sim.currentNominees =
-                    [];
+            s.evictionsThisWeek =
+                0;
 
-                sim.currentPOVPlayers =
-                    [];
+            s.currentEventIndex =
+                0;
 
-                sim.currentPOVWinner =
-                    null;
+            s.engineEventIndex =
+                0;
 
-                sim.currentSafetyWinner =
-                    null;
+            s.currentHOH =
+                null;
 
-                sim.currentEviction =
-                    null;
+            s.currentSafetyWinner =
+                null;
 
-                sim.pendingEvictionId =
-                    null;
+            s.safetyWinner =
+                null;
 
-                sim.evictionVoteResult =
-                    null;
-            }
+            s.currentNominees =
+                [];
 
-            if (
-                typeof setText ===
-                "function"
-            ) {
-                setText(
-                    "current-week",
-                    nextWeek
-                );
-            }
+            s.currentPOVPlayers =
+                [];
 
-            if (
-                typeof updateSimulatorStatus ===
-                "function"
-            ) {
-                updateSimulatorStatus(
-                    sim
-                );
-            }
+            s.currentPOVWinner =
+                null;
 
-            if (
-                typeof resetGameChain ===
-                "function"
-            ) {
-                resetGameChain(0);
-            }
+            s.currentEviction =
+                null;
 
-            showEvent(
+            s.pendingEvictionId =
+                null;
+
+            s.evictionVoteResult =
+                null;
+
+
+            s.currentPhase =
+                "week";
+
+
+            refreshUI();
+
+
+            window.showEvent(
                 `Week ${nextWeek}`,
                 "WEEK",
                 `
@@ -3118,344 +1449,479 @@
                 }
             );
 
-            if (
-                typeof persistCurrentSeason ===
-                "function"
-            ) {
-                persistCurrentSeason();
-            }
+
+            save();
 
             return;
+
         }
 
+
         /*
-         * Finale.
+         * =====================================================
+         * FINALE
+         * =====================================================
          */
+
         if (
-            sim.currentPhase ===
-                "finale" ||
-            sim.finaleStarted
+            s.currentPhase === "finale" ||
+            s.finaleStarted
         ) {
-            const finaleChain =
-                typeof getFinaleChain ===
-                "function"
-                    ? getFinaleChain()
+
+            const chain =
+                window.getFinaleChain
+                    ? window.getFinaleChain()
                     : [];
+
 
             const index =
                 Number(
-                    sim.currentEventIndex || 0
+                    s.engineEventIndex ??
+                    s.currentEventIndex ??
+                    0
                 );
 
+
             const event =
-                finaleChain[index];
+                chain[index];
+
 
             if (!event) {
-                if (
-                    typeof beginFinale ===
-                    "function"
-                ) {
-                    beginFinale();
+
+                if (window.beginFinale) {
+                    window.beginFinale();
                 }
 
                 return;
+
             }
 
-            sim.renderingEventKey =
+
+            s.renderingEventKey =
                 event.key;
 
-            sim.renderingEventLabel =
+            s.renderingEventLabel =
                 event.label;
 
-            switch (event.key) {
-                case "final-hoh":
-                    runFinalHOHEvent();
-                    break;
-
-                case "jury-voting":
-                    runJuryVotingEvent();
-                    break;
-
-                case "finale-results":
-                    runFinaleResultsEvent();
-                    break;
-
-                default:
-                    sim.currentEventIndex++;
-            }
 
             if (
-                typeof persistCurrentSeason ===
-                "function"
+                event.key ===
+                "final-hoh"
             ) {
-                persistCurrentSeason();
+
+                window.runFinalHOHEvent();
+
+            } else if (
+                event.key ===
+                "jury-voting"
+            ) {
+
+                window.runJuryVotingEvent();
+
+            } else if (
+                event.key ===
+                "finale-results"
+            ) {
+
+                window.runFinaleResultsEvent();
+
             }
 
+
+            /*
+             * Finale functions use the old
+             * currentEventIndex.
+             *
+             * Keep the engine index synchronized.
+             */
+
+            s.engineEventIndex =
+                Number(
+                    s.currentEventIndex ||
+                    index + 1
+                );
+
+
+            refreshUI();
+            save();
+
             return;
+
         }
 
+
         /*
-         * -----------------------------------------------------
-         * THE IMPORTANT PART:
-         *
-         * ALWAYS use our clean chain.
-         * -----------------------------------------------------
+         * =====================================================
+         * REGULAR WEEK
+         * =====================================================
          */
-        const chain =
-            engineChain(
-                sim.currentWeek
+
+        const week =
+            Number(
+                s.currentWeek || 1
             );
 
-        const index =
-            Number(
-                sim.currentEventIndex || 0
+
+        const chain =
+            stableWeekEventChain(
+                week
             );
+
+
+        let index =
+            Number(
+                s.engineEventIndex ??
+                0
+            );
+
+
+        /*
+         * If this is an older save that doesn't have
+         * engineEventIndex, derive it from currentEventIndex.
+         */
+
+        if (
+            s.engineEventIndex === undefined ||
+            s.engineEventIndex === null
+        ) {
+
+            index =
+                Number(
+                    s.currentEventIndex ||
+                    0
+                );
+
+        }
+
 
         const event =
             chain[index];
 
-        /*
-         * Week finished.
-         */
-        if (!event) {
-            sim.pendingWeekAdvance =
-                true;
 
-            sim.pendingCycle =
-                "nextWeek";
+        /*
+         * End of chain.
+         */
+
+        if (!event) {
+
+            /*
+             * If this is a double eviction cycle,
+             * start another cycle in the same week.
+             */
 
             if (
-                typeof persistCurrentSeason ===
-                "function"
+                s.pendingCycle === "double"
             ) {
-                persistCurrentSeason();
+
+                s.pendingCycle =
+                    false;
+
+                s.engineEventIndex =
+                    0;
+
+                s.currentEventIndex =
+                    0;
+
+                s.currentHOH =
+                    null;
+
+                s.currentSafetyWinner =
+                    null;
+
+                s.safetyWinner =
+                    null;
+
+                s.currentNominees =
+                    [];
+
+                s.currentPOVPlayers =
+                    [];
+
+                s.currentPOVWinner =
+                    null;
+
+                s.currentEviction =
+                    null;
+
+                s.pendingEvictionId =
+                    null;
+
+                s.evictionVoteResult =
+                    null;
+
+
+                refreshUI();
+
+                save();
+
+                return;
+
             }
 
+
+            s.pendingWeekAdvance =
+                true;
+
+
+            refreshUI();
+            save();
+
             return;
+
         }
 
-        sim.viewingWeek =
-            Number(
-                sim.currentWeek || 1
-            );
 
-        sim.renderingEventKey =
+        /*
+         * Mark the event for history recording.
+         */
+
+        s.renderingEventKey =
             event.key;
 
-        sim.renderingEventLabel =
+        s.renderingEventLabel =
             event.label;
+
+
+        /*
+         * =====================================================
+         * DISPATCH
+         * =====================================================
+         */
 
         switch (event.key) {
 
+
             case "twist":
-                runTwistEventFixed(
-                    event.twistId
-                );
+
+                if (
+                    window.runTwistEvent
+                ) {
+
+                    window.runTwistEvent(
+                        event.twistId
+                    );
+
+                }
+
                 break;
+
 
             case "hoh":
-                runHOHEvent();
+
+                window.runHOHEvent();
+
                 break;
 
-            case "built-in-safety":
-                runBuiltInSafetyEvent();
-                break;
 
-            case "nominations":
-                runNominationEventFixed();
-                break;
+            case "safety":
 
-            case "pov-players":
-                runPOVPlayersEvent();
-                break;
-
-            case "pov":
-                runPOVEvent();
-                break;
-
-            case "veto-ceremony":
-                runVetoCeremonyEventFixed();
-                break;
-
-            case "custom-competition":
-                runCustomCompetitionEventFixed(
+                runStableSafetyEvent(
                     event.competitionId
                 );
+
                 break;
+
+
+            case "nominations":
+
+                runStableNominationEvent();
+
+                break;
+
+
+            case "pov-players":
+
+                window.runPOVPlayersEvent();
+
+                break;
+
+
+            case "pov":
+
+                window.runPOVEvent();
+
+                break;
+
+
+            case "veto-ceremony":
+
+                window.runVetoCeremonyEvent();
+
+                break;
+
+
+            case "custom-competition":
+
+                window.runCustomCompetitionEvent(
+                    event.competitionId
+                );
+
+                break;
+
 
             case "eviction-voting":
-                runEvictionVotingPortraitEvent();
+
+                runStableEvictionVotingEvent();
+
                 break;
+
 
             case "eviction":
-                runEvictionEventFixed();
+
+                /*
+                 * Before running the old eviction function,
+                 * ensure it has the correct target.
+                 */
+
+                window.runEvictionEvent();
+
+                /*
+                 * Detect a double eviction.
+                 */
+
+                if (
+                    s.evictionsThisWeek >= 1 &&
+                    season.rules?.doubleEvictionEnabled === true &&
+                    (
+                        season.rules?.doubleEvictionWeeks ||
+                        []
+                    )
+                        .map(Number)
+                        .includes(week) &&
+                    activePlayers().length >
+                        Number(
+                            season.rules?.finalists || 2
+                        )
+                ) {
+
+                    s.pendingCycle =
+                        "double";
+
+                    s.pendingWeekAdvance =
+                        false;
+
+                }
+
                 break;
+
 
             default:
-                sim.currentEventIndex++;
+
+                s.currentEventIndex++;
+
                 break;
+
         }
 
-        if (
-            typeof persistCurrentSeason ===
-            "function"
-        ) {
-            persistCurrentSeason();
-        }
+
+        /*
+         * Advance OUR engine index.
+         *
+         * The underlying legacy functions may have changed
+         * currentEventIndex themselves, so we deliberately
+         * keep engineEventIndex authoritative.
+         */
+
+        s.engineEventIndex =
+            index + 1;
+
+
+        /*
+         * If the eviction function already ended the week,
+         * let the next click start the next week.
+         */
 
         if (
-            typeof renderSimulationWeekNavigation ===
-            "function"
+            event.key === "eviction" &&
+            !s.pendingCycle
         ) {
-            renderSimulationWeekNavigation();
+
+            if (
+                s.currentPhase !== "finale" &&
+                activePlayers().length >
+                    Number(
+                        season.rules?.finalists || 2
+                    )
+            ) {
+
+                s.pendingWeekAdvance =
+                    true;
+
+            }
+
         }
 
-        if (
-            typeof renderMemoryWallMini ===
-            "function"
-        ) {
-            renderMemoryWallMini();
-        }
+
+        refreshUI();
+        save();
+
     }
 
-    /*
-     * ---------------------------------------------------------
-     * PORTRAIT CENTERING
-     * ---------------------------------------------------------
-     */
-    const style =
-        document.createElement("style");
-
-    style.textContent = `
-        #event-content,
-        .sim-main-panel #event-content {
-            text-align: center !important;
-        }
-
-        #event-content > div,
-        .sim-main-panel #event-content > div {
-            margin-left: auto !important;
-            margin-right: auto !important;
-        }
-
-        #event-content .sim-portrait-grid,
-        .sim-main-panel #event-content .sim-portrait-grid {
-            width: fit-content !important;
-            max-width: 100% !important;
-            margin-left: auto !important;
-            margin-right: auto !important;
-            justify-content: center !important;
-            align-self: center !important;
-        }
-
-        .sim-portrait {
-            margin-left: auto !important;
-            margin-right: auto !important;
-        }
-
-        .ceremony-role-section {
-            width: 100%;
-            text-align: center !important;
-        }
-
-        .eviction-voting-intro {
-            width: 100%;
-            max-width: 850px;
-            margin: 0 auto;
-            text-align: center;
-        }
-
-        .eviction-nominees {
-            width: fit-content;
-            max-width: 100%;
-            margin: 20px auto;
-        }
-
-        .eviction-live-votes {
-            width: min(850px, 100%);
-            margin: 25px auto;
-        }
-
-        .eviction-vote-card {
-            display: grid;
-            grid-template-columns:
-                minmax(110px, 1fr)
-                minmax(130px, auto)
-                minmax(110px, 1fr);
-
-            align-items: center;
-            justify-items: center;
-
-            gap: 25px;
-
-            width: 100%;
-
-            padding: 18px 10px;
-
-            border-bottom: 1px solid #4a4a4a;
-        }
-
-        .eviction-voter,
-        .eviction-target {
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            width: 100%;
-        }
-
-        .eviction-vote-arrow {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 7px;
-
-            text-align: center;
-        }
-
-        .eviction-vote-arrow span {
-            font-size: 10px;
-            font-weight: 900;
-            letter-spacing: .7px;
-            color: #aaa;
-        }
-
-        .eviction-vote-arrow strong {
-            font-size: 28px;
-            line-height: 1;
-        }
-
-        @media (max-width: 600px) {
-            .eviction-vote-card {
-                grid-template-columns:
-                    1fr;
-                gap: 10px;
-            }
-
-            .eviction-vote-arrow {
-                flex-direction: row;
-            }
-        }
-    `;
-
-    document.head.appendChild(style);
 
     /*
-     * ---------------------------------------------------------
-     * INSTALL THE CLEAN ENGINE
-     * ---------------------------------------------------------
+     * =========================================================
+     * PUBLIC OVERRIDES
+     * =========================================================
      */
+
     window.getWeekEventChain =
-        engineChain;
+        stableWeekEventChain;
+
 
     window.runNextEvent =
-        runNextEventClean;
+        runStableNextEvent;
+
 
     window.runEvictionVotingEvent =
-        runEvictionVotingPortraitEvent;
+        runStableEvictionVotingEvent;
 
-    console.log(
-        "Big Brother Simulator: clean event dispatcher loaded."
+
+    /*
+     * We also expose the stable versions so they can be
+     * called/debugged from the browser console.
+     */
+
+    window.runStableSafetyEvent =
+        runStableSafetyEvent;
+
+    window.runStableNominationEvent =
+        runStableNominationEvent;
+
+    window.runStableEvictionVotingEvent =
+        runStableEvictionVotingEvent;
+
+
+    /*
+     * Replace the navigation renderer.
+     */
+
+    window.renderSimulationWeekNavigation =
+        renderStableWeekNavigation;
+
+
+    /*
+     * Initial refresh once the script is loaded.
+     */
+
+    setTimeout(
+        function () {
+
+            try {
+
+                renderStableWeekNavigation();
+
+            } catch (error) {
+
+                console.error(
+                    "Stable engine initialization error:",
+                    error
+                );
+
+            }
+
+        },
+        0
     );
+
 
 })();
