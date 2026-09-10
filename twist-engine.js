@@ -2443,3 +2443,1019 @@
         }
     );
 })();
+
+/*
+ * =========================================================
+ * FINAL SIMULATION ENGINE OVERRIDE
+ * =========================================================
+ *
+ * This is intentionally placed LAST in twist-engine.js.
+ *
+ * It fixes:
+ *   1. Safety/Tropical Immunity occurring after POV
+ *   2. Special competitions occurring after POV
+ *   3. Eviction voting displaying the eviction result too early
+ *   4. Eviction voting portraits
+ *   5. Portrait centering
+ *   6. The old app.js event chain being re-used accidentally
+ *
+ * The existing app.js remains responsible for the individual
+ * competition/event mechanics.
+ * This block is the ONE owner of event order.
+ */
+
+(function () {
+    "use strict";
+
+    function engineState() {
+        if (!currentSeason) return null;
+
+        if (!currentSeason.simulation) {
+            currentSeason.simulation =
+                typeof createDefaultSimulation === "function"
+                    ? createDefaultSimulation()
+                    : {};
+        }
+
+        return currentSeason.simulation;
+    }
+
+    function engineChain(week) {
+        const sim = engineState();
+
+        if (!sim) return [];
+
+        const w = Number(
+            week || sim.currentWeek || 1
+        );
+
+        /*
+         * Finale is handled separately.
+         */
+        if (
+            sim.currentPhase === "finale" ||
+            sim.finaleStarted
+        ) {
+            return typeof getFinaleChain === "function"
+                ? getFinaleChain()
+                : [];
+        }
+
+        const chain = [];
+
+        /*
+         * -----------------------------------------------------
+         * TWISTS
+         * -----------------------------------------------------
+         */
+        if (
+            typeof getScheduledTwistsForWeekFixed ===
+            "function"
+        ) {
+            getScheduledTwistsForWeekFixed(w).forEach(
+                twist => {
+                    chain.push({
+                        key: "twist",
+                        label:
+                            twist.name || "Twist",
+                        twistId: twist.id
+                    });
+                }
+            );
+        }
+
+        /*
+         * -----------------------------------------------------
+         * HOH
+         * -----------------------------------------------------
+         */
+        const hoh =
+            typeof getCompetitionForWeekType ===
+            "function"
+                ? getCompetitionForWeekType(w, "hoh")
+                : null;
+
+        chain.push({
+            key: "hoh",
+            label:
+                hoh?.name ||
+                "HOH Competition"
+        });
+
+        /*
+         * -----------------------------------------------------
+         * SAFETY / TROPICAL IMMUNITY
+         *
+         * THIS MUST HAPPEN BEFORE NOMINATIONS.
+         * -----------------------------------------------------
+         */
+        const safetyCompetitions =
+            typeof getWeekCompetitions === "function"
+                ? getWeekCompetitions(w).filter(
+                      c => c && c.type === "safety"
+                  )
+                : [];
+
+        const safetyEnabled =
+            currentSeason?.rules
+                ?.safetyCompetitionEnabled === true;
+
+        if (
+            safetyEnabled ||
+            safetyCompetitions.length
+        ) {
+            if (safetyCompetitions.length) {
+                safetyCompetitions.forEach(comp => {
+                    chain.push({
+                        key: "custom-competition",
+                        label:
+                            comp.name ||
+                            "Safety Competition",
+                        competitionId: comp.id,
+                        competitionType: "safety"
+                    });
+                });
+            } else {
+                chain.push({
+                    key: "built-in-safety",
+                    label: "Safety Competition"
+                });
+            }
+        }
+
+        /*
+         * -----------------------------------------------------
+         * NOMINATIONS
+         * -----------------------------------------------------
+         */
+        chain.push({
+            key: "nominations",
+            label: "Nomination Ceremony"
+        });
+
+        /*
+         * -----------------------------------------------------
+         * VETO PLAYER SELECTION
+         * -----------------------------------------------------
+         */
+        chain.push({
+            key: "pov-players",
+            label: "Veto Selections"
+        });
+
+        /*
+         * -----------------------------------------------------
+         * POV
+         * -----------------------------------------------------
+         */
+        const pov =
+            typeof getCompetitionForWeekType ===
+            "function"
+                ? getCompetitionForWeekType(w, "pov")
+                : null;
+
+        chain.push({
+            key: "pov",
+            label:
+                pov?.name ||
+                "POV Competition"
+        });
+
+        /*
+         * -----------------------------------------------------
+         * VETO CEREMONY
+         * -----------------------------------------------------
+         */
+        chain.push({
+            key: "veto-ceremony",
+            label: "Veto Ceremony"
+        });
+
+        /*
+         * -----------------------------------------------------
+         * OTHER CUSTOM COMPETITIONS
+         *
+         * Safety competitions are deliberately excluded here
+         * because they were already inserted above.
+         * -----------------------------------------------------
+         */
+        const otherCompetitions =
+            typeof getWeekCompetitions === "function"
+                ? getWeekCompetitions(w).filter(
+                      c =>
+                          c &&
+                          (
+                              c.type === "special" ||
+                              c.type === "luxury"
+                          )
+                  )
+                : [];
+
+        otherCompetitions.forEach(comp => {
+            chain.push({
+                key: "custom-competition",
+                label:
+                    comp.name ||
+                    "Special Competition",
+                competitionId: comp.id,
+                competitionType: comp.type
+            });
+        });
+
+        /*
+         * -----------------------------------------------------
+         * EVICTION VOTING
+         * -----------------------------------------------------
+         */
+        chain.push({
+            key: "eviction-voting",
+            label: "Eviction Voting"
+        });
+
+        /*
+         * -----------------------------------------------------
+         * EVICTION RESULT
+         * -----------------------------------------------------
+         */
+        chain.push({
+            key: "eviction",
+            label: "Eviction"
+        });
+
+        return chain;
+    }
+
+    /*
+     * ---------------------------------------------------------
+     * EVICITON VOTING DISPLAY
+     * ---------------------------------------------------------
+     *
+     * Calculate votes here, but DO NOT announce who is evicted.
+     *
+     * The actual eviction result is displayed by the next
+     * "Eviction" event.
+     */
+    function runEvictionVotingPortraitEvent() {
+        const sim = engineState();
+
+        if (!sim) return;
+
+        const active =
+            typeof getActiveHouseguests === "function"
+                ? getActiveHouseguests()
+                : [];
+
+        const nominees =
+            (sim.currentNominees || [])
+                .map(id =>
+                    active.find(
+                        p => p.id === id
+                    )
+                )
+                .filter(Boolean);
+
+        if (nominees.length < 2) {
+            sim.currentEventIndex++;
+
+            if (
+                typeof resetGameChain ===
+                "function"
+            ) {
+                resetGameChain(
+                    sim.currentEventIndex
+                );
+            }
+
+            showEvent(
+                "Eviction Voting",
+                "EVICTION VOTING",
+                `
+                    <p>
+                        There are not enough nominees
+                        for a standard eviction vote.
+                    </p>
+                `
+            );
+
+            return;
+        }
+
+        const voters =
+            active.filter(
+                voter =>
+                    voter.id !== sim.currentHOH &&
+                    !nominees.some(
+                        nominee =>
+                            nominee.id === voter.id
+                    )
+            );
+
+        const votes = [];
+
+        voters.forEach(voter => {
+            const scores =
+                nominees
+                    .map(target => {
+                        const bond =
+                            typeof allianceBond ===
+                            "function"
+                                ? allianceBond(
+                                      voter.id,
+                                      target.id
+                                  )
+                                : 0;
+
+                        return {
+                            target,
+                            score:
+                                Math.max(
+                                    0.1,
+                                    10 -
+                                        bond +
+                                        Math.random() * 5
+                                )
+                        };
+                    })
+                    .sort(
+                        (a, b) =>
+                            b.score -
+                            a.score
+                    );
+
+            const target =
+                scores[0]?.target;
+
+            if (target) {
+                votes.push({
+                    voter: voter.id,
+                    target: target.id
+                });
+            }
+        });
+
+        const counts = {};
+
+        nominees.forEach(
+            nominee => {
+                counts[nominee.id] = 0;
+            }
+        );
+
+        votes.forEach(vote => {
+            counts[vote.target] =
+                Number(
+                    counts[vote.target] || 0
+                ) + 1;
+        });
+
+        /*
+         * Store the vote result for the NEXT event.
+         * Do not display the result here.
+         */
+        const sorted =
+            nominees
+                .slice()
+                .sort(
+                    (a, b) =>
+                        (counts[b.id] || 0) -
+                        (counts[a.id] || 0)
+                );
+
+        const target =
+            sorted[0];
+
+        const other =
+            sorted[1];
+
+        sim.pendingEvictionId =
+            target?.id || null;
+
+        sim.evictionVoteResult = {
+            target:
+                target?.id || null,
+            targetVotes:
+                target
+                    ? counts[target.id] || 0
+                    : 0,
+            other:
+                other?.id || null,
+            otherVotes:
+                other
+                    ? counts[other.id] || 0
+                    : 0,
+            totalVotes:
+                votes.length,
+            votes
+        };
+
+        /*
+         * Advance to the actual Eviction event.
+         */
+        sim.currentEventIndex++;
+
+        if (
+            typeof updateSimulatorStatus ===
+            "function"
+        ) {
+            updateSimulatorStatus(sim);
+        }
+
+        if (
+            typeof resetGameChain ===
+            "function"
+        ) {
+            resetGameChain(
+                sim.currentEventIndex
+            );
+        }
+
+        /*
+         * -----------------------------------------------------
+         * PORTRAIT-BASED VOTE DISPLAY
+         * -----------------------------------------------------
+         */
+        const voteRows =
+            votes.map(vote => {
+                const voter =
+                    typeof getHouseguestForSimulation ===
+                    "function"
+                        ? getHouseguestForSimulation(
+                              vote.voter
+                          )
+                        : null;
+
+                const voted =
+                    typeof getHouseguestForSimulation ===
+                    "function"
+                        ? getHouseguestForSimulation(
+                              vote.target
+                          )
+                        : null;
+
+                if (!voter || !voted) {
+                    return "";
+                }
+
+                return `
+                    <div class="eviction-vote-card">
+
+                        <div class="eviction-voter">
+                            ${simulationPortrait(
+                                voter,
+                                "medium"
+                            )}
+                        </div>
+
+                        <div class="eviction-vote-arrow">
+                            <span>VOTES TO EVICT</span>
+                            <strong>→</strong>
+                        </div>
+
+                        <div class="eviction-target">
+                            ${simulationPortrait(
+                                voted,
+                                "medium"
+                            )}
+                        </div>
+
+                    </div>
+                `;
+            }).join("");
+
+        showEvent(
+            "Eviction Voting",
+            "EVICTION VOTING",
+            `
+                <div class="eviction-voting-intro">
+
+                    <h3>
+                        The Houseguests Cast Their Votes
+                    </h3>
+
+                    <div class="eviction-nominees">
+                        ${simulationPortraits(
+                            nominees.map(
+                                nominee =>
+                                    nominee.id
+                            ),
+                            "large"
+                        )}
+                    </div>
+
+                </div>
+
+                <div class="eviction-live-votes">
+                    ${voteRows ||
+                    "<p>No eligible voters.</p>"}
+                </div>
+            `
+        );
+    }
+
+    /*
+     * ---------------------------------------------------------
+     * FINAL EVENT DISPATCHER
+     * ---------------------------------------------------------
+     *
+     * IMPORTANT:
+     *
+     * We DO NOT call the old runNextEvent here.
+     *
+     * That was the source of the safety-order bug because the
+     * old function calls the old app.js getWeekEventChain().
+     */
+    function runNextEventClean() {
+        if (!currentSeason) {
+            alert(
+                "Please open a saved season first."
+            );
+            return;
+        }
+
+        const sim =
+            engineState();
+
+        if (!sim) return;
+
+        /*
+         * History mode does not alter the simulation.
+         */
+        if (
+            sim.isViewingHistory
+        ) {
+            if (
+                typeof returnToCurrentSimulation ===
+                "function"
+            ) {
+                returnToCurrentSimulation();
+            }
+
+            return;
+        }
+
+        /*
+         * Start the next week only after the current eviction
+         * screen has already been displayed.
+         */
+        if (
+            sim.pendingWeekAdvance
+        ) {
+            const nextWeek =
+                Number(
+                    sim.currentWeek || 1
+                ) + 1;
+
+            if (
+                nextWeek >
+                getSeasonLength(
+                    currentSeason
+                )
+            ) {
+                if (
+                    typeof beginFinale ===
+                    "function"
+                ) {
+                    beginFinale();
+                } else if (
+                    typeof finalizeSeason ===
+                    "function"
+                ) {
+                    finalizeSeason(
+                        getActiveHouseguests()
+                    );
+                }
+
+                return;
+            }
+
+            if (
+                typeof resetCycleForNewHOH ===
+                "function"
+            ) {
+                resetCycleForNewHOH(
+                    sim,
+                    nextWeek
+                );
+            } else {
+                sim.currentWeek =
+                    nextWeek;
+
+                sim.viewingWeek =
+                    nextWeek;
+
+                sim.pendingWeekAdvance =
+                    false;
+
+                sim.pendingCycle =
+                    null;
+
+                sim.currentEventIndex =
+                    0;
+
+                sim.currentHOH =
+                    null;
+
+                sim.currentNominees =
+                    [];
+
+                sim.currentPOVPlayers =
+                    [];
+
+                sim.currentPOVWinner =
+                    null;
+
+                sim.currentSafetyWinner =
+                    null;
+
+                sim.currentEviction =
+                    null;
+
+                sim.pendingEvictionId =
+                    null;
+
+                sim.evictionVoteResult =
+                    null;
+            }
+
+            if (
+                typeof setText ===
+                "function"
+            ) {
+                setText(
+                    "current-week",
+                    nextWeek
+                );
+            }
+
+            if (
+                typeof updateSimulatorStatus ===
+                "function"
+            ) {
+                updateSimulatorStatus(
+                    sim
+                );
+            }
+
+            if (
+                typeof resetGameChain ===
+                "function"
+            ) {
+                resetGameChain(0);
+            }
+
+            showEvent(
+                `Week ${nextWeek}`,
+                "WEEK",
+                `
+                    <p>
+                        Week ${nextWeek}
+                        is now beginning.
+                    </p>
+                `,
+                {
+                    skipHistory: true,
+                    week: nextWeek
+                }
+            );
+
+            if (
+                typeof persistCurrentSeason ===
+                "function"
+            ) {
+                persistCurrentSeason();
+            }
+
+            return;
+        }
+
+        /*
+         * Finale.
+         */
+        if (
+            sim.currentPhase ===
+                "finale" ||
+            sim.finaleStarted
+        ) {
+            const finaleChain =
+                typeof getFinaleChain ===
+                "function"
+                    ? getFinaleChain()
+                    : [];
+
+            const index =
+                Number(
+                    sim.currentEventIndex || 0
+                );
+
+            const event =
+                finaleChain[index];
+
+            if (!event) {
+                if (
+                    typeof beginFinale ===
+                    "function"
+                ) {
+                    beginFinale();
+                }
+
+                return;
+            }
+
+            sim.renderingEventKey =
+                event.key;
+
+            sim.renderingEventLabel =
+                event.label;
+
+            switch (event.key) {
+                case "final-hoh":
+                    runFinalHOHEvent();
+                    break;
+
+                case "jury-voting":
+                    runJuryVotingEvent();
+                    break;
+
+                case "finale-results":
+                    runFinaleResultsEvent();
+                    break;
+
+                default:
+                    sim.currentEventIndex++;
+            }
+
+            if (
+                typeof persistCurrentSeason ===
+                "function"
+            ) {
+                persistCurrentSeason();
+            }
+
+            return;
+        }
+
+        /*
+         * -----------------------------------------------------
+         * THE IMPORTANT PART:
+         *
+         * ALWAYS use our clean chain.
+         * -----------------------------------------------------
+         */
+        const chain =
+            engineChain(
+                sim.currentWeek
+            );
+
+        const index =
+            Number(
+                sim.currentEventIndex || 0
+            );
+
+        const event =
+            chain[index];
+
+        /*
+         * Week finished.
+         */
+        if (!event) {
+            sim.pendingWeekAdvance =
+                true;
+
+            sim.pendingCycle =
+                "nextWeek";
+
+            if (
+                typeof persistCurrentSeason ===
+                "function"
+            ) {
+                persistCurrentSeason();
+            }
+
+            return;
+        }
+
+        sim.viewingWeek =
+            Number(
+                sim.currentWeek || 1
+            );
+
+        sim.renderingEventKey =
+            event.key;
+
+        sim.renderingEventLabel =
+            event.label;
+
+        switch (event.key) {
+
+            case "twist":
+                runTwistEventFixed(
+                    event.twistId
+                );
+                break;
+
+            case "hoh":
+                runHOHEvent();
+                break;
+
+            case "built-in-safety":
+                runBuiltInSafetyEvent();
+                break;
+
+            case "nominations":
+                runNominationEventFixed();
+                break;
+
+            case "pov-players":
+                runPOVPlayersEvent();
+                break;
+
+            case "pov":
+                runPOVEvent();
+                break;
+
+            case "veto-ceremony":
+                runVetoCeremonyEventFixed();
+                break;
+
+            case "custom-competition":
+                runCustomCompetitionEventFixed(
+                    event.competitionId
+                );
+                break;
+
+            case "eviction-voting":
+                runEvictionVotingPortraitEvent();
+                break;
+
+            case "eviction":
+                runEvictionEventFixed();
+                break;
+
+            default:
+                sim.currentEventIndex++;
+                break;
+        }
+
+        if (
+            typeof persistCurrentSeason ===
+            "function"
+        ) {
+            persistCurrentSeason();
+        }
+
+        if (
+            typeof renderSimulationWeekNavigation ===
+            "function"
+        ) {
+            renderSimulationWeekNavigation();
+        }
+
+        if (
+            typeof renderMemoryWallMini ===
+            "function"
+        ) {
+            renderMemoryWallMini();
+        }
+    }
+
+    /*
+     * ---------------------------------------------------------
+     * PORTRAIT CENTERING
+     * ---------------------------------------------------------
+     */
+    const style =
+        document.createElement("style");
+
+    style.textContent = `
+        #event-content,
+        .sim-main-panel #event-content {
+            text-align: center !important;
+        }
+
+        #event-content > div,
+        .sim-main-panel #event-content > div {
+            margin-left: auto !important;
+            margin-right: auto !important;
+        }
+
+        #event-content .sim-portrait-grid,
+        .sim-main-panel #event-content .sim-portrait-grid {
+            width: fit-content !important;
+            max-width: 100% !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
+            justify-content: center !important;
+            align-self: center !important;
+        }
+
+        .sim-portrait {
+            margin-left: auto !important;
+            margin-right: auto !important;
+        }
+
+        .ceremony-role-section {
+            width: 100%;
+            text-align: center !important;
+        }
+
+        .eviction-voting-intro {
+            width: 100%;
+            max-width: 850px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .eviction-nominees {
+            width: fit-content;
+            max-width: 100%;
+            margin: 20px auto;
+        }
+
+        .eviction-live-votes {
+            width: min(850px, 100%);
+            margin: 25px auto;
+        }
+
+        .eviction-vote-card {
+            display: grid;
+            grid-template-columns:
+                minmax(110px, 1fr)
+                minmax(130px, auto)
+                minmax(110px, 1fr);
+
+            align-items: center;
+            justify-items: center;
+
+            gap: 25px;
+
+            width: 100%;
+
+            padding: 18px 10px;
+
+            border-bottom: 1px solid #4a4a4a;
+        }
+
+        .eviction-voter,
+        .eviction-target {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            width: 100%;
+        }
+
+        .eviction-vote-arrow {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+
+            text-align: center;
+        }
+
+        .eviction-vote-arrow span {
+            font-size: 10px;
+            font-weight: 900;
+            letter-spacing: .7px;
+            color: #aaa;
+        }
+
+        .eviction-vote-arrow strong {
+            font-size: 28px;
+            line-height: 1;
+        }
+
+        @media (max-width: 600px) {
+            .eviction-vote-card {
+                grid-template-columns:
+                    1fr;
+                gap: 10px;
+            }
+
+            .eviction-vote-arrow {
+                flex-direction: row;
+            }
+        }
+    `;
+
+    document.head.appendChild(style);
+
+    /*
+     * ---------------------------------------------------------
+     * INSTALL THE CLEAN ENGINE
+     * ---------------------------------------------------------
+     */
+    window.getWeekEventChain =
+        engineChain;
+
+    window.runNextEvent =
+        runNextEventClean;
+
+    window.runEvictionVotingEvent =
+        runEvictionVotingPortraitEvent;
+
+    console.log(
+        "Big Brother Simulator: clean event dispatcher loaded."
+    );
+
+})();
