@@ -2939,3 +2939,97 @@ select {
         grid-template-columns: 45px 1fr;
     }
 }
+
+
+/* =========================================================
+   STABLE ENGINE V5 — FINAL OVERRIDES
+   ========================================================= */
+
+.sim-main-panel .event-display,
+.sim-main-panel #event-content {
+    background: #11141b !important;
+    color: #949cab;
+}
+
+.sim-main-panel #event-content {
+    min-height: 220px;
+    box-sizing: border-box;
+}
+
+.stable-voting-screen,
+.stable-vote-list,
+.stable-vote-row,
+.stable-vote-tally,
+.stable-vote-tally-item {
+    background: transparent !important;
+}
+
+.stable-vote-row {
+    background: #242424 !important;
+    color: #ddd !important;
+}
+
+.stable-vote-row * {
+    color: inherit;
+}
+
+.stable-voting-screen {
+    padding: 8px 0 20px;
+}
+
+.stable-vote-list {
+    max-height: none;
+    overflow: visible;
+}
+
+.stable-inline-memory-wall {
+    margin-top: 24px;
+}
+
+.stable-results-wall-title {
+    margin: 28px 0 12px;
+    text-align: center;
+}
+
+.bb-final-memory-wall {
+    width: min(950px, 100%);
+    margin-left: auto !important;
+    margin-right: auto !important;
+    justify-content: center;
+}
+
+.bb-final-memory-card {
+    overflow: hidden;
+}
+
+.bb-final-memory-card .sim-portrait {
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
+
+.chain-step.completed {
+    color: #8f96a5;
+}
+
+.chain-step.pending {
+    color: #555d6d;
+}
+
+.chain-step.active {
+    color: #fff;
+    font-weight: 900;
+}
+
+@media (max-width: 700px) {
+    .stable-vote-row {
+        grid-template-columns: 1fr;
+    }
+
+    .stable-vote-middle {
+        flex-direction: row;
+    }
+
+    .bb-final-memory-wall {
+        grid-template-columns: repeat(2, minmax(120px, 1fr));
+    }
+}
