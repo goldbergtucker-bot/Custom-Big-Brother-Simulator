@@ -3033,3 +3033,40 @@ select {
         grid-template-columns: repeat(2, minmax(120px, 1fr));
     }
 }
+
+
+/* =========================================================
+   FINAL 3 / NOMINATION CEREMONY FIXES — 2026-09-10
+   ========================================================= */
+
+/* The ceremony itself is a full-width flex column. This centers the HOH
+   portrait even though #event-content forces its direct child div to 100%. */
+.stable-ceremony {
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    text-align: center !important;
+}
+
+.stable-ceremony > .sim-portrait,
+.stable-ceremony .sim-portrait-grid {
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
+
+.stable-ceremony .sim-portrait-grid {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+    align-items: flex-start !important;
+    width: fit-content !important;
+    max-width: 100% !important;
+}
+
+.stable-ceremony h2,
+.stable-ceremony h3,
+.stable-ceremony p {
+    text-align: center !important;
+}
