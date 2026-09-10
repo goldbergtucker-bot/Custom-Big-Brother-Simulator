@@ -6742,14 +6742,7 @@ function showEvent(title, type, content, options = {}) {
         sim.renderingEventKey = null;
         sim.renderingEventLabel = null;
     }
-    /* The stable engine is loaded after app.js. Its navigation renderer must
-       get the final word because this function is lexically bound inside
-       app.js event handlers (they do not call window.showEvent). */
-    if (typeof window.renderSimulationWeekNavigation === "function") {
-        window.renderSimulationWeekNavigation();
-    } else {
-        renderSimulationWeekNavigation();
-    }
+    renderSimulationWeekNavigation();
     renderMemoryWallMini();
     updateProceedButtonForViewMode();
 }
