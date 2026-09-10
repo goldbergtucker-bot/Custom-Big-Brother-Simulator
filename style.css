@@ -3070,24 +3070,3 @@ select {
 .stable-ceremony p {
     text-align: center !important;
 }
-
-/* =========================================================
-   EVICTION PORTRAIT CENTERING — FINAL SMALL FIX
-   ========================================================= */
-
-/* The evicted houseguest portrait is a direct child of #event-content.
-   Force that single portrait to occupy its own centered block so it cannot
-   inherit the event layout's left alignment. */
-.sim-main-panel #event-content > .sim-portrait {
-    display: block !important;
-    width: 120px !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
-    text-align: center !important;
-}
-
-.sim-main-panel #event-content > .sim-portrait img,
-.sim-main-panel #event-content > .sim-portrait .sim-portrait-placeholder {
-    margin-left: auto !important;
-    margin-right: auto !important;
-}
