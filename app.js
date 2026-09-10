@@ -60,7 +60,7 @@ const RELATIONSHIP_KEYS = [
 
 let savedSeasons = [];
 
-let currentSeason = null;
+var currentSeason = null;
 
 let editingSeasonId = null;
 
