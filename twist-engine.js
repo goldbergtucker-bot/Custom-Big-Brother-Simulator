@@ -343,11 +343,10 @@
         const isDouble = season.rules?.doubleEvictionEnabled === true &&
             (season.rules?.doubleEvictionWeeks || []).map(Number).includes(week);
 
+        const voteCount = Number(s.evictionVoteResult?.targetVotes || 0);
         s.pendingEvictionId = null;
         s.evictionVoteResult = null;
         s.currentEventIndex = stableWeekEventChain(week).length;
-
-        const voteCount = Number(s.evictionVoteResult?.targetVotes || 0);
 
         if (remaining.length <= finalists) {
             s.pendingCycle = "finale";
@@ -740,4 +739,424 @@
     }, 0));
 
     console.log("Stable Big Brother engine loaded.");
+})();
+
+/* =========================================================
+   FINAL STABILITY PATCH — EVENT NAVIGATION / FINALE / RESULTS
+   =========================================================
+
+   The simulator uses currentEventIndex as the NEXT event to run.  The old
+   navigation treated that index as the event currently being displayed,
+   which made the left rail jump ahead (for example, HOH content with
+   Nominations highlighted).  The patch below makes the rail show the event
+   that just happened as NOW and everything after it as pending.
+
+   The finale is also an explicit five-event chain:
+     Final HOH Part 1
+     Final HOH Part 2
+     Final HOH Part 3
+     Jury Voting
+     Final Results
+*/
+(function () {
+    "use strict";
+
+    const season = () => window.currentSeason || null;
+    const sim = () => season()?.simulation || null;
+    const esc = value => window.escapeHTML ? window.escapeHTML(String(value ?? "")) : String(value ?? "");
+    const player = id => (season()?.houseguests || []).find(p => p.id === id) || null;
+    const active = () => window.getActiveHouseguests ? window.getActiveHouseguests() : [];
+    const name = id => window.getHouseguestDisplayName
+        ? window.getHouseguestDisplayName(id, season()?.houseguests || [])
+        : (player(id)?.name || "Unknown");
+    const portraits = (ids, size) => window.simulationPortraits ? window.simulationPortraits(ids, size) : "";
+    const portrait = (p, size) => window.simulationPortrait ? window.simulationPortrait(p, size) : "";
+
+    function finalCompetitions() {
+        const list = season()?.competitions?.finalHoh;
+        return Array.isArray(list) ? list : [];
+    }
+
+    function finalCompetition(part) {
+        return finalCompetitions()[part - 1] || null;
+    }
+
+    function finaleChain() {
+        const s = sim();
+        const finalists = (s?.finalists || []).map(player).filter(Boolean);
+        if (finalists.length >= 3) {
+            return [
+                { key: "final-hoh-1", label: finalCompetition(1)?.name || "Final HOH Part 1" },
+                { key: "final-hoh-2", label: finalCompetition(2)?.name || "Final HOH Part 2" },
+                { key: "final-hoh-3", label: finalCompetition(3)?.name || "Final HOH Part 3" },
+                { key: "jury-voting", label: "Jury Voting" },
+                { key: "finale-results", label: "Final Results" }
+            ];
+        }
+        return [
+            { key: "jury-voting", label: "Jury Voting" },
+            { key: "finale-results", label: "Final Results" }
+        ];
+    }
+
+    function show(title, type, content, options = {}) {
+        if (window.showEvent) window.showEvent(title, type, content, options);
+    }
+
+    /* Correct left-side navigation. currentEventIndex is the NEXT event. */
+    function renderNavigation() {
+        const container = document.getElementById("sim-week-navigation");
+        const s = sim();
+        const ss = season();
+        if (!container || !s || !ss) return;
+
+        const maxWeeks = Number(window.getSeasonLength ? window.getSeasonLength(ss) : 1) || 1;
+        const currentWeek = Number(s.currentWeek || 1);
+        const viewingWeek = Number(s.viewingWeek || currentWeek);
+        const history = Array.isArray(s.history) ? s.history.slice().sort((a,b) => Number(a.sequence||0)-Number(b.sequence||0)) : [];
+        const html = [];
+
+        for (let w = 1; w <= maxWeeks; w++) {
+            const isCurrent = w === currentWeek;
+            const isViewing = w === viewingWeek;
+            const items = history.filter(h => Number(h.week) === w);
+            const isFinaleWeek = isCurrent && (s.currentPhase === "finale" || s.finaleStarted);
+
+            html.push(`<div class="sim-week-block ${isCurrent ? "current" : ""} ${isViewing ? "viewing" : ""} ${w < currentWeek ? "past" : ""}>`);
+            html.push(`<button type="button" class="sim-week-label" data-sim-week="${w}">Week ${w}</button>`);
+
+            if (isViewing) {
+                html.push(`<div class="sim-event-list">`);
+
+                items.forEach((item, i) => {
+                    /* The most recently displayed live event is NOW. */
+                    const isNow = !s.isViewingHistory && i === items.length - 1 && w === currentWeek;
+                    html.push(
+                        `<button type="button" class="sim-event-nav completed ${isNow ? "now" : ""}" data-history-week="${w}" data-history-index="${i}">` +
+                        `<span>${esc(item.label || item.title || "Event")}</span>${isNow ? `<small>NOW</small>` : ""}</button>`
+                    );
+                });
+
+                if (isCurrent && !s.isViewingHistory && !s.pendingWeekAdvance && !s.pendingCycle) {
+                    const chain = (s.currentPhase === "finale" || s.finaleStarted)
+                        ? finaleChain()
+                        : stableWeekChain(w);
+                    const nextIndex = Number(s.currentEventIndex || 0);
+                    chain.slice(nextIndex).forEach(item => {
+                        html.push(`<div class="sim-event-nav pending"><span>${esc(item.label)}</span></div>`);
+                    });
+                }
+
+                html.push(`</div>`);
+            }
+            html.push(`</div>`);
+        }
+
+        container.innerHTML = html.join("");
+        container.querySelectorAll("[data-sim-week]").forEach(btn => {
+            btn.addEventListener("click", () => window.viewSimulationWeek?.(Number(btn.dataset.simWeek)));
+        });
+        container.querySelectorAll("[data-history-week]").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const w = Number(btn.dataset.historyWeek);
+                const i = Number(btn.dataset.historyIndex);
+                const items = history.filter(h => Number(h.week) === w);
+                const item = items[i];
+                if (item) window.showHistoricalSimulationEvent?.(item);
+            });
+        });
+    }
+
+    function stableWeekChain(week) {
+        const s = season();
+        const chain = [];
+        if (!s) return chain;
+        (window.getScheduledTwistsForWeek?.(Number(week)) || []).forEach(t => chain.push({key:"twist", label:t.name || "Twist", twistId:t.id}));
+        const hoh = window.getCompetitionForWeekType?.(Number(week), "hoh");
+        const pov = window.getCompetitionForWeekType?.(Number(week), "pov");
+        chain.push({key:"hoh", label:hoh?.name || "HOH Competition"});
+        (window.getWeekCompetitions?.(Number(week)) || []).filter(c => String(c.type||"").toLowerCase()==="safety").forEach(c => chain.push({key:"safety", label:c.name || "Safety Competition", competitionId:c.id}));
+        chain.push({key:"nominations", label:"Nomination Ceremony"});
+        if (s.rules?.vetoEnabled !== false) {
+            chain.push({key:"pov-players", label:"Veto Selections"});
+            chain.push({key:"pov", label:pov?.name || "POV Competition"});
+            chain.push({key:"veto-ceremony", label:"Veto Ceremony"});
+        }
+        (window.getWeekCompetitions?.(Number(week)) || []).filter(c => ["special","luxury"].includes(String(c.type||"").toLowerCase())).forEach(c => chain.push({key:"custom-competition", label:c.name || "Special Competition", competitionId:c.id}));
+        chain.push({key:"eviction-voting", label:"Eviction Voting"}, {key:"eviction", label:"Eviction"});
+        return chain;
+    }
+
+    /* ---------------------------------------------------------
+       Final HOH — three genuinely separate events.
+       --------------------------------------------------------- */
+    function runFinalHOHPart(part) {
+        const ss = season();
+        const s = sim();
+        if (!ss || !s) return;
+
+        const finalists = (s.finalists || []).map(player).filter(Boolean);
+        if (finalists.length < 3) {
+            s.currentEventIndex++;
+            show("Final HOH", "FINAL HOH", "<p>There are fewer than three finalists, so the three-part Final HOH is skipped.</p>");
+            return;
+        }
+
+        let contestants;
+        if (part === 1) {
+            contestants = finalists.slice(0, 3);
+        } else if (part === 2) {
+            const p1 = player(s.finalHOHPart1);
+            contestants = finalists.filter(p => p.id !== p1?.id);
+        } else {
+            const p1 = player(s.finalHOHPart1);
+            const p2 = player(s.finalHOHPart2);
+            contestants = [p1, p2].filter(Boolean);
+        }
+
+        if (contestants.length < 2) {
+            s.currentEventIndex++;
+            return;
+        }
+
+        const comp = finalCompetition(part);
+        let winner = null;
+        if (comp && window.chooseCompetitionWinnerByCustom) winner = window.chooseCompetitionWinnerByCustom(contestants, comp);
+        if (!winner && window.chooseCompetitionWinner) winner = window.chooseCompetitionWinner(contestants, "mental", "social", "general");
+        if (!winner) winner = contestants[Math.floor(Math.random() * contestants.length)];
+
+        s[`finalHOHPart${part}`] = winner.id;
+        s.finalHOH = winner.id;
+        s.currentEventIndex++;
+
+        const title = comp?.name || `Final HOH Part ${part}`;
+        show(
+            title,
+            "FINAL HOH COMPETITION",
+            `${portrait(winner, "large")}<p><strong>${esc(name(winner.id))}</strong> has won <strong>${esc(title)}</strong>.</p>` +
+            `<p>Final HOH Part ${part} is complete.</p>` +
+            (comp?.description ? `<p class="event-description">${esc(comp.description)}</p>` : "")
+        );
+    }
+
+    function runFinalHOH1() { runFinalHOHPart(1); }
+    function runFinalHOH2() { runFinalHOHPart(2); }
+    function runFinalHOH3() { runFinalHOHPart(3); }
+
+    /* The final HOH winner chooses which of the other two goes to jury. */
+    function runFinalJuryVoting() {
+        const ss = season();
+        const s = sim();
+        if (!ss || !s) return;
+        let finalists = (s.finalists || []).map(player).filter(Boolean);
+
+        if (finalists.length > 2) {
+            const finalHOH = player(s.finalHOHPart3 || s.finalHOH) || finalists[0];
+            const eligible = finalists.filter(p => p.id !== finalHOH.id);
+            let chosen = eligible[0];
+            if (eligible.length > 1) {
+                chosen = eligible.slice().sort((a,b) => {
+                    const ba = window.allianceBond ? Number(window.allianceBond(finalHOH.id, a.id) || 0) : 0;
+                    const bb = window.allianceBond ? Number(window.allianceBond(finalHOH.id, b.id) || 0) : 0;
+                    return bb - ba;
+                })[0];
+            }
+            const evicted = eligible.find(p => p.id !== chosen.id);
+            if (evicted) {
+                evicted.status = "evicted";
+                evicted.placement = 3;
+                if (!Array.isArray(s.finalPlacements)) s.finalPlacements = [];
+                if (!s.finalPlacements.some(x => x.id === evicted.id)) {
+                    s.finalPlacements.push({id:evicted.id, name:name(evicted.id), placement:3});
+                }
+            }
+            finalists = [finalHOH, chosen].filter(Boolean);
+            s.finalists = finalists.map(p => p.id);
+        }
+
+        if (!Array.isArray(s.jury) || !s.jury.length) {
+            s.jury = window.getJuryMembers ? window.getJuryMembers() : [];
+        }
+
+        const votes = [];
+        s.jury.forEach(jid => {
+            const juror = player(jid);
+            if (!juror || finalists.length === 0) return;
+            const scored = finalists.map(f => ({
+                id:f.id,
+                score:
+                    Number(f.ratings?.social || 0) * .40 +
+                    Number(f.ratings?.strategic || 0) * .35 +
+                    Number(f.ratings?.general || 0) * .15 +
+                    Number(f.ratings?.mental || 0) * .10 +
+                    (window.allianceBond ? Number(window.allianceBond(jid, f.id) || 0) * .15 : 0) +
+                    Math.random() * 3
+            })).sort((a,b) => b.score - a.score);
+            votes.push({juror:jid, vote:scored[0]?.id || finalists[0].id});
+        });
+
+        const counts = {};
+        finalists.forEach(f => counts[f.id] = 0);
+        votes.forEach(v => counts[v.vote] = Number(counts[v.vote] || 0) + 1);
+        s.juryVotes = votes;
+        s.finaleVoteResults = {votes, counts};
+        s.currentEventIndex++;
+
+        const rows = votes.map(v => `<div class="jury-vote-row"><div class="jury-vote-person">${portrait(player(v.juror),"small")}</div><strong>${esc(name(v.juror))}</strong><span>votes for</span><strong>${esc(name(v.vote))}</strong></div>`).join("");
+        show("Jury Voting", "JURY VOTING", `<div class="jury-finalists">${portraits(finalists.map(p=>p.id),"large")}</div><h3>The Jury Votes</h3><div class="jury-vote-list">${rows || "<p>No jury members were eligible to vote.</p>"}</div><p>Press <strong>Proceed</strong> to reveal the Final Results.</p>`);
+    }
+
+    function buildAllPlacements() {
+        const ss = season();
+        const s = sim();
+        if (!ss || !s) return [];
+        const map = new Map();
+        (s.finalPlacements || []).forEach(x => {
+            if (x?.id) map.set(x.id, {id:x.id, name:name(x.id), placement:Number(x.placement || 0)});
+        });
+        (ss.houseguests || []).forEach(p => {
+            if (p.placement != null && Number(p.placement) > 0) {
+                map.set(p.id, {id:p.id, name:name(p.id), placement:Number(p.placement)});
+            }
+        });
+        const finalists = (s.finalists || []).map(player).filter(Boolean);
+        const counts = s.finaleVoteResults?.counts || {};
+        const ranked = finalists.slice().sort((a,b)=>(counts[b.id]||0)-(counts[a.id]||0));
+        if (ranked[0]) map.set(ranked[0].id,{id:ranked[0].id,name:name(ranked[0].id),placement:1});
+        if (ranked[1]) map.set(ranked[1].id,{id:ranked[1].id,name:name(ranked[1].id),placement:2});
+        const all = (ss.houseguests || []).slice().sort((a,b)=>Number(a.placement||99)-Number(b.placement||99));
+        all.forEach(p => {
+            if (!map.has(p.id) && p.status !== "active") {
+                /* Fallback only for legacy seasons that never stored placement. */
+                const existing = [...map.values()].filter(x=>x.placement>0).length;
+                map.set(p.id,{id:p.id,name:name(p.id),placement:existing ? Math.min(16, 16-existing) : 0});
+            }
+        });
+        return [...map.values()].filter(x=>x.placement>0).sort((a,b)=>a.placement-b.placement);
+    }
+
+    function renderFinalPlacementsMemoryWall() {
+        const container = document.getElementById("final-placements");
+        if (!container) return;
+        const placements = buildAllPlacements();
+        if (!placements.length) {
+            container.innerHTML = `<div class="empty-state"><h3>No Placements Yet</h3><p>Finish the simulation to see final placements.</p></div>`;
+            return;
+        }
+        container.innerHTML = `<div class="final-memory-wall">${placements.map(p => {
+            const hg = player(p.id);
+            const placeLabel = p.placement === 1 ? "1ST PLACE" : p.placement === 2 ? "2ND PLACE" : p.placement === 3 ? "3RD PLACE" : `${p.placement}TH PLACE`;
+            return `<article class="final-memory-card place-${p.placement}"><div class="final-memory-rank">${esc(placeLabel)}</div>${portrait(hg,"medium")}<div class="final-memory-name">${esc(p.name)}</div></article>`;
+        }).join("")}</div>`;
+    }
+
+    function runFinalResults() {
+        const ss = season();
+        const s = sim();
+        if (!ss || !s) return;
+        const finalists = (s.finalists || []).map(player).filter(Boolean);
+        const counts = s.finaleVoteResults?.counts || {};
+        const ranked = finalists.slice().sort((a,b)=>(counts[b.id]||0)-(counts[a.id]||0));
+        const winner = ranked[0] || null;
+        const runner = ranked[1] || null;
+        if (winner) { winner.status="winner"; winner.placement=1; s.winner=winner.id; }
+        if (runner) { runner.status="runner-up"; runner.placement=2; s.runnerUp=runner.id; }
+        if (winner && !Array.isArray(s.finalPlacements)) s.finalPlacements=[];
+        if (winner && !s.finalPlacements.some(x=>x.id===winner.id)) s.finalPlacements.push({id:winner.id,name:name(winner.id),placement:1});
+        if (runner && !s.finalPlacements.some(x=>x.id===runner.id)) s.finalPlacements.push({id:runner.id,name:name(runner.id),placement:2});
+
+        /* Guarantee the full 1–16 placement record from player placement fields. */
+        s.finalPlacements = buildAllPlacements();
+        s.completed = true;
+        s.currentPhase = "complete";
+        s.currentEventIndex = 0;
+        renderFinalPlacementsMemoryWall();
+
+        show("Final Results", "FINAL RESULTS", `<div class="final-results-cards">${winner ? `${portrait(winner,"large")}<h2>${esc(name(winner.id))}</h2><p class="final-winner-label">WINNER — ${counts[winner.id] || 0} JURY VOTES</p>` : ""}${runner ? `${portrait(runner,"large")}<p class="final-runner-label">RUNNER-UP — ${counts[runner.id] || 0} JURY VOTES</p>` : ""}</div><div class="final-jury-tally">${ranked.map(f=>`<div><strong>${esc(name(f.id))}</strong><span>${counts[f.id]||0} vote${(counts[f.id]||0)===1?"":"s"}</span></div>`).join("")}</div><button type="button" class="primary-button" onclick="showResults()">VIEW FULL RESULTS</button>`);
+        window.persistCurrentSeason?.();
+    }
+
+    /* Override the finale functions and chain used by the stable engine. */
+    /* app.js's showEvent has a lexical reference to its own navigation function.
+       Wrap it so the corrected navigation is always rendered after every event. */
+    const originalShowEvent = window.showEvent;
+    window.showEvent = function () {
+        const result = originalShowEvent ? originalShowEvent.apply(this, arguments) : undefined;
+        renderNavigation();
+        return result;
+    };
+
+    const originalShowResults = window.showResults;
+    window.showResults = function () {
+        const result = originalShowResults ? originalShowResults.apply(this, arguments) : undefined;
+        renderFinalPlacementsMemoryWall();
+        return result;
+    };
+
+    window.getFinaleChain = finaleChain;
+    window.runFinalHOHEvent = runFinalHOH1;
+    window.runFinalHOH1 = runFinalHOH1;
+    window.runFinalHOH2 = runFinalHOH2;
+    window.runFinalHOH3 = runFinalHOH3;
+    window.runJuryVotingEvent = runFinalJuryVoting;
+    window.runFinaleResultsEvent = runFinalResults;
+    window.renderFinalPlacements = renderFinalPlacementsMemoryWall;
+    window.renderSimulationWeekNavigation = renderNavigation;
+
+    /* The stable engine's runNextEvent needs to dispatch the three final HOHs. */
+    const stableProceed = window.runNextEvent;
+    window.runNextEvent = function () {
+        const s = sim();
+        if (s && (s.currentPhase === "finale" || s.finaleStarted)) {
+            if (s.isViewingHistory) {
+                window.returnToCurrentSimulation?.();
+                return;
+            }
+            const chain = finaleChain();
+            const event = chain[Number(s.currentEventIndex || 0)];
+            if (!event) return;
+            s.renderingEventKey = event.key;
+            s.renderingEventLabel = event.label;
+            if (event.key === "final-hoh-1") runFinalHOH1();
+            else if (event.key === "final-hoh-2") runFinalHOH2();
+            else if (event.key === "final-hoh-3") runFinalHOH3();
+            else if (event.key === "jury-voting") runFinalJuryVoting();
+            else if (event.key === "finale-results") runFinalResults();
+            renderNavigation();
+            window.persistCurrentSeason?.();
+            return;
+        }
+        return stableProceed?.apply(this, arguments);
+    };
+
+    /* Replace the old white voting cards with dark simulator styling. */
+    const style = document.createElement("style");
+    style.textContent = `
+        .sim-event-nav { position:relative; }
+        .sim-event-nav.now { color:#fff !important; font-weight:900; background:#3a3a3a; border-left:3px solid #00d7e8; padding-left:6px; }
+        .sim-event-nav.now::before { content:"" !important; }
+        .sim-event-nav.now small { display:block; color:#00d7e8; font-size:8px; letter-spacing:1px; margin-top:2px; }
+        .sim-event-nav.pending { color:#777; }
+        .bb-vote-card { border:1px solid #555 !important; border-radius:6px !important; background:#292929 !important; color:#eee !important; box-shadow:none !important; }
+        .bb-vote-card .bb-vote-person strong { color:#eee !important; }
+        .bb-vote-arrow span { color:#aaa !important; }
+        .bb-vote-arrow strong { color:#ddd !important; }
+        .bb-vote-counts > div { border:1px solid #555 !important; border-radius:6px !important; background:#292929 !important; color:#eee !important; }
+        .bb-vote-list { gap:10px !important; }
+        .final-memory-wall { display:grid; grid-template-columns:repeat(4,minmax(130px,1fr)); gap:14px; width:min(1100px,100%); margin:0 auto; }
+        .final-memory-card { position:relative; min-width:0; padding:12px 10px 14px; background:#20242c; border:1px solid #343a46; border-radius:8px; text-align:center; overflow:hidden; }
+        .final-memory-card .sim-portrait { width:100% !important; }
+        .final-memory-card .sim-portrait img, .final-memory-card .sim-portrait-placeholder { width:min(150px,100%) !important; height:155px !important; margin:0 auto 8px !important; }
+        .final-memory-rank { font-size:11px; font-weight:900; letter-spacing:.8px; color:#8f98a8; margin-bottom:8px; }
+        .final-memory-name { font-size:14px; font-weight:900; color:#fff; line-height:1.2; }
+        .place-1 { border-color:#b89b45; }
+        .place-1 .final-memory-rank { color:#f0cf68; }
+        .place-2 .final-memory-rank { color:#c9c9c9; }
+        .place-3 .final-memory-rank { color:#c78f61; }
+        @media(max-width:850px){ .final-memory-wall{grid-template-columns:repeat(3,minmax(110px,1fr));} }
+        @media(max-width:600px){ .final-memory-wall{grid-template-columns:repeat(2,minmax(110px,1fr));} }
+    `;
+    document.head.appendChild(style);
+
+    document.addEventListener("DOMContentLoaded", () => setTimeout(renderNavigation, 0));
 })();
