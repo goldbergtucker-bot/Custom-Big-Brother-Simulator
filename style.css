@@ -2589,3 +2589,134 @@ select {
     }
 
 }
+
+/* =========================================================
+   STABLE SIMULATOR CONTROLS
+   ========================================================= */
+.sim-proceed-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.sim-resimulate-button {
+    white-space: nowrap;
+}
+
+/* Stable portrait voting layout */
+.bb-voting-header {
+    text-align: center;
+    margin: 10px auto 25px;
+    max-width: 700px;
+}
+
+.bb-vote-list {
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.bb-vote-card {
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(130px, 1fr) 180px minmax(130px, 1fr);
+    align-items: center;
+    gap: 20px;
+    padding: 18px;
+    box-sizing: border-box;
+    border: 1px solid #ddd;
+    border-radius: 14px;
+    background: #fff;
+}
+
+.bb-vote-person {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+.bb-vote-person strong {
+    margin-top: 8px;
+}
+
+.bb-vote-arrow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 6px;
+}
+
+.bb-vote-arrow span {
+    font-weight: 700;
+    font-size: 13px;
+    text-transform: uppercase;
+}
+
+.bb-vote-arrow strong {
+    font-size: 28px;
+}
+
+.bb-vote-counts {
+    width: 100%;
+    max-width: 700px;
+    margin: 25px auto 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 15px;
+}
+
+.bb-vote-counts > div {
+    padding: 15px;
+    border-radius: 12px;
+    border: 1px solid #ddd;
+    text-align: center;
+    background: #fafafa;
+}
+
+.bb-vote-counts strong,
+.bb-vote-counts span {
+    display: block;
+}
+
+.bb-vote-counts span {
+    margin-top: 5px;
+    font-weight: 700;
+}
+
+.bb-voting-complete {
+    text-align: center;
+    margin: 25px auto 0;
+    font-weight: 600;
+}
+
+.sim-main-panel #event-content .sim-portrait-grid {
+    width: fit-content !important;
+    max-width: 100% !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    align-self: center !important;
+    justify-content: center !important;
+}
+
+@media (max-width: 800px) {
+    .bb-vote-card {
+        grid-template-columns: 1fr;
+    }
+
+    .bb-vote-arrow {
+        flex-direction: row;
+    }
+
+    .bb-vote-counts {
+        grid-template-columns: 1fr;
+    }
+}
