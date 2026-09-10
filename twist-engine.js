@@ -401,7 +401,10 @@
         s.evictionsThisWeek = Number(s.evictionsThisWeek || 0) + 1;
 
         const remaining = players();
-        const finalistCount = Number(seasonObj.rules?.finalists || 3);
+        // Big Brother's finale sequence starts at FINAL 3. The configured number
+        // of finalists describes the eventual Final 2 result, not another regular
+        // week at three Houseguests.
+        const finalistCount = 3;
         const isDouble = seasonObj.rules?.doubleEvictionEnabled === true &&
             (seasonObj.rules?.doubleEvictionWeeks || []).map(Number).includes(week) &&
             s.evictionsThisWeek < 2;
@@ -440,6 +443,15 @@
     /* ---------------------------------------------------------
        Finale
        --------------------------------------------------------- */
+    function getEligibleJuryIds() {
+        const jurySize = Math.max(0, Number(season()?.rules?.jurySize ?? 7));
+        return (season()?.houseguests || [])
+            .filter(p => p.status === "evicted" && Number(p.placement) >= 4)
+            .sort((a, b) => Number(a.placement) - Number(b.placement))
+            .slice(0, jurySize)
+            .map(p => p.id);
+    }
+
     function startFinale() {
         const s = simulation();
         s.pendingCycle = null;
@@ -449,7 +461,7 @@
         s.currentEventIndex = 0;
         s.viewingWeek = seasonWeeks();
         s.finalists = players().map(p => p.id);
-        s.jury = window.getJuryMembers ? window.getJuryMembers() : [];
+        s.jury = getEligibleJuryIds();
         s.finalHOH1 = null;
         s.finalHOH2 = null;
         s.finalHOH3 = null;
@@ -521,7 +533,10 @@
             s.finalists = finalists.map(p => p.id);
         }
 
-        if (!Array.isArray(s.jury) || !s.jury.length) s.jury = window.getJuryMembers ? window.getJuryMembers() : [];
+        // Rebuild the jury from actual placements immediately before the vote.
+        // This is deliberate: it guarantees pre-jury evictees can never vote,
+        // even when an older saved simulation contains a stale jury array.
+        s.jury = getEligibleJuryIds();
         const votes = [];
         s.jury.forEach(jid => {
             const juror = byId(jid);
@@ -1075,6 +1090,13 @@
 
         if (s.currentPhase === "complete" || s.completed) {
             showResultsStable();
+            return;
+        }
+
+        // Never run a normal HOH/POV week with only three active Houseguests.
+        // This also repairs older saved games that reached Final 3 before this fix.
+        if (s.currentPhase !== "finale" && !s.finaleStarted && players().length <= 3) {
+            startFinale();
             return;
         }
 
