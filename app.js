@@ -6690,10 +6690,16 @@ function ensureFinaleState(sim) {
 function getJuryMembers() {
     const sim = ensureFinaleState(currentSeason?.simulation || createDefaultSimulation());
     const jurySize = Math.max(0, Number(currentSeason?.rules?.jurySize ?? 7));
-    const evicted = (currentSeason?.houseguests || []).filter(p => p.status === "evicted");
-    // Most recent evictees form the jury. This also works for seasons whose jury
-    // is smaller than the number of total evictions.
-    return evicted.slice(-jurySize).map(p => p.id);
+
+    // Jury eligibility must be based on actual finish/eviction order, NOT on the
+    // order Houseguests happen to appear in the cast array. At the Final 3, the
+    // jurors are the jurySize evictees with the best placements (4th, 5th, ...).
+    // This prevents pre-jury Houseguests from accidentally receiving jury votes.
+    const evicted = (currentSeason?.houseguests || [])
+        .filter(p => p.status === "evicted" && Number(p.placement) >= 4)
+        .sort((a, b) => Number(a.placement) - Number(b.placement));
+
+    return evicted.slice(0, jurySize).map(p => p.id);
 }
 
 function getFinalistsForFinale() {
@@ -6707,7 +6713,14 @@ function getFinalistsForFinale() {
 function getFinaleChain() {
     const finalists = getFinalistsForFinale();
     const chain = [];
-    if (finalists.length >= 3) chain.push({key:"final-hoh", label:"Final HOH"});
+    if (finalists.length >= 3) {
+        const comps = currentSeason?.competitions?.finalHoh || [];
+        chain.push(
+            {key:"final-hoh-1", label:comps[0]?.name || "Final HOH — Part 1"},
+            {key:"final-hoh-2", label:comps[1]?.name || "Final HOH — Part 2"},
+            {key:"final-hoh-3", label:comps[2]?.name || "Final HOH — Part 3"}
+        );
+    }
     chain.push({key:"jury-voting", label:"Jury Voting"}, {key:"finale-results", label:"Final Results"});
     return chain;
 }
