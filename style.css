@@ -2447,3 +2447,145 @@ select {
 .runner-up-card { margin-top:12px; }
 
 @media (max-width:1050px){ .brantsteele-sim-layout{grid-template-columns:190px minmax(0,1fr);} }
+
+/* =========================================================
+   STABLE EVICTION VOTING
+   ========================================================= */
+
+.bb-voting-header {
+    text-align: center;
+    margin: 10px auto 25px;
+    max-width: 700px;
+}
+
+.bb-voting-header h3 {
+    margin-bottom: 8px;
+}
+
+.bb-vote-list {
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.bb-vote-card {
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(130px, 1fr) 180px minmax(130px, 1fr);
+    align-items: center;
+    gap: 20px;
+    padding: 18px;
+    box-sizing: border-box;
+    border: 1px solid #ddd;
+    border-radius: 14px;
+    background: #fff;
+}
+
+.bb-vote-person {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    min-width: 0;
+}
+
+.bb-vote-person strong {
+    margin-top: 8px;
+    text-align: center;
+}
+
+.bb-vote-arrow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 6px;
+}
+
+.bb-vote-arrow span {
+    font-weight: 700;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+
+.bb-vote-arrow strong {
+    font-size: 28px;
+}
+
+.bb-vote-counts {
+    width: 100%;
+    max-width: 700px;
+    margin: 25px auto 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 15px;
+}
+
+.bb-vote-counts > div {
+    padding: 15px;
+    border-radius: 12px;
+    border: 1px solid #ddd;
+    text-align: center;
+    background: #fafafa;
+}
+
+.bb-vote-counts strong {
+    display: block;
+    margin-bottom: 6px;
+}
+
+.bb-vote-counts span {
+    font-weight: 700;
+}
+
+.bb-voting-complete {
+    text-align: center;
+    margin: 25px auto 0;
+    font-weight: 600;
+}
+
+
+/* =========================================================
+   FORCE SIMULATION PORTRAITS TO CENTER
+   ========================================================= */
+
+.sim-main-panel #event-content .sim-portrait-grid {
+    width: fit-content !important;
+    max-width: 100% !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    align-self: center !important;
+    justify-content: center !important;
+}
+
+.sim-main-panel #event-content .sim-portrait {
+    text-align: center !important;
+}
+
+
+/* =========================================================
+   MOBILE VOTING
+   ========================================================= */
+
+@media (max-width: 700px) {
+
+    .bb-vote-card {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .bb-vote-arrow {
+        flex-direction: row;
+    }
+
+    .bb-vote-counts {
+        grid-template-columns: 1fr;
+    }
+
+}
