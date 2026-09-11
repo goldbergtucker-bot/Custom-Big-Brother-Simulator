@@ -6696,64 +6696,36 @@ function ensureFinaleState(sim) {
     return sim;
 }
 
-function getJuryMembers() {
-    const jurySize = Math.max(
+function juryMembers() {
+    const s = simulation();
+    const size = Math.max(
         0,
-        Number(currentSeason?.rules?.jurySize ?? 7)
+        Number(season()?.rules?.jurySize ?? 7)
     );
 
-    if (jurySize === 0) return [];
+    const maxPlacement = 2 + size;
 
-    // Jury starts at 3rd place.
-    // Example: Jury Size 9 = 3rd through 11th.
-   
-    const lowestJurorPlacement = 2 + jurySize;
-
-    const jurors = (currentSeason?.houseguests || [])
-        .filter(player => {
-            const placement = Number(player.placement);
+    const eligible = players()
+        .filter(p => {
+            const place = Number(p.placement);
 
             return (
-                player.status === "evicted" &&
-                Number.isFinite(placement) &&
-                placement >= 3 &&
-                placement <= lowestJurorPlacement
+                Number.isFinite(place) &&
+                place >= 3 &&
+                place <= maxPlacement
             );
         })
-        .sort((a, b) => Number(a.placement) - Number(b.placement));
+        .sort(
+            (a, b) =>
+                Number(a.placement) -
+                Number(b.placement)
+        );
 
-    return jurors
-        .slice(0, jurySize)
-        .map(player => player.id);
-}
+    if (s) {
+        s.jury = eligible.map(p => p.id);
+    }
 
-function getJuryMembers() {
-    const jurySize = Math.max(
-        0,
-        Number(currentSeason?.rules?.jurySize ?? 7)
-    );
-
-    if (jurySize === 0) return [];
-
-    // Jury starts at 3rd place.
-    // Example: Jury Size 9 = 3rd through 11th.
-    const lowestJurorPlacement = 2 + jurySize;
-
-    const jurors = (currentSeason?.houseguests || [])
-        .filter(player => {
-            const placement = Number(player.placement);
-            return (
-                player.status === "evicted" &&
-                Number.isFinite(placement) &&
-                placement >= 3 &&
-                placement <= lowestJurorPlacement
-            );
-        })
-        .sort((a, b) => Number(a.placement) - Number(b.placement));
-
-    return jurors
-        .slice(0, jurySize)
-        .map(player => player.id);
+    return eligible;
 }
 
 function getFinalistsForFinale() {
