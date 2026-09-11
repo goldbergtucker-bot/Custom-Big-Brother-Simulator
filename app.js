@@ -3740,21 +3740,29 @@ function getHouseguestForSimulation(id) {
     return (currentSeason?.houseguests || []).find(p => p.id === id) || null;
 }
 
-function simulationPortrait(player, size = "medium") {
+function simulationPortrait(player, size = "medium", options = {}) {
     if (!player) return "";
-    const name = getHouseguestDisplayName(player.id, currentSeason?.houseguests || []);
+    const { showName = true, useFullName = false } = options;
+    const houseguests = currentSeason?.houseguests || [];
+    const fullName = getHouseguestDisplayName(player.id, houseguests);
+    // Houseguests are referred to by first name only while still in the house.
+    // Once they've been evicted, won, or finished as runner-up, show the full name
+    // so the record of who they are stays permanent.
+    const isFinalStatus = player.status === "evicted" || player.status === "winner" || player.status === "runner-up";
+    const name = (useFullName || isFinalStatus) ? fullName : getHouseguestFirstName(player.id, houseguests);
     const image = String(player.image || "").trim();
     const cls = `sim-portrait sim-portrait-${size}`;
+    const nameSpan = showName ? `<span>${escapeHTML(name)}</span>` : "";
     if (image) {
-        return `<div class="${cls}"><img src="${escapeAttribute(image)}" alt="${escapeAttribute(name)}" onerror="this.style.display='none';this.parentElement.classList.add('no-image');"><span>${escapeHTML(name)}</span></div>`;
+        return `<div class="${cls}"><img src="${escapeAttribute(image)}" alt="${escapeAttribute(fullName)}" onerror="this.style.display='none';this.parentElement.classList.add('no-image');">${nameSpan}</div>`;
     }
-    const initials = name.split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join("").toUpperCase() || "?";
-    return `<div class="${cls} no-image"><div class="sim-portrait-placeholder">${escapeHTML(initials)}</div><span>${escapeHTML(name)}</span></div>`;
+    const initials = fullName.split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join("").toUpperCase() || "?";
+    return `<div class="${cls} no-image"><div class="sim-portrait-placeholder">${escapeHTML(initials)}</div>${nameSpan}</div>`;
 }
 
-function simulationPortraits(ids = [], size = "medium") {
+function simulationPortraits(ids = [], size = "medium", options = {}) {
     const players = (ids || []).map(getHouseguestForSimulation).filter(Boolean);
-    return `<div class="sim-portrait-grid">${players.map(p => simulationPortrait(p, size)).join("")}</div>`;
+    return `<div class="sim-portrait-grid">${players.map(p => simulationPortrait(p, size, options)).join("")}</div>`;
 }
 
 function getCompetitionForWeekType(week, type) {
@@ -4860,6 +4868,31 @@ function getHouseguestDisplayName(
                 houseguest.id
             )
         }`
+    );
+}
+
+
+function getHouseguestFirstName(id, houseguests) {
+
+    if (!id) {
+        return "—";
+    }
+
+    const houseguest =
+        (houseguests || []).find(
+            player => player.id === id
+        );
+
+    if (!houseguest) {
+        return "Unknown";
+    }
+
+    const parsed = parseHouseguestName(houseguest);
+
+    return (
+        parsed.firstName ||
+        houseguest.name ||
+        `Houseguest ${getHouseguestNumber(houseguest.id)}`
     );
 }
 
@@ -6327,7 +6360,7 @@ function runNominationEvent() {
     resetGameChain(simulation.currentEventIndex);
     const hohPlayer = getHouseguestForSimulation(simulation.currentHOH);
     showEvent("Nomination Ceremony", "NOMINATION CEREMONY", `
-        <div class="ceremony-role-section"><h3>Head of Household</h3>${simulationPortrait(hohPlayer, "large")}</div>
+        <div class="ceremony-role-section"><h3>Head of Household</h3>${simulationPortrait(hohPlayer, "large", {showName:false})}</div>
         ${twistNote}
         <p class="ceremony-statement"><strong>${escapeHTML(getHouseguestDisplayName(simulation.currentHOH, active))}</strong> has nominated:</p>
         <div class="ceremony-role-section"><h3>Nominees</h3>${simulationPortraits(nominees.map(p => p.id), "large")}</div>
@@ -6379,7 +6412,7 @@ function runVetoCeremonyEvent() {
     showEvent("Veto Ceremony", "VETO CEREMONY", `
         <div class="ceremony-leaders">
             <div class="ceremony-role-section"><h3>Head of Household</h3>${simulationPortrait(hohPlayer, "large")}</div>
-            <div class="ceremony-role-section"><h3>Power of Veto Holder</h3>${simulationPortrait(vetoPlayer, "large")}</div>
+            <div class="ceremony-role-section"><h3>Power of Veto Holder</h3>${simulationPortrait(vetoPlayer, "large", {showName:false})}</div>
         </div>
         ${diamondNote}
         <p class="ceremony-statement">${vetoUsed ? `<strong>${escapeHTML(getHouseguestDisplayName(vetoWinner, currentSeason.houseguests))}</strong> used the Power of Veto.${replacementId ? ` <strong>${escapeHTML(getHouseguestDisplayName(replacementId, currentSeason.houseguests))}</strong> was named as the replacement nominee.` : ""}` : vetoWinner ? `<strong>${escapeHTML(getHouseguestDisplayName(vetoWinner, currentSeason.houseguests))}</strong> did not use the Power of Veto.` : `No Power of Veto holder was available.`}</p>
@@ -6445,7 +6478,7 @@ function runEvictionEvent() {
     "Eviction",
     "EVICTION",
     `<div class="eviction-result-portrait">
-        ${simulationPortrait(evictionTarget, "large")}
+        ${simulationPortrait(evictionTarget, "large", {showName:false})}
     </div>
     <p><strong>${escapeHTML(getHouseguestDisplayName(evictionTarget?.id, currentSeason.houseguests))}</strong> has been evicted from the Big Brother house.</p>
     ${voteText}
@@ -6458,7 +6491,7 @@ function runEvictionEvent() {
     if (week >= maxWeeks) { finalizeSeason(getActiveHouseguests()); return; }
     simulation.pendingCycle = "nextWeek";
     simulation.pendingWeekAdvance = true;
-    showEvent("Eviction", "EVICTION", `${simulationPortrait(evictionTarget, "large")}<p><strong>${escapeHTML(getHouseguestDisplayName(evictionTarget?.id, currentSeason.houseguests))}</strong> has been evicted from the Big Brother house.</p>${voteText}<p>Press <strong>Proceed</strong> to begin Week ${week + 1}.</p>`);
+    showEvent("Eviction", "EVICTION", `${simulationPortrait(evictionTarget, "large", {showName:false})}<p><strong>${escapeHTML(getHouseguestDisplayName(evictionTarget?.id, currentSeason.houseguests))}</strong> has been evicted from the Big Brother house.</p>${voteText}<p>Press <strong>Proceed</strong> to begin Week ${week + 1}.</p>`);
 }
 
 function resetCycleForNewHOH(simulation, nextWeek = null) {
@@ -6631,7 +6664,7 @@ function runHOHEvent() {
     updateSimulatorStatus(simulation);
     resetGameChain(simulation.currentEventIndex);
     const comp = getCompetitionForWeekType(simulation.currentWeek, "hoh");
-    showEvent(comp?.name || "Head of Household", "HOH COMPETITION", `${simulationPortrait(hoh, "large")}<p><strong>${escapeHTML(getHouseguestDisplayName(hoh.id, houseguests))}</strong> has won <strong>${escapeHTML(comp?.name || "Head of Household")}</strong>.</p>${comp?.description ? `<p class="event-description">${escapeHTML(comp.description)}</p>` : ""}`);
+    showEvent(comp?.name || "Head of Household", "HOH COMPETITION", `${simulationPortrait(hoh, "large", {showName:false})}<p><strong>${escapeHTML(getHouseguestDisplayName(hoh.id, houseguests))}</strong> has won <strong>${escapeHTML(comp?.name || "Head of Household")}</strong>.</p>${comp?.description ? `<p class="event-description">${escapeHTML(comp.description)}</p>` : ""}`);
 }
 
 function runPOVPlayersEvent() {
@@ -6675,7 +6708,7 @@ function runPOVEvent() {
     updateSimulatorStatus(simulation);
     resetGameChain(simulation.currentEventIndex);
     const comp = getCompetitionForWeekType(simulation.currentWeek, "pov");
-    showEvent(comp?.name || "Power of Veto", "POV COMPETITION", `${simulationPortrait(winner, "large")}<p><strong>${escapeHTML(getHouseguestDisplayName(winner?.id, currentSeason.houseguests))}</strong> has won <strong>${escapeHTML(comp?.name || "the Power of Veto")}</strong>.</p>${comp?.description ? `<p class="event-description">${escapeHTML(comp.description)}</p>` : ""}`);
+    showEvent(comp?.name || "Power of Veto", "POV COMPETITION", `${simulationPortrait(winner, "large", {showName:false})}<p><strong>${escapeHTML(getHouseguestDisplayName(winner?.id, currentSeason.houseguests))}</strong> has won <strong>${escapeHTML(comp?.name || "the Power of Veto")}</strong>.</p>${comp?.description ? `<p class="event-description">${escapeHTML(comp.description)}</p>` : ""}`);
 }
 
 
@@ -6947,7 +6980,7 @@ function runTwistEvent(twistId) {
         if(holder){ sim.twistState[twist.id]={holderId:holder.id,used:false,awardedWeek:sim.currentWeek}; }
     }
     const powerLine=twist.power?`<p><strong>Power:</strong> ${escapeHTML(twist.power)}${twist.powerUntil?` (usable through Week ${twist.powerUntil})`:''}</p>`:'';
-    showEvent(twist.name||'Twist','TWIST',`<div class="twist-event-card"><h3>${escapeHTML(twist.name||'Twist')}</h3>${powerLine}${holder?`${simulationPortrait(holder,'large')}<p><strong>${escapeHTML(getHouseguestDisplayName(holder.id,currentSeason.houseguests))}</strong> received the power.</p>`:''}<p>${escapeHTML(twist.description||'')}</p></div>`);
+    showEvent(twist.name||'Twist','TWIST',`<div class="twist-event-card"><h3>${escapeHTML(twist.name||'Twist')}</h3>${powerLine}${holder?`${simulationPortrait(holder,'large',{showName:false})}<p><strong>${escapeHTML(getHouseguestDisplayName(holder.id,currentSeason.houseguests))}</strong> received the power.</p>`:''}<p>${escapeHTML(twist.description||'')}</p></div>`);
     resetGameChain(sim.currentEventIndex);
 }
 
@@ -6969,7 +7002,7 @@ function runFinalHOHEvent() {
     const winner=comp?chooseCompetitionWinnerByCustom(finalists,comp):chooseCompetitionWinner(finalists,'mental','social','general');
     sim.finalHOH=winner.id; sim.currentEventIndex++;
     resetGameChain(sim.currentEventIndex);
-    showEvent(comp?.name||'Final HOH','FINAL HOH',`${simulationPortrait(winner,'large')}<p><strong>${escapeHTML(getHouseguestDisplayName(winner.id,currentSeason.houseguests))}</strong> has won <strong>${escapeHTML(comp?.name||'Final HOH')}</strong>.</p><p>The Final HOH will determine the final two.</p>`);
+    showEvent(comp?.name||'Final HOH','FINAL HOH',`${simulationPortrait(winner,'large',{showName:false})}<p><strong>${escapeHTML(getHouseguestDisplayName(winner.id,currentSeason.houseguests))}</strong> has won <strong>${escapeHTML(comp?.name||'Final HOH')}</strong>.</p><p>The Final HOH will determine the final two.</p>`);
 }
 
 function runJuryVotingEvent() {
@@ -6995,7 +7028,7 @@ function runJuryVotingEvent() {
     const counts={}; finalists.forEach(f=>counts[f.id]=0); votes.forEach(v=>counts[v.vote]=(counts[v.vote]||0)+1);
     sim.juryVotes=votes; sim.finaleVoteResults={votes,counts}; sim.currentEventIndex++;
     resetGameChain(sim.currentEventIndex);
-    const rows=votes.map(v=>`<div class="jury-vote-row">${simulationPortrait(getHouseguestForSimulation(v.juror),'small')}<strong>${escapeHTML(getHouseguestDisplayName(v.juror,currentSeason.houseguests))}</strong><span>votes for</span><strong>${escapeHTML(getHouseguestDisplayName(v.vote,currentSeason.houseguests))}</strong></div>`).join('');
+    const rows=votes.map(v=>`<div class="jury-vote-row">${simulationPortrait(getHouseguestForSimulation(v.juror),'small',{showName:false})}<strong>${escapeHTML(getHouseguestDisplayName(v.juror,currentSeason.houseguests))}</strong><span>votes for</span><strong>${escapeHTML(getHouseguestDisplayName(v.vote,currentSeason.houseguests))}</strong></div>`).join('');
     showEvent('Jury Voting','JURY VOTING',`<div class="jury-finalists">${simulationPortraits(finalists.map(p=>p.id),'large')}</div><h3>The Jury Votes</h3><div class="jury-vote-list">${rows||'<p>No jury members were eligible to vote.</p>'}</div>`);
 }
 
@@ -7010,7 +7043,7 @@ function runFinaleResultsEvent() {
     sim.finalPlacements=[...(winner?[{id:winner.id,name:getHouseguestDisplayName(winner.id,currentSeason.houseguests),placement:1}]:[]),...(runner?[{id:runner.id,name:getHouseguestDisplayName(runner.id,currentSeason.houseguests),placement:2}]:[]),...other.map(p=>({id:p.id,name:getHouseguestDisplayName(p.id,currentSeason.houseguests),placement:Number(p.placement||0)})).sort((a,b)=>a.placement-b.placement)];
     sim.currentEventIndex=0;
     persistCurrentSeason();
-    showEvent('Final Results','FINAL RESULTS',`<div class="final-results-cards">${winner?`${simulationPortrait(winner,'large')}<h2>${escapeHTML(getHouseguestDisplayName(winner.id,currentSeason.houseguests))}</h2><p class="final-winner-label">WINNER — ${counts[winner.id]||0} JURY VOTES</p>`:''}${runner?`${simulationPortrait(runner,'large')}<p class="final-runner-label">RUNNER-UP — ${counts[runner.id]||0} JURY VOTES</p>`:''}</div><div class="final-jury-tally">${finalists.map(f=>`<div><strong>${escapeHTML(getHouseguestDisplayName(f.id,currentSeason.houseguests))}</strong><span>${counts[f.id]||0} vote${(counts[f.id]||0)===1?'':'s'}</span></div>`).join('')}</div><button type="button" class="primary-button" onclick="showResults()">View Full Results</button>`);
+    showEvent('Final Results','FINAL RESULTS',`<div class="final-results-cards">${winner?`${simulationPortrait(winner,'large',{showName:false})}<h2>${escapeHTML(getHouseguestDisplayName(winner.id,currentSeason.houseguests))}</h2><p class="final-winner-label">WINNER — ${counts[winner.id]||0} JURY VOTES</p>`:''}${runner?`${simulationPortrait(runner,'large')}<p class="final-runner-label">RUNNER-UP — ${counts[runner.id]||0} JURY VOTES</p>`:''}</div><div class="final-jury-tally">${finalists.map(f=>`<div><strong>${escapeHTML(getHouseguestDisplayName(f.id,currentSeason.houseguests))}</strong><span>${counts[f.id]||0} vote${(counts[f.id]||0)===1?'':'s'}</span></div>`).join('')}</div><button type="button" class="primary-button" onclick="showResults()">View Full Results</button>`);
 }
 
 function finalizeSeason(finalists) {
