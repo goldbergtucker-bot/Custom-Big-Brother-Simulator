@@ -184,22 +184,56 @@
     function juryMembers() {
         const s = simulation();
         const size = Math.max(0, Number(season()?.rules?.jurySize ?? 7));
-        const eligible = players()
-            .filter(p => p.status === "evicted" && Number(p.placement) >= 4)
-            .sort((a, b) => Number(a.placement) - Number(b.placement));
-        const ids = eligible.slice(0, size).map(p => p.id);
-        if (s) s.jury = ids.slice();
-        return eligible.slice(0, size);
+        const maxPlacement = 3 + size;
+        const eligible = players().filter(p => {
+            const place = Number(p.placement);
+            return place >= 4 && place <= maxPlacement;
+        }).sort((a,b) => Number(a.placement)-Number(b.placement));
+        if (s) s.jury = eligible.map(p => p.id);
+        return eligible;
     }
-
     function preJuryMembers() {
         const size = Math.max(0, Number(season()?.rules?.jurySize ?? 7));
-        const highestJuryPlacement = 3 + size;
-        return players()
-            .filter(p => p.status === "evicted" && Number(p.placement) > highestJuryPlacement)
-            .sort((a, b) => Number(b.placement) - Number(a.placement));
+        const maxPlacement = 3 + size;
+        return players().filter(p => Number(p.placement) > maxPlacement).sort((a,b)=>Number(b.placement)-Number(a.placement));
     }
 
+    function chooseFinalTwoAndRecordJury() {
+        const s = simulation();
+        const three = activePlayers().slice();
+        if (!s || three.length !== 3) return null;
+        const finalHOH = byId(s.finalHOH3 || s.finalHOH1) || three[0];
+        const others = three.filter(p => p.id !== finalHOH.id);
+        const chosen = others.slice().sort((a,b) => {
+            const aa = window.allianceBond ? Number(window.allianceBond(finalHOH.id,a.id)||0) : 0;
+            const bb = window.allianceBond ? Number(window.allianceBond(finalHOH.id,b.id)||0) : 0;
+            return bb-aa;
+        })[0] || others[0];
+        const third = others.find(p => p.id !== chosen.id) || others[0];
+        if (!chosen || !third) return null;
+        third.status='evicted'; third.placement=3;
+        const finalists=[finalHOH,chosen]; s.finalists=finalists.map(p=>p.id);
+        const size=Math.max(0,Number(season()?.rules?.jurySize??7));
+        const maxPlacement=3+size;
+        const jury=players().filter(p=>{const place=Number(p.placement); return place>=4 && place<=maxPlacement;}).sort((a,b)=>Number(a.placement)-Number(b.placement));
+        s.jury=jury.map(p=>p.id);
+        const votes=jury.map(juror=>{
+            const ranked=finalists.map(f=>{
+                const bond=window.allianceBond?Number(window.allianceBond(juror.id,f.id)||0):0;
+                const score=Number(f.ratings?.social||0)*.4+Number(f.ratings?.strategic||0)*.35+Number(f.ratings?.general||0)*.15+Number(f.ratings?.mental||0)*.1+bond*.15+Math.random()*3;
+                return {f,score};
+            }).sort((a,b)=>b.score-a.score);
+            return {juror:juror.id,vote:ranked[0].f.id};
+        });
+        const counts={}; finalists.forEach(f=>counts[f.id]=0); votes.forEach(v=>counts[v.vote]=Number(counts[v.vote]||0)+1);
+        s.juryVotes=votes; s.finaleVoteResults={votes,counts};
+        return {third,finalists,jury,votes,counts};
+    }
+
+    function juryVotingHTML(finalists,votes){
+        const rows=votes.map(v=>{const j=byId(v.juror),t=byId(v.vote);return `<div class="stable-jury-vote-row">${portrait(j,'small')}<strong>${esc(nameOf(j))}</strong><span>votes for</span><strong>${esc(nameOf(t))}</strong></div>`;}).join('');
+        return `<div class="stable-jury-voting">${portraits(finalists.map(p=>p.id),'large')}<h3>The Jury Votes</h3><div>${rows||'<p>No eligible jury members were recorded.</p>'}</div><p>Press <strong>Proceed</strong> to reveal the Final Results.</p></div>`;
+    }
     function finalTwo() {
         const s = simulation();
 
@@ -501,71 +535,39 @@
 
     function nextEvent() {
         addStyles();
-        const s = simulation();
-        if (!s || typeof ORIGINAL_NEXT !== "function") return;
-
-        // Return from the dedicated Final Eviction screen to the recorded jury vote.
-        if (s.finalEvictionReveal) {
-            continueAfterFinalEviction();
-            return;
+        const s=simulation();
+        if(!s) return;
+        if(s.finalEvictionReveal){
+            const pending=s.finalEvictionReveal; s.finalEvictionReveal=null; s.currentEventIndex=4;
+            if(window.showEvent) window.showEvent('Jury Voting','JURY VOTING',pending.juryContent||'<p>The jury vote has been recorded.</p>',{week:s.currentWeek,skipHistory:false,skipLiveView:false});
+            save(); return;
         }
-
-        const isFinale = s.currentPhase === "finale" || s.finaleStarted === true;
-        const before = isFinale ? activePlayers().slice() : [];
-        const indexBefore = Number(s.currentEventIndex || 0);
-        const chainBefore = isFinale && window.getFinaleChain ? (window.getFinaleChain() || []) : [];
-        const eventBefore = chainBefore[indexBefore];
-
-        // Final 3 -> Final 2: let the stable engine perform the actual decision,
-        // then insert our dedicated third-place reveal before Jury Voting is shown.
-        if (isFinale && before.length === 3 && eventBefore?.key === "jury-voting") {
-            ORIGINAL_NEXT();
-            const after = activePlayers().slice();
-            const evicted = before.find(p => !after.some(a => String(a.id) === String(p.id)));
-
-            if (after.length === 2 && evicted) {
-                evicted.status = "evicted";
-                evicted.placement = 3;
-
-                const juryView = s.liveView ? {
-                    title: s.liveView.title || "Jury Voting",
-                    type: s.liveView.type || "JURY VOTING",
-                    content: s.liveView.content || "",
-                    week: s.liveView.week || s.currentWeek,
-                    nextIndex: Number(s.currentEventIndex || indexBefore + 1)
-                } : {
-                    title: "Jury Voting",
-                    type: "JURY VOTING",
-                    content: "<p>The jury vote has been recorded.</p>",
-                    week: s.currentWeek,
-                    nextIndex: indexBefore + 1
-                };
-
-                s.currentEventIndex = indexBefore;
-                showFinalEviction(evicted, juryView);
-                save();
-                return;
+        if(s.isViewingHistory){if(window.returnToCurrentSimulation)window.returnToCurrentSimulation();return;}
+        const isFinale=s.currentPhase==='finale'||s.finaleStarted===true;
+        if(isFinale){
+            const index=Number(s.currentEventIndex||0);
+            if(index===3 && activePlayers().length===3){
+                const r=chooseFinalTwoAndRecordJury(); if(!r)return; s.currentEventIndex=3;
+                s.finalEvictionReveal={playerId:r.third.id,juryContent:juryVotingHTML(r.finalists,r.votes)};
+                if(window.showEvent) window.showEvent('Final Eviction','EVICTION',`<div class="single-finale-eviction">${portrait(r.third,'large')}<h2>${esc(nameOf(r.third))}</h2><p><strong>${esc(nameOf(r.third))}</strong> has been evicted from the Big Brother house in <strong>3rd place</strong>.</p><p>The Final 2 have now been decided. Press <strong>Proceed</strong> to reveal the jury vote.</p></div>`,{week:s.currentWeek,skipHistory:true,skipLiveView:false});
+                save(); return;
             }
-
-            return;
+            if(index===4){
+                const finalists=finalTwo(); const counts=resolveVoteCounts(finalists);
+                const ranked=finalists.slice().sort((a,b)=>Number(counts[b.id]||0)-Number(counts[a.id]||0));
+                const winner=ranked[0]||null, runner=ranked[1]||null;
+                if(winner){winner.status='winner';winner.placement=1;s.winner=winner.id;}
+                if(runner){runner.status='runner-up';runner.placement=2;s.runnerUp=runner.id;}
+                rebuildFinalPlacements(winner,runner); s.completed=true;s.currentPhase='complete';s.pendingCycle=null;s.pendingWeekAdvance=false;s.currentEventIndex=5;
+                const tally=finalists.map(p=>`<div class="single-finale-tally-row"><span>${esc(nameOf(p))}</span><strong>${Number(counts[p.id]||0)} vote${Number(counts[p.id]||0)===1?'':'s'}</strong></div>`).join('');
+                const wall=allPlacements().map(x=>playerCard(x.player,x.placement,null)).join('');
+                if(window.showEvent) window.showEvent('Final Results','FINAL RESULTS',`<div class="single-finale-results"><h2>Final Results</h2><div class="single-finale-champions">${winner?`<div class="single-finale-champion">${portrait(winner,'large')}<h2>${esc(nameOf(winner))}</h2><p><strong>WINNER</strong></p><p>${Number(counts[winner.id]||0)} jury votes</p></div>`:''}${runner?`<div class="single-finale-champion">${portrait(runner,'large')}<h2>${esc(nameOf(runner))}</h2><p><strong>RUNNER-UP</strong></p><p>${Number(counts[runner.id]||0)} jury votes</p></div>`:''}</div><section class="single-finale-section"><h3>Final Vote Count</h3><div class="single-finale-tally">${tally}</div></section><section class="single-finale-section"><h3>Complete Placements</h3><div class="single-finale-grid">${wall}</div></section><p>Press <strong>Proceed</strong> to open the complete Results page.</p></div>`,{week:s.currentWeek,skipHistory:false,skipLiveView:false});
+                save(); return;
+            }
+            if(index>=5||s.completed){showResults();return;}
+            ORIGINAL_NEXT(); return;
         }
-
-        // IMPORTANT: the stable twist engine has a private runFinalResults().
-        // We allow it to run if necessary, but immediately replace its output
-        // with our resolved results. This catches both the normal finale-results
-        // path and older saves that jump directly to a completed simulation.
-        const wasFinalResults = isFinale && (
-            eventBefore?.key === "finale-results" ||
-            eventBefore?.key === "final-results"
-        );
-
         ORIGINAL_NEXT();
-
-        if (wasFinalResults || s.completed === true || s.currentPhase === "complete") {
-            // Do not let an old/stale Results-page renderer win this race.
-            showResults();
-            return;
-        }
     }
 
     addStyles();
