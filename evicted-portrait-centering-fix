@@ -1,0 +1,102 @@
+/*
+ * BIG BROTHER SIMULATOR — EVICTED HOUSEGUEST PORTRAIT CENTERING FIX
+ *
+ * Load after the other simulator fixes.
+ * Visual-only: centers evicted Houseguest portraits/cards.
+ */
+
+(function () {
+    "use strict";
+
+    function centerEvictedPortraits() {
+        const headings = Array.from(document.querySelectorAll("h2,h3,h4"));
+
+        headings.forEach(heading => {
+            const text = heading.textContent.trim().toLowerCase();
+
+            if (
+                !text.includes("evict") &&
+                !text.includes("eviction") &&
+                !text.includes("evicted")
+            ) return;
+
+            const container =
+                heading.closest("section") ||
+                heading.parentElement;
+
+            if (!container) return;
+
+            const candidates = container.querySelectorAll(
+                '[style*="grid"], [style*="flex"], .houseguest-card, .player-card, .eviction-card'
+            );
+
+            candidates.forEach(el => {
+                el.style.justifyItems = "center";
+                el.style.justifyContent = "center";
+                el.style.alignItems = "center";
+                el.style.textAlign = "center";
+            });
+
+            container.querySelectorAll("img").forEach(img => {
+                img.style.display = "block";
+                img.style.marginLeft = "auto";
+                img.style.marginRight = "auto";
+            });
+        });
+
+        /*
+         * Also center any currently displayed eviction portrait/card.
+         * These selectors are intentionally broad but only affect elements
+         * inside the active event area.
+         */
+        const eventAreas = document.querySelectorAll(
+            "#event-content, #event-container, .event-content, .event-card, .game-event"
+        );
+
+        eventAreas.forEach(area => {
+            area.querySelectorAll("img").forEach(img => {
+                img.style.display = "block";
+                img.style.marginLeft = "auto";
+                img.style.marginRight = "auto";
+            });
+
+            area.querySelectorAll(
+                ".houseguest-card, .player-card, .eviction-card"
+            ).forEach(card => {
+                card.style.display = "flex";
+                card.style.flexDirection = "column";
+                card.style.alignItems = "center";
+                card.style.justifyContent = "center";
+                card.style.textAlign = "center";
+                card.style.marginLeft = "auto";
+                card.style.marginRight = "auto";
+            });
+        });
+    }
+
+    function applyFix() {
+        centerEvictedPortraits();
+        setTimeout(centerEvictedPortraits, 100);
+        setTimeout(centerEvictedPortraits, 300);
+        setTimeout(centerEvictedPortraits, 700);
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", applyFix);
+    } else {
+        applyFix();
+    }
+
+    const observer = new MutationObserver(() => {
+        centerEvictedPortraits();
+    });
+
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+
+    console.log(
+        "EVICTED PORTRAIT CENTERING FIX loaded."
+    );
+})();
