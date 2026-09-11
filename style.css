@@ -3070,3 +3070,30 @@ select {
 .stable-ceremony p {
     text-align: center !important;
 }
+
+/* =========================================================
+   EVICTION PORTRAIT CENTERING FIX
+   ========================================================= */
+
+.sim-main-panel #event-content .eviction-result-portrait {
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    margin: 22px auto !important;
+}
+
+.sim-main-panel #event-content .eviction-result-portrait .sim-portrait {
+    width: 120px !important;
+    margin: 0 auto !important;
+    align-self: center !important;
+    text-align: center !important;
+}
+
+.sim-main-panel #event-content .eviction-result-portrait .sim-portrait img,
+.sim-main-panel #event-content .eviction-result-portrait .sim-portrait-placeholder {
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
