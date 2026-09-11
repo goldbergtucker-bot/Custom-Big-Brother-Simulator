@@ -182,28 +182,16 @@
     }
 
     function juryMembers() {
-        const size = Math.max(
-    0,
-    Number(season()?.rules?.jurySize ?? 7)
-);
-
-const maxPlacement = 2 + size;
-
-const jury = players()
-    .filter(p => {
-        const place = Number(p.placement);
-
-        return (
-            Number.isFinite(place) &&
-            place >= 3 &&
-            place <= maxPlacement
-        );
-    })
-    .sort(
-        (a, b) =>
-            Number(a.placement) -
-            Number(b.placement)
-    );
+        const s = simulation();
+        const size = Math.max(0, Number(season()?.rules?.jurySize ?? 7));
+        const maxPlacement = 3 + size;
+        const eligible = players().filter(p => {
+            const place = Number(p.placement);
+            return place >= 4 && place <= maxPlacement;
+        }).sort((a,b) => Number(a.placement)-Number(b.placement));
+        if (s) s.jury = eligible.map(p => p.id);
+        return eligible;
+    }
     function preJuryMembers() {
         const size = Math.max(0, Number(season()?.rules?.jurySize ?? 7));
         const maxPlacement = 3 + size;
