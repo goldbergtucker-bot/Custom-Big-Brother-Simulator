@@ -7045,7 +7045,7 @@ function runJuryVotingEvent() {
         finalists=[finalHOH,chosen].filter(Boolean);
         sim.finalists=finalists.map(p=>p.id);
     }
-    if (!Array.isArray(sim.jury) || sim.jury.length === 0) sim.jury=getJuryMembers();
+    sim.jury = getJuryMembers();
     const votes=[];
     sim.jury.forEach(jid=>{
         const juror=getHouseguestForSimulation(jid); if(!juror) return;
