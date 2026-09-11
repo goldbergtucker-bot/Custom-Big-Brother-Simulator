@@ -6693,7 +6693,7 @@ function getJuryMembers() {
 
     // Jury eligibility must be based on actual finish/eviction order, NOT on the
     // order Houseguests happen to appear in the cast array. At the Final 3, the
-    // jurors are the jurySize evictees with the best placements (4th, 5th, ...).
+    // jurors are the jurySize evictees with the best placements (3rd, 4th, ...).
     // This prevents pre-jury Houseguests from accidentally receiving jury votes.
     const evicted = (currentSeason?.houseguests || [])
         .filter(p => p.status === "evicted" && Number(p.placement) >= 4)
