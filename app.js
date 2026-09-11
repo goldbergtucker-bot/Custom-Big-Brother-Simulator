@@ -6706,6 +6706,7 @@ function getJuryMembers() {
 
     // Jury starts at 3rd place.
     // Example: Jury Size 9 = 3rd through 11th.
+   
     const lowestJurorPlacement = 2 + jurySize;
 
     const jurors = (currentSeason?.houseguests || [])
