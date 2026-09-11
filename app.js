@@ -6703,6 +6703,7 @@ function juryMembers() {
         Number(season()?.rules?.jurySize ?? 7)
     );
 
+    // Jury starts with 3rd place.
     const maxPlacement = 2 + size;
 
     const eligible = players()
