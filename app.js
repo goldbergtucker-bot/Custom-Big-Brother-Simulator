@@ -6696,7 +6696,7 @@ function getJuryMembers() {
     // jurors are the jurySize evictees with the best placements (3rd, 4th, ...).
     // This prevents pre-jury Houseguests from accidentally receiving jury votes.
     const evicted = (currentSeason?.houseguests || [])
-        .filter(p => p.status === "evicted" && Number(p.placement) >= 4)
+        .filter(p => p.status === "evicted" && Number(p.placement) >= 3)
         .sort((a, b) => Number(a.placement) - Number(b.placement));
 
     return evicted.slice(0, jurySize).map(p => p.id);
