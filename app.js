@@ -1054,7 +1054,7 @@ function syncLiveHouseguestNames(id) {
         if (!card) return;
         const number = card.querySelector(".houseguest-number");
         const display = card.querySelector(".houseguest-display-name");
-        if (number) number.textContent = `Houseguest ${index + 1}`;
+        if (number) number.textContent = "Houseguest";
         if (display) display.textContent = fullName;
     });
 
