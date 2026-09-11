@@ -1,126 +1,219 @@
 /*
- * BIG BROTHER SIMULATOR — EVICTED HOUSEGUEST PORTRAIT CENTERING FIX v2
+ * FINAL EVICTION + PORTRAIT CENTERING FIX
  *
- * Targets the ACTUAL eviction DOM used by app.js.
- *
- * Root cause:
- * #event-content > div is globally forced to width:100%, which also catches
- * the lone .sim-portrait returned directly by simulationPortrait().
- *
- * This fix restores the portrait itself to its intended 120px width and
- * centers it in the event panel. It does not alter simulation logic,
- * placements, voting, or history.
+ * This file is intentionally separate from app.js and twist-engine.js.
+ * It does not replace the simulation engine. It only:
+ *   1. Forces eviction ceremony content/portraits to the center.
+ *   2. Gives the Final 3 -> Final 2 transition its own Final Eviction screen
+ *      before the already-generated Jury Voting screen.
  */
-
 (function () {
     "use strict";
 
-    function fixEvictionPortrait() {
-        const eventContent = document.getElementById("event-content");
-        const eventType = document.getElementById("event-type");
+    const STYLE_ID = "final-eviction-fix-style";
+    const ORIGINAL_NEXT = window.runNextEvent;
 
-        if (!eventContent) return;
+    function getSeason() {
+        return window.currentSeason || null;
+    }
 
-        const type = String(eventType?.textContent || "").trim().toUpperCase();
-        const title = String(document.getElementById("event-title")?.textContent || "").trim().toLowerCase();
+    function getSimulation() {
+        return getSeason()?.simulation || null;
+    }
 
-        const isEviction =
-            type === "EVICTION" ||
-            title === "eviction" ||
-            title.includes("eviction");
+    function getPlayer(id) {
+        return (getSeason()?.houseguests || []).find(p => p.id === id) || null;
+    }
 
-        if (!isEviction) return;
+    function nameOf(player) {
+        if (!player) return "Unknown Houseguest";
+        if (window.getHouseguestDisplayName) {
+            return window.getHouseguestDisplayName(player.id, getSeason()?.houseguests || []);
+        }
+        return player.name || "Unknown Houseguest";
+    }
+
+    function portrait(player) {
+        return window.simulationPortrait ? window.simulationPortrait(player, "large") : "";
+    }
+
+    function escapeText(value) {
+        return window.escapeHTML ? window.escapeHTML(String(value ?? "")) : String(value ?? "");
+    }
+
+    function save() {
+        if (window.persistCurrentSeason) window.persistCurrentSeason();
+    }
+
+    function addStyles() {
+        if (document.getElementById(STYLE_ID)) return;
+        const style = document.createElement("style");
+        style.id = STYLE_ID;
+        style.textContent = `
+            /* Keep every regular eviction ceremony centered. */
+            .sim-main-panel #event-content .stable-eviction-result {
+                width: 100% !important;
+                max-width: 900px !important;
+                margin-left: auto !important;
+                margin-right: auto !important;
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: center !important;
+                justify-content: flex-start !important;
+                text-align: center !important;
+                box-sizing: border-box !important;
+            }
+
+            .sim-main-panel #event-content .stable-eviction-result > .sim-portrait {
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: center !important;
+                justify-content: center !important;
+                margin: 18px auto 14px !important;
+                align-self: center !important;
+            }
+
+            .sim-main-panel #event-content .stable-eviction-result > h2,
+            .sim-main-panel #event-content .stable-eviction-result > p {
+                width: 100% !important;
+                text-align: center !important;
+                margin-left: auto !important;
+                margin-right: auto !important;
+            }
+
+            /* The dedicated Final Eviction presentation uses the same centered layout. */
+            .final-eviction-fix-card {
+                width: 100% !important;
+                max-width: 900px !important;
+                margin: 0 auto !important;
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: center !important;
+                justify-content: flex-start !important;
+                text-align: center !important;
+                box-sizing: border-box !important;
+            }
+
+            .final-eviction-fix-card > .sim-portrait {
+                margin: 20px auto 16px !important;
+                align-self: center !important;
+            }
+
+            .final-eviction-fix-card h2,
+            .final-eviction-fix-card p {
+                width: 100% !important;
+                text-align: center !important;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    function showFinalEviction(player, week) {
+        const sim = getSimulation();
+        if (!sim || !player || !window.showEvent) return;
+
+        sim.renderingEventKey = "final-eviction";
+        sim.renderingEventLabel = "Final Eviction";
+
+        window.showEvent(
+            "Final Eviction",
+            "EVICTION",
+            `
+                <div class="final-eviction-fix-card">
+                    ${portrait(player)}
+                    <h2>${escapeText(nameOf(player))}</h2>
+                    <p><strong>${escapeText(nameOf(player))}</strong> has been evicted from the Big Brother house in <strong>3rd place</strong>.</p>
+                    <p>The Final 2 have been decided. Press <strong>Proceed</strong> to continue to Jury Voting.</p>
+                </div>
+            `,
+            { week: week, skipLiveView: false }
+        );
+    }
+
+    function continueToJuryVoting() {
+        const sim = getSimulation();
+        if (!sim || !sim.pendingFinalEvictionReveal) return false;
+
+        const saved = sim.pendingFinalEvictionReveal;
+        sim.pendingFinalEvictionReveal = null;
+        sim.currentEventIndex = Number(saved.nextIndex);
+
+        if (window.showEvent) {
+            window.showEvent(
+                saved.title || "Jury Voting",
+                saved.type || "JURY VOTING",
+                saved.content || "",
+                {
+                    week: saved.week || sim.currentWeek,
+                    skipHistory: true,
+                    skipLiveView: false
+                }
+            );
+        }
+
+        save();
+        if (window.renderSimulationWeekNavigation) window.renderSimulationWeekNavigation();
+        return true;
+    }
+
+    window.runNextEvent = function () {
+        addStyles();
+
+        const sim = getSimulation();
+        const activeBefore = sim && window.getActiveHouseguests
+            ? window.getActiveHouseguests().slice()
+            : [];
 
         /*
-         * app.js renders the eviction portrait directly as:
-         * #event-content > .sim-portrait.sim-portrait-large
-         *
-         * style.css later applies:
-         * #event-content > div { width:100%; }
-         *
-         * That broad rule wins over .sim-portrait-large { width:120px; }.
+         * The stable engine normally performs the Final 3 -> Final 2 decision
+         * inside Jury Voting. Let it calculate everything exactly as before,
+         * then insert a presentation-only Final Eviction screen between that
+         * calculation and the jury vote display.
          */
-        eventContent.querySelectorAll(":scope > .sim-portrait").forEach(portrait => {
-            portrait.style.setProperty("width", "120px", "important");
-            portrait.style.setProperty("max-width", "120px", "important");
-            portrait.style.setProperty("min-width", "120px", "important");
-            portrait.style.setProperty("margin-left", "auto", "important");
-            portrait.style.setProperty("margin-right", "auto", "important");
-            portrait.style.setProperty("align-self", "center", "important");
-            portrait.style.setProperty("justify-self", "center", "important");
-            portrait.style.setProperty("text-align", "center", "important");
-            portrait.style.setProperty("display", "block", "important");
-            portrait.style.setProperty("box-sizing", "border-box", "important");
-
-            const image = portrait.querySelector("img");
-            if (image) {
-                image.style.setProperty("display", "block", "important");
-                image.style.setProperty("width", "120px", "important");
-                image.style.setProperty("height", "145px", "important");
-                image.style.setProperty("margin-left", "auto", "important");
-                image.style.setProperty("margin-right", "auto", "important");
-            }
-
-            const placeholder = portrait.querySelector(".sim-portrait-placeholder");
-            if (placeholder) {
-                placeholder.style.setProperty("margin-left", "auto", "important");
-                placeholder.style.setProperty("margin-right", "auto", "important");
-            }
-        });
-    }
-
-    function applyFix() {
-        fixEvictionPortrait();
-        setTimeout(fixEvictionPortrait, 0);
-        setTimeout(fixEvictionPortrait, 50);
-        setTimeout(fixEvictionPortrait, 150);
-        setTimeout(fixEvictionPortrait, 300);
-    }
-
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", applyFix);
-    } else {
-        applyFix();
-    }
-
-    /*
-     * showEvent() replaces #event-content.innerHTML, so observe that exact
-     * container instead of scanning unrelated headings/cards.
-     */
-    const eventContent = document.getElementById("event-content");
-
-    if (eventContent) {
-        const observer = new MutationObserver(applyFix);
-        observer.observe(eventContent, {
-            childList: true,
-            subtree: true
-        });
-    }
-
-    const eventType = document.getElementById("event-type");
-    const eventTitle = document.getElementById("event-title");
-
-    if (eventType || eventTitle) {
-        const observer = new MutationObserver(applyFix);
-
-        if (eventType) {
-            observer.observe(eventType, {
-                childList: true,
-                characterData: true,
-                subtree: true
-            });
+        if (sim && sim.pendingFinalEvictionReveal) {
+            continueToJuryVoting();
+            return;
         }
 
-        if (eventTitle) {
-            observer.observe(eventTitle, {
-                childList: true,
-                characterData: true,
-                subtree: true
-            });
-        }
-    }
+        const isFinalThreeJuryStep =
+            sim &&
+            (sim.currentPhase === "finale" || sim.finaleStarted) &&
+            activeBefore.length === 3 &&
+            typeof ORIGINAL_NEXT === "function";
 
-    console.log(
-        "EVICTED PORTRAIT CENTERING FIX v2 loaded — targeted to #event-content > .sim-portrait."
-    );
+        const nextIndexBefore = Number(sim?.currentEventIndex || 0);
+
+        if (!isFinalThreeJuryStep) {
+            if (typeof ORIGINAL_NEXT === "function") ORIGINAL_NEXT();
+            return;
+        }
+
+        ORIGINAL_NEXT();
+
+        const activeAfter = window.getActiveHouseguests
+            ? window.getActiveHouseguests().slice()
+            : [];
+
+        const evicted = activeBefore.find(p => !activeAfter.some(a => a.id === p.id));
+
+        /* Only insert this screen when the engine actually created a 3rd-place player. */
+        if (!evicted || Number(evicted.placement) !== 3 || !sim.liveView) return;
+
+        const juryView = {
+            title: sim.liveView.title || "Jury Voting",
+            type: sim.liveView.type || "JURY VOTING",
+            content: sim.liveView.content || "",
+            week: sim.liveView.week || sim.currentWeek,
+            nextIndex: nextIndexBefore + 1
+        };
+
+        sim.pendingFinalEvictionReveal = juryView;
+        sim.currentEventIndex = nextIndexBefore;
+
+        showFinalEviction(evicted, juryView.week);
+        save();
+    };
+
+    addStyles();
+    console.log("Final eviction presentation fix loaded.");
 })();
