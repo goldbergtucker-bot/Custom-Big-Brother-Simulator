@@ -6727,65 +6727,31 @@ function getJuryMembers() {
         .map(player => player.id);
 }
 
-    /*
-     * =========================================================
-     * JURY BOUNDARY
-     * =========================================================
-     *
-     * The finalists are:
-     *   1st place
-     *   2nd place
-     *   3rd place
-     *
-     * Therefore the jury ALWAYS begins with 4th place.
-     *
-     * Example:
-     *
-     * Jury Size = 9
-     *
-     * 4th  = Juror
-     * 5th  = Juror
-     * 6th  = Juror
-     * 7th  = Juror
-     * 8th  = Juror
-     * 9th  = Juror
-     * 10th = Juror
-     * 11th = Juror
-     * 12th = Juror
-     *
-     * 3rd  = Finalist — NOT a juror
-     * 13th = Pre-jury
-     * 14th = Pre-jury
-     * 15th = Pre-jury
-     * 16th = Pre-jury
-     *
-     * The lowest juror placement is therefore:
-     *
-     *     3 + jurySize
-     *
-     * =========================================================
-     */
+function getJuryMembers() {
+    const jurySize = Math.max(
+        0,
+        Number(currentSeason?.rules?.jurySize ?? 7)
+    );
 
-    const lowestJurorPlacement = 3 + jurySize;
+    if (jurySize === 0) return [];
 
-    const eligibleJurors = (currentSeason?.houseguests || [])
+    // Jury starts at 3rd place.
+    // Example: Jury Size 9 = 3rd through 11th.
+    const lowestJurorPlacement = 2 + jurySize;
+
+    const jurors = (currentSeason?.houseguests || [])
         .filter(player => {
             const placement = Number(player.placement);
-
             return (
                 player.status === "evicted" &&
                 Number.isFinite(placement) &&
-                placement >= 4 &&
+                placement >= 3 &&
                 placement <= lowestJurorPlacement
             );
         })
-        .sort(
-            (a, b) =>
-                Number(a.placement) -
-                Number(b.placement)
-        );
+        .sort((a, b) => Number(a.placement) - Number(b.placement));
 
-    return eligibleJurors
+    return jurors
         .slice(0, jurySize)
         .map(player => player.id);
 }
