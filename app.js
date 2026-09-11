@@ -6441,7 +6441,16 @@ function runEvictionEvent() {
     if (isDouble && simulation.evictionsThisWeek < 2 && remaining.length > Number(currentSeason.rules?.finalists || 2)) {
         simulation.pendingCycle = "double";
         simulation.pendingWeekAdvance = false;
-        showEvent("Eviction", "EVICTION", `${simulationPortrait(evictionTarget, "large")}<p><strong>${escapeHTML(getHouseguestDisplayName(evictionTarget?.id, currentSeason.houseguests))}</strong> has been evicted from the Big Brother house.</p>${voteText}<p><strong>Double Eviction:</strong> Press Proceed to begin the second HOH competition in Week ${week}.</p>`);
+        showEvent(
+    "Eviction",
+    "EVICTION",
+    `<div class="eviction-result-portrait">
+        ${simulationPortrait(evictionTarget, "large")}
+    </div>
+    <p><strong>${escapeHTML(getHouseguestDisplayName(evictionTarget?.id, currentSeason.houseguests))}</strong> has been evicted from the Big Brother house.</p>
+    ${voteText}
+    <p><strong>Double Eviction:</strong> Press Proceed to begin the second HOH competition in Week ${week}.</p>`
+);
         return;
     }
 
