@@ -1,84 +1,80 @@
 /*
- * BIG BROTHER SIMULATOR — EVICTED HOUSEGUEST PORTRAIT CENTERING FIX
+ * BIG BROTHER SIMULATOR — EVICTED HOUSEGUEST PORTRAIT CENTERING FIX v2
  *
- * Load after the other simulator fixes.
- * Visual-only: centers evicted Houseguest portraits/cards.
+ * Targets the ACTUAL eviction DOM used by app.js.
+ *
+ * Root cause:
+ * #event-content > div is globally forced to width:100%, which also catches
+ * the lone .sim-portrait returned directly by simulationPortrait().
+ *
+ * This fix restores the portrait itself to its intended 120px width and
+ * centers it in the event panel. It does not alter simulation logic,
+ * placements, voting, or history.
  */
 
 (function () {
     "use strict";
 
-    function centerEvictedPortraits() {
-        const headings = Array.from(document.querySelectorAll("h2,h3,h4"));
+    function fixEvictionPortrait() {
+        const eventContent = document.getElementById("event-content");
+        const eventType = document.getElementById("event-type");
 
-        headings.forEach(heading => {
-            const text = heading.textContent.trim().toLowerCase();
+        if (!eventContent) return;
 
-            if (
-                !text.includes("evict") &&
-                !text.includes("eviction") &&
-                !text.includes("evicted")
-            ) return;
+        const type = String(eventType?.textContent || "").trim().toUpperCase();
+        const title = String(document.getElementById("event-title")?.textContent || "").trim().toLowerCase();
 
-            const container =
-                heading.closest("section") ||
-                heading.parentElement;
+        const isEviction =
+            type === "EVICTION" ||
+            title === "eviction" ||
+            title.includes("eviction");
 
-            if (!container) return;
-
-            const candidates = container.querySelectorAll(
-                '[style*="grid"], [style*="flex"], .houseguest-card, .player-card, .eviction-card'
-            );
-
-            candidates.forEach(el => {
-                el.style.justifyItems = "center";
-                el.style.justifyContent = "center";
-                el.style.alignItems = "center";
-                el.style.textAlign = "center";
-            });
-
-            container.querySelectorAll("img").forEach(img => {
-                img.style.display = "block";
-                img.style.marginLeft = "auto";
-                img.style.marginRight = "auto";
-            });
-        });
+        if (!isEviction) return;
 
         /*
-         * Also center any currently displayed eviction portrait/card.
-         * These selectors are intentionally broad but only affect elements
-         * inside the active event area.
+         * app.js renders the eviction portrait directly as:
+         * #event-content > .sim-portrait.sim-portrait-large
+         *
+         * style.css later applies:
+         * #event-content > div { width:100%; }
+         *
+         * That broad rule wins over .sim-portrait-large { width:120px; }.
          */
-        const eventAreas = document.querySelectorAll(
-            "#event-content, #event-container, .event-content, .event-card, .game-event"
-        );
+        eventContent.querySelectorAll(":scope > .sim-portrait").forEach(portrait => {
+            portrait.style.setProperty("width", "120px", "important");
+            portrait.style.setProperty("max-width", "120px", "important");
+            portrait.style.setProperty("min-width", "120px", "important");
+            portrait.style.setProperty("margin-left", "auto", "important");
+            portrait.style.setProperty("margin-right", "auto", "important");
+            portrait.style.setProperty("align-self", "center", "important");
+            portrait.style.setProperty("justify-self", "center", "important");
+            portrait.style.setProperty("text-align", "center", "important");
+            portrait.style.setProperty("display", "block", "important");
+            portrait.style.setProperty("box-sizing", "border-box", "important");
 
-        eventAreas.forEach(area => {
-            area.querySelectorAll("img").forEach(img => {
-                img.style.display = "block";
-                img.style.marginLeft = "auto";
-                img.style.marginRight = "auto";
-            });
+            const image = portrait.querySelector("img");
+            if (image) {
+                image.style.setProperty("display", "block", "important");
+                image.style.setProperty("width", "120px", "important");
+                image.style.setProperty("height", "145px", "important");
+                image.style.setProperty("margin-left", "auto", "important");
+                image.style.setProperty("margin-right", "auto", "important");
+            }
 
-            area.querySelectorAll(
-                ".houseguest-card, .player-card, .eviction-card"
-            ).forEach(card => {
-                card.style.display = "flex";
-                card.style.flexDirection = "column";
-                card.style.alignItems = "center";
-                card.style.justifyContent = "center";
-                card.style.textAlign = "center";
-                card.style.marginLeft = "auto";
-                card.style.marginRight = "auto";
-            });
+            const placeholder = portrait.querySelector(".sim-portrait-placeholder");
+            if (placeholder) {
+                placeholder.style.setProperty("margin-left", "auto", "important");
+                placeholder.style.setProperty("margin-right", "auto", "important");
+            }
         });
     }
 
     function applyFix() {
-        centerEvictedPortraits();
-        setTimeout(centerEvictedPortraits, 100);
-        setTimeout(centerEvictedPortraits, 300);
-        setTimeout(centerEvictedPortraits, 700);
+        fixEvictionPortrait();
+        setTimeout(fixEvictionPortrait, 0);
+        setTimeout(fixEvictionPortrait, 50);
+        setTimeout(fixEvictionPortrait, 150);
+        setTimeout(fixEvictionPortrait, 300);
     }
 
     if (document.readyState === "loading") {
@@ -87,16 +83,44 @@
         applyFix();
     }
 
-    const observer = new MutationObserver(() => {
-        centerEvictedPortraits();
-    });
+    /*
+     * showEvent() replaces #event-content.innerHTML, so observe that exact
+     * container instead of scanning unrelated headings/cards.
+     */
+    const eventContent = document.getElementById("event-content");
 
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true
-    });
+    if (eventContent) {
+        const observer = new MutationObserver(applyFix);
+        observer.observe(eventContent, {
+            childList: true,
+            subtree: true
+        });
+    }
+
+    const eventType = document.getElementById("event-type");
+    const eventTitle = document.getElementById("event-title");
+
+    if (eventType || eventTitle) {
+        const observer = new MutationObserver(applyFix);
+
+        if (eventType) {
+            observer.observe(eventType, {
+                childList: true,
+                characterData: true,
+                subtree: true
+            });
+        }
+
+        if (eventTitle) {
+            observer.observe(eventTitle, {
+                childList: true,
+                characterData: true,
+                subtree: true
+            });
+        }
+    }
 
     console.log(
-        "EVICTED PORTRAIT CENTERING FIX loaded."
+        "EVICTED PORTRAIT CENTERING FIX v2 loaded — targeted to #event-content > .sim-portrait."
     );
 })();
