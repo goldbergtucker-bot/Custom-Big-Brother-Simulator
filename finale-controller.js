@@ -474,25 +474,54 @@
         save();
     }
 
-    function continueAfterFinalEviction() {
-        const s = simulation();
-        const pending = s?.finalEvictionReveal;
-        if (!pending) return false;
-        s.finalEvictionReveal = null;
-        s.currentEventIndex = Number(pending.nextIndex);
+   function continueAfterFinalEviction() {
+    const s = simulation();
+    const pending = s?.finalEvictionReveal;
 
-        if (pending.juryView && window.showEvent) {
-            window.showEvent(
-                pending.juryView.title || "Jury Voting",
-                pending.juryView.type || "JURY VOTING",
-                pending.juryView.content || "",
-                { week: pending.juryView.week || s.currentWeek, skipHistory: false, skipLiveView: false }
-            );
-        }
-        if (window.renderSimulationWeekNavigation) window.renderSimulationWeekNavigation();
-        save();
-        return true;
+    if (!pending) return false;
+
+    s.finalEvictionReveal = null;
+
+    /*
+     * The actual finale chain is:
+     *
+     * 0 = Final HOH Part 1
+     * 1 = Final HOH Part 2
+     * 2 = Final HOH Part 3
+     * 3 = Final Eviction
+     * 4 = Jury Voting
+     * 5 = Final Results
+     *
+     * Do NOT hard-code the index unless the chain actually
+     * contains these events.
+     */
+    const juryIndex = Number(
+        pending.juryIndex ?? 4
+    );
+
+    s.currentEventIndex = juryIndex;
+
+    if (pending.juryContent && window.showEvent) {
+        window.showEvent(
+            "Jury Voting",
+            "JURY VOTING",
+            pending.juryContent,
+            {
+                week: s.currentWeek,
+                skipHistory: false,
+                skipLiveView: false
+            }
+        );
     }
+
+    if (window.renderSimulationWeekNavigation) {
+        window.renderSimulationWeekNavigation();
+    }
+
+    save();
+
+    return true;
+}
 
     function showResults() {
         addStyles();
@@ -536,18 +565,332 @@
         save();
     }
 
-    function nextEvent() {
-        addStyles();
-        const s = simulation();
-        if (!s) return;
-        if (s.finalEvictionReveal) {
-            const pending = s.finalEvictionReveal;
-            s.finalEvictionReveal = null;
-            s.currentEventIndex = 4;
-            if (window.showEvent) window.showEvent('Jury Voting', 'JURY VOTING', pending.juryContent || '<p>The jury vote has been recorded.</p>', { week: s.currentWeek, skipHistory: false, skipLiveView: false });
+   function nextEvent() {
+    addStyles();
+
+    const s = simulation();
+
+    if (!s) return;
+
+    /*
+     * -------------------------------------------------------
+     * FINAL EVICTION REVEAL
+     * -------------------------------------------------------
+     *
+     * The user has already seen the Final 3 eviction screen.
+     * Proceed should now reveal the jury vote.
+     */
+    if (s.finalEvictionReveal) {
+        continueAfterFinalEviction();
+        return;
+    }
+
+    /*
+     * Never advance the actual simulation while the user
+     * is viewing an old event.
+     */
+    if (s.isViewingHistory) {
+        if (window.returnToCurrentSimulation) {
+            window.returnToCurrentSimulation();
+        }
+        return;
+    }
+
+    const isFinale =
+        s.currentPhase === "finale" ||
+        s.finaleStarted === true;
+
+    /*
+     * -------------------------------------------------------
+     * FINALE
+     * -------------------------------------------------------
+     */
+    if (isFinale) {
+
+        const index = Number(
+            s.currentEventIndex || 0
+        );
+
+        /*
+         * ---------------------------------------------------
+         * FINAL HOH PARTS 1–3
+         * ---------------------------------------------------
+         *
+         * app.js owns these events.
+         *
+         * Do NOT call ORIGINAL_NEXT() for them here.
+         * Doing so can cause the normal event engine and the
+         * finale controller to process the same event twice.
+         */
+        if (
+            index === 0 ||
+            index === 1 ||
+            index === 2
+        ) {
+            if (window.runFinalHOHEvent) {
+                window.runFinalHOHEvent();
+            } else if (ORIGINAL_NEXT) {
+                ORIGINAL_NEXT();
+            }
+
             save();
             return;
         }
+
+        /*
+         * ---------------------------------------------------
+         * FINAL 3 → FINAL 2
+         * ---------------------------------------------------
+         *
+         * Event 3 is the dedicated Final Eviction.
+         */
+        if (
+            index === 3 &&
+            activePlayers().length === 3
+        ) {
+
+            /*
+             * Prevent generating the jury vote twice if the
+             * event is accidentally requested again.
+             */
+            if (s.finalEvictionReveal) {
+                return;
+            }
+
+            const result =
+                chooseFinalTwoAndRecordJury();
+
+            if (!result) {
+                console.error(
+                    "Finale Controller: Could not resolve Final 3 eviction."
+                );
+                return;
+            }
+
+            /*
+             * Store the jury screen until the user presses
+             * Proceed on the Final Eviction screen.
+             */
+            s.finalEvictionReveal = {
+                playerId: result.third.id,
+
+                juryIndex: 4,
+
+                juryContent:
+                    juryVotingHTML(
+                        result.finalists,
+                        result.votes
+                    )
+            };
+
+            /*
+             * Make absolutely certain the evicted player
+             * is recorded as 3rd place.
+             */
+            result.third.status = "evicted";
+            result.third.placement = 3;
+
+            s.currentEventIndex = 3;
+
+            if (window.showEvent) {
+                window.showEvent(
+                    "Final Eviction",
+                    "EVICTION",
+                    `
+                    <div class="single-finale-eviction">
+
+                        ${portrait(
+                            result.third,
+                            "large"
+                        )}
+
+                        <h2>
+                            ${esc(
+                                nameOf(result.third)
+                            )}
+                        </h2>
+
+                        <p>
+                            <strong>
+                                ${esc(
+                                    nameOf(result.third)
+                                )}
+                            </strong>
+                            has been evicted from the
+                            Big Brother house in
+                            <strong>3rd place</strong>.
+                        </p>
+
+                        <p>
+                            The Final 2 have now been
+                            decided.
+                        </p>
+
+                        <p>
+                            Press
+                            <strong>Proceed</strong>
+                            to reveal the jury vote.
+                        </p>
+
+                    </div>
+                    `,
+                    {
+                        week: s.currentWeek,
+                        skipHistory: true,
+                        skipLiveView: false
+                    }
+                );
+            }
+
+            save();
+            return;
+        }
+
+        /*
+         * ---------------------------------------------------
+         * JURY VOTING
+         * ---------------------------------------------------
+         *
+         * Event 4 has already been generated by the
+         * Final Eviction transition.
+         *
+         * If the event is reached normally, display it once.
+         */
+        if (index === 4) {
+
+            const finalists =
+                finalTwo();
+
+            /*
+             * Make sure jury members are based on placement.
+             */
+            const jury =
+                juryMembers();
+
+            /*
+             * If the jury vote does not exist yet, generate it
+             * exactly once.
+             */
+            let votes =
+                rawJuryVotes();
+
+            if (
+                !votes.length &&
+                finalists.length === 2
+            ) {
+
+                const generated =
+                    jury.map(juror => {
+
+                        const ranked =
+                            finalists
+                                .map(finalist => {
+
+                                    const bond =
+                                        window.allianceBond
+                                            ? Number(
+                                                window.allianceBond(
+                                                    juror.id,
+                                                    finalist.id
+                                                ) || 0
+                                            )
+                                            : 0;
+
+                                    const score =
+                                        Number(
+                                            finalist.ratings?.social || 0
+                                        ) * 0.4 +
+
+                                        Number(
+                                            finalist.ratings?.strategic || 0
+                                        ) * 0.35 +
+
+                                        Number(
+                                            finalist.ratings?.general || 0
+                                        ) * 0.15 +
+
+                                        Number(
+                                            finalist.ratings?.mental || 0
+                                        ) * 0.1 +
+
+                                        bond * 0.15 +
+
+                                        Math.random() * 3;
+
+                                    return {
+                                        finalist,
+                                        score
+                                    };
+                                })
+                                .sort(
+                                    (a, b) =>
+                                        b.score - a.score
+                                );
+
+                        return {
+                            juror: juror.id,
+                            vote:
+                                ranked[0]?.finalist?.id ||
+                                null
+                        };
+                    });
+
+                s.juryVotes = generated;
+
+                votes = generated;
+            }
+
+            /*
+             * Display jury voting exactly once.
+             */
+            if (window.showEvent) {
+
+                window.showEvent(
+                    "Jury Voting",
+                    "JURY VOTING",
+                    juryVotingHTML(
+                        finalists,
+                        votes
+                    ),
+                    {
+                        week: s.currentWeek,
+                        skipHistory: false,
+                        skipLiveView: false
+                    }
+                );
+            }
+
+            save();
+            return;
+        }
+
+        /*
+         * ---------------------------------------------------
+         * FINAL RESULTS
+         * ---------------------------------------------------
+         */
+        if (index >= 5) {
+
+            showResults();
+
+            save();
+
+            return;
+        }
+    }
+
+    /*
+     * -------------------------------------------------------
+     * NORMAL SEASON EVENTS
+     * -------------------------------------------------------
+     *
+     * Anything outside the finale is handed back to the
+     * original simulator engine.
+     */
+    if (ORIGINAL_NEXT) {
+        ORIGINAL_NEXT();
+    }
+}
         if (s.isViewingHistory) { if (window.returnToCurrentSimulation) window.returnToCurrentSimulation(); return; }
         const isFinale = s.currentPhase === 'finale' || s.finaleStarted === true;
         if (isFinale) {
@@ -566,5 +909,331 @@
         if (ORIGINAL_NEXT) ORIGINAL_NEXT();
     }
 
-    window.runNextEvent = nextEvent;
+  function nextEvent() {
+    addStyles();
+
+    const s = simulation();
+
+    if (!s) return;
+
+    /*
+     * -------------------------------------------------------
+     * FINAL EVICTION REVEAL
+     * -------------------------------------------------------
+     *
+     * The user has already seen the Final 3 eviction screen.
+     * Proceed should now reveal the jury vote.
+     */
+    if (s.finalEvictionReveal) {
+        continueAfterFinalEviction();
+        return;
+    }
+
+    /*
+     * Never advance the actual simulation while the user
+     * is viewing an old event.
+     */
+    if (s.isViewingHistory) {
+        if (window.returnToCurrentSimulation) {
+            window.returnToCurrentSimulation();
+        }
+        return;
+    }
+
+    const isFinale =
+        s.currentPhase === "finale" ||
+        s.finaleStarted === true;
+
+    /*
+     * -------------------------------------------------------
+     * FINALE
+     * -------------------------------------------------------
+     */
+    if (isFinale) {
+
+        const index = Number(
+            s.currentEventIndex || 0
+        );
+
+        /*
+         * ---------------------------------------------------
+         * FINAL HOH PARTS 1–3
+         * ---------------------------------------------------
+         *
+         * app.js owns these events.
+         *
+         * Do NOT call ORIGINAL_NEXT() for them here.
+         * Doing so can cause the normal event engine and the
+         * finale controller to process the same event twice.
+         */
+        if (
+            index === 0 ||
+            index === 1 ||
+            index === 2
+        ) {
+            if (window.runFinalHOHEvent) {
+                window.runFinalHOHEvent();
+            } else if (ORIGINAL_NEXT) {
+                ORIGINAL_NEXT();
+            }
+
+            save();
+            return;
+        }
+
+        /*
+         * ---------------------------------------------------
+         * FINAL 3 → FINAL 2
+         * ---------------------------------------------------
+         *
+         * Event 3 is the dedicated Final Eviction.
+         */
+        if (
+            index === 3 &&
+            activePlayers().length === 3
+        ) {
+
+            /*
+             * Prevent generating the jury vote twice if the
+             * event is accidentally requested again.
+             */
+            if (s.finalEvictionReveal) {
+                return;
+            }
+
+            const result =
+                chooseFinalTwoAndRecordJury();
+
+            if (!result) {
+                console.error(
+                    "Finale Controller: Could not resolve Final 3 eviction."
+                );
+                return;
+            }
+
+            /*
+             * Store the jury screen until the user presses
+             * Proceed on the Final Eviction screen.
+             */
+            s.finalEvictionReveal = {
+                playerId: result.third.id,
+
+                juryIndex: 4,
+
+                juryContent:
+                    juryVotingHTML(
+                        result.finalists,
+                        result.votes
+                    )
+            };
+
+            /*
+             * Make absolutely certain the evicted player
+             * is recorded as 3rd place.
+             */
+            result.third.status = "evicted";
+            result.third.placement = 3;
+
+            s.currentEventIndex = 3;
+
+            if (window.showEvent) {
+                window.showEvent(
+                    "Final Eviction",
+                    "EVICTION",
+                    `
+                    <div class="single-finale-eviction">
+
+                        ${portrait(
+                            result.third,
+                            "large"
+                        )}
+
+                        <h2>
+                            ${esc(
+                                nameOf(result.third)
+                            )}
+                        </h2>
+
+                        <p>
+                            <strong>
+                                ${esc(
+                                    nameOf(result.third)
+                                )}
+                            </strong>
+                            has been evicted from the
+                            Big Brother house in
+                            <strong>3rd place</strong>.
+                        </p>
+
+                        <p>
+                            The Final 2 have now been
+                            decided.
+                        </p>
+
+                        <p>
+                            Press
+                            <strong>Proceed</strong>
+                            to reveal the jury vote.
+                        </p>
+
+                    </div>
+                    `,
+                    {
+                        week: s.currentWeek,
+                        skipHistory: true,
+                        skipLiveView: false
+                    }
+                );
+            }
+
+            save();
+            return;
+        }
+
+        /*
+         * ---------------------------------------------------
+         * JURY VOTING
+         * ---------------------------------------------------
+         *
+         * Event 4 has already been generated by the
+         * Final Eviction transition.
+         *
+         * If the event is reached normally, display it once.
+         */
+        if (index === 4) {
+
+            const finalists =
+                finalTwo();
+
+            /*
+             * Make sure jury members are based on placement.
+             */
+            const jury =
+                juryMembers();
+
+            /*
+             * If the jury vote does not exist yet, generate it
+             * exactly once.
+             */
+            let votes =
+                rawJuryVotes();
+
+            if (
+                !votes.length &&
+                finalists.length === 2
+            ) {
+
+                const generated =
+                    jury.map(juror => {
+
+                        const ranked =
+                            finalists
+                                .map(finalist => {
+
+                                    const bond =
+                                        window.allianceBond
+                                            ? Number(
+                                                window.allianceBond(
+                                                    juror.id,
+                                                    finalist.id
+                                                ) || 0
+                                            )
+                                            : 0;
+
+                                    const score =
+                                        Number(
+                                            finalist.ratings?.social || 0
+                                        ) * 0.4 +
+
+                                        Number(
+                                            finalist.ratings?.strategic || 0
+                                        ) * 0.35 +
+
+                                        Number(
+                                            finalist.ratings?.general || 0
+                                        ) * 0.15 +
+
+                                        Number(
+                                            finalist.ratings?.mental || 0
+                                        ) * 0.1 +
+
+                                        bond * 0.15 +
+
+                                        Math.random() * 3;
+
+                                    return {
+                                        finalist,
+                                        score
+                                    };
+                                })
+                                .sort(
+                                    (a, b) =>
+                                        b.score - a.score
+                                );
+
+                        return {
+                            juror: juror.id,
+                            vote:
+                                ranked[0]?.finalist?.id ||
+                                null
+                        };
+                    });
+
+                s.juryVotes = generated;
+
+                votes = generated;
+            }
+
+            /*
+             * Display jury voting exactly once.
+             */
+            if (window.showEvent) {
+
+                window.showEvent(
+                    "Jury Voting",
+                    "JURY VOTING",
+                    juryVotingHTML(
+                        finalists,
+                        votes
+                    ),
+                    {
+                        week: s.currentWeek,
+                        skipHistory: false,
+                        skipLiveView: false
+                    }
+                );
+            }
+
+            save();
+            return;
+        }
+
+        /*
+         * ---------------------------------------------------
+         * FINAL RESULTS
+         * ---------------------------------------------------
+         */
+        if (index >= 5) {
+
+            showResults();
+
+            save();
+
+            return;
+        }
+    }
+
+    /*
+     * -------------------------------------------------------
+     * NORMAL SEASON EVENTS
+     * -------------------------------------------------------
+     *
+     * Anything outside the finale is handed back to the
+     * original simulator engine.
+     */
+    if (ORIGINAL_NEXT) {
+        ORIGINAL_NEXT();
+    }
+}
+
 })();
