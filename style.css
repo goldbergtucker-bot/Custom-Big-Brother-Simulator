@@ -3203,16 +3203,17 @@ select {
 
 /* Force the actual image itself to remain centered. */
 
-.sim-main-panel #event-content .single-finale-grid .sim-portrait img,
-.sim-main-panel #event-content .single-finale-grid .sim-portrait .sim-portrait-placeholder,
-#final-placements .single-finale-grid .sim-portrait img,
-#final-placements .single-finale-grid .sim-portrait .sim-portrait-placeholder {
-    width: 120px !important;
-    height: 145px !important;
-
-    display: block !important;
-
-    margin: 0 auto 7px !important;
+.single-finale-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(120px, 140px));
+    justify-content: center;
+    justify-items: center;
+    align-items: start;
+    gap: 28px 35px;
+    width: 100%;
+    max-width: 1000px;
+    margin: 20px auto;
+    box-sizing: border-box;
 }
 
 
