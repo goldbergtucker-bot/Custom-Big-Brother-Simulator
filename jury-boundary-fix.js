@@ -63,8 +63,11 @@
     }
 
     function portrait(p, size) {
+        // showName:false — every call site here also prints the name via nameOf()
+        // right next to the portrait, so the portrait's own caption is suppressed
+        // to avoid showing the same name twice.
         return p && typeof window.simulationPortrait === "function"
-            ? window.simulationPortrait(p, size || "small")
+            ? window.simulationPortrait(p, size || "small", { showName: false })
             : "";
     }
 
