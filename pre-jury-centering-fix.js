@@ -85,5 +85,6 @@
 
     console.log(
         "PRE-JURY CENTERING FIX loaded — portraits and names centered."
+        
     );
 })();
