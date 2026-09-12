@@ -6996,13 +6996,214 @@ function beginFinale() {
 }
 
 function runFinalHOHEvent() {
-    const sim=ensureFinaleState(currentSeason.simulation), finalists=getFinalistsForFinale();
-    if(finalists.length<3){ sim.currentEventIndex++; resetGameChain(sim.currentEventIndex); showEvent('Final HOH','FINAL HOH',`<p>There are only two finalists, so the Final HOH competition is skipped.</p>`); return; }
-    const comp=(currentSeason.competitions?.finalHoh||[])[0] || null;
-    const winner=comp?chooseCompetitionWinnerByCustom(finalists,comp):chooseCompetitionWinner(finalists,'mental','social','general');
-    sim.finalHOH=winner.id; sim.currentEventIndex++;
+    const sim = ensureFinaleState(currentSeason.simulation);
+    const finalists = getFinalistsForFinale();
+
+    if (finalists.length < 3) {
+        sim.currentEventIndex++;
+        resetGameChain(sim.currentEventIndex);
+
+        showEvent(
+            "Final HOH",
+            "FINAL HOH",
+            "<p>There are only two finalists, so the Final HOH competition is skipped.</p>"
+        );
+
+        return;
+    }
+
+    /*
+     * currentEventIndex tells us which Final HOH part is being played:
+     *
+     * 0 = Part 1 — all three finalists
+     * 1 = Part 2 — the two players who lost Part 1
+     * 2 = Part 3 — Part 1 winner vs Part 2 winner
+     */
+
+    const part = Number(sim.currentEventIndex || 0);
+
+    const competitions =
+        currentSeason.competitions?.finalHoh || [];
+
+    const comp =
+        competitions[part] ||
+        competitions[0] ||
+        null;
+
+    let competitors = finalists.slice();
+
+    /*
+     * PART 2
+     *
+     * The Part 1 winner does not compete.
+     */
+    if (part === 1) {
+        const part1Winner =
+            getHouseguestForSimulation(sim.finalHOH1);
+
+        if (part1Winner) {
+            competitors = finalists.filter(
+                player => player.id !== part1Winner.id
+            );
+        }
+    }
+
+    /*
+     * PART 3
+     *
+     * Part 1 winner and Part 2 winner compete.
+     */
+    if (part === 2) {
+        const part1Winner =
+            getHouseguestForSimulation(sim.finalHOH1);
+
+        const part2Winner =
+            getHouseguestForSimulation(sim.finalHOH2);
+
+        competitors = [
+            part1Winner,
+            part2Winner
+        ].filter(Boolean);
+
+        /*
+         * Safety fallback in case an old saved season does not
+         * have the new Final HOH fields yet.
+         */
+        if (competitors.length < 2) {
+            competitors = finalists.slice(0, 2);
+        }
+    }
+
+    if (!competitors.length) {
+        sim.currentEventIndex++;
+        resetGameChain(sim.currentEventIndex);
+
+        showEvent(
+            "Final HOH",
+            "FINAL HOH",
+            "<p>No eligible Final HOH competitors were found.</p>"
+        );
+
+        return;
+    }
+
+    let winner;
+
+    if (comp) {
+        winner = chooseCompetitionWinnerByCustom(
+            competitors,
+            comp
+        );
+    } else {
+        winner = chooseCompetitionWinner(
+            competitors,
+            "mental",
+            "social",
+            "general"
+        );
+    }
+
+    if (!winner) {
+        winner = competitors[0];
+    }
+
+    /*
+     * Save each part separately.
+     */
+    if (part === 0) {
+        sim.finalHOH1 = winner.id;
+    }
+
+    if (part === 1) {
+        sim.finalHOH2 = winner.id;
+    }
+
+    if (part === 2) {
+        sim.finalHOH3 = winner.id;
+
+        /*
+         * finalHOH remains the authoritative Final HOH field
+         * for older parts of the simulator.
+         */
+        sim.finalHOH = winner.id;
+    }
+
+    sim.currentEventIndex++;
+
     resetGameChain(sim.currentEventIndex);
-    showEvent(comp?.name||'Final HOH','FINAL HOH',`${simulationPortrait(winner,'large',{showName:false})}<p><strong>${escapeHTML(getHouseguestDisplayName(winner.id,currentSeason.houseguests))}</strong> has won <strong>${escapeHTML(comp?.name||'Final HOH')}</strong>.</p><p>The Final HOH will determine the final two.</p>`);
+
+    const partLabel =
+        part === 0
+            ? "Part 1"
+            : part === 1
+                ? "Part 2"
+                : "Part 3";
+
+    const competitorHTML =
+        competitors
+            .map(player =>
+                simulationPortrait(
+                    player,
+                    "medium",
+                    { showName: true }
+                )
+            )
+            .join("");
+
+    showEvent(
+        comp?.name || `Final HOH — ${partLabel}`,
+        "FINAL HOH",
+        `
+            <div class="final-hoh-event">
+                <h2>${escapeHTML(partLabel)}</h2>
+
+                <p class="event-description">
+                    ${escapeHTML(
+                        comp?.description ||
+                        `Final HOH ${partLabel}`
+                    )}
+                </p>
+
+                <div class="final-hoh-competitors">
+                    ${competitorHTML}
+                </div>
+
+                ${simulationPortrait(
+                    winner,
+                    "large",
+                    { showName: false }
+                )}
+
+                <p>
+                    <strong>
+                        ${escapeHTML(
+                            getHouseguestDisplayName(
+                                winner.id,
+                                currentSeason.houseguests
+                            )
+                        )}
+                    </strong>
+                    has won
+                    <strong>
+                        ${escapeHTML(
+                            comp?.name ||
+                            `Final HOH — ${partLabel}`
+                        )}
+                    </strong>.
+                </p>
+
+                ${
+                    part === 0
+                        ? "<p>The winner advances to Part 3.</p>"
+                        : part === 1
+                            ? "<p>The Part 1 and Part 2 winners advance to Part 3.</p>"
+                            : "<p>The winner is the Final HOH and will determine the Final 2.</p>"
+                }
+            </div>
+        `
+    );
+
+    persistCurrentSeason();
 }
 
 function runJuryVotingEvent() {
