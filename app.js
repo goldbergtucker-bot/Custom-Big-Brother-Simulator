@@ -6944,7 +6944,7 @@ function runNextEvent() {
         const chain=getFinaleChain(), index=Number(sim.currentEventIndex||0), event=chain[index];
         if(!event){ beginFinale(); return; }
         sim.renderingEventKey=event.key; sim.renderingEventLabel=event.label;
-        if(event.key==='final-hoh') runFinalHOHEvent();
+        if(event.key==='final-hoh-1' || event.key==='final-hoh-2' || event.key==='final-hoh-3') runFinalHOHEvent();
         else if(event.key==='jury-voting') runJuryVotingEvent();
         else if(event.key==='finale-results') runFinaleResultsEvent();
         persistCurrentSeason(); return;
