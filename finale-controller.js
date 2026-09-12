@@ -538,43 +538,33 @@
 
     function nextEvent() {
         addStyles();
-        const s=simulation();
-        if(!s) return;
-        if(s.finalEvictionReveal){
-            const pending=s.finalEvictionReveal; s.finalEvictionReveal=null; s.currentEventIndex=4;
-            if(window.showEvent) window.showEvent('Jury Voting','JURY VOTING',pending.juryContent||'<p>The jury vote has been recorded.</p>',{week:s.currentWeek,skipHistory:false,skipLiveView:false});
-            save(); return;
+        const s = simulation();
+        if (!s) return;
+        if (s.finalEvictionReveal) {
+            const pending = s.finalEvictionReveal;
+            s.finalEvictionReveal = null;
+            s.currentEventIndex = 4;
+            if (window.showEvent) window.showEvent('Jury Voting', 'JURY VOTING', pending.juryContent || '<p>The jury vote has been recorded.</p>', { week: s.currentWeek, skipHistory: false, skipLiveView: false });
+            save();
+            return;
         }
-        if(s.isViewingHistory){if(window.returnToCurrentSimulation)window.returnToCurrentSimulation();return;}
-        const isFinale=s.currentPhase==='finale'||s.finaleStarted===true;
-        if(isFinale){
-            const index=Number(s.currentEventIndex||0);
-            if(index===3 && activePlayers().length===3){
-                const r=chooseFinalTwoAndRecordJury(); if(!r)return; s.currentEventIndex=3;
-                s.finalEvictionReveal={playerId:r.third.id,juryContent:juryVotingHTML(r.finalists,r.votes)};
-                if(window.showEvent) window.showEvent('Final Eviction','EVICTION',`<div class="single-finale-eviction">${portrait(r.third,'large')}<h2>${esc(nameOf(r.third))}</h2><p><strong>${esc(nameOf(r.third))}</strong> has been evicted from the Big Brother house in <strong>3rd place</strong>.</p><p>The Final 2 have now been decided. Press <strong>Proceed</strong> to reveal the jury vote.</p></div>`,{week:s.currentWeek,skipHistory:true,skipLiveView:false});
-                save(); return;
+        if (s.isViewingHistory) { if (window.returnToCurrentSimulation) window.returnToCurrentSimulation(); return; }
+        const isFinale = s.currentPhase === 'finale' || s.finaleStarted === true;
+        if (isFinale) {
+            const index = Number(s.currentEventIndex || 0);
+            if (index === 3 && activePlayers().length === 3) {
+                const r = chooseFinalTwoAndRecordJury();
+                if (!r) return;
+                s.currentEventIndex = 3;
+                s.finalEvictionReveal = { playerId: r.third.id, juryContent: juryVotingHTML(r.finalists, r.votes) };
+                if (window.showEvent) window.showEvent('Final Eviction', 'EVICTION', `<div class="single-finale-eviction">${portrait(r.third, 'large')}<h2>${esc(nameOf(r.third))}</h2><p><strong>${esc(nameOf(r.third))}</strong> has been evicted from the Big Brother house in <strong>3rd place</strong>.</p><p>The Final 2 have now been decided. Press <strong>Proceed</strong> to reveal the jury vote.</p></div>`, { week: s.currentWeek, skipHistory: true, skipLiveView: false });
+                save();
+                return;
             }
-            if(index===4){
-                const finalists=finalTwo(); const counts=resolveVoteCounts(finalists);
-                const ranked=finalists.slice().sort((a,b)=>Number(counts[b.id]||0)-Number(counts[a.id]||0));
-                const winner=ranked[0]||null, runner=ranked[1]||null;
-                if(winner){winner.status='winner';winner.placement=1;s.winner=winner.id;}
-                if(runner){runner.status='runner-up';runner.placement=2;s.runnerUp=runner.id;}
-                rebuildFinalPlacements(winner,runner); s.completed=true;s.currentPhase='complete';s.pendingCycle=null;s.pendingWeekAdvance=false;s.currentEventIndex=5;
-                const tally=finalists.map(p=>`<div class="single-finale-tally-row"><span>${esc(nameOf(p))}</span><strong>${Number(counts[p.id]||0)} vote${Number(counts[p.id]||0)===1?'':'s'}</strong></div>`).join('');
-                const wall=allPlacements().map(x=>playerCard(x.player,x.placement,null)).join('');
-                if(window.showEvent) window.showEvent('Final Results','FINAL RESULTS',`<div class="single-finale-results"><h2>Final Results</h2><div class="single-finale-champions">${winner?`<div class="single-finale-champion">${portrait(winner,'large')}<h2>${esc(nameOf(winner))}</h2><p><strong>WINNER</strong></p><p>${Number(counts[winner.id]||0)} jury votes</p></div>`:''}${runner?`<div class="single-finale-champion">${portrait(runner,'large')}<h2>${esc(nameOf(runner))}</h2><p><strong>RUNNER-UP</strong></p><p>${Number(counts[runner.id]||0)} jury votes</p></div>`:''}</div><section class="single-finale-section"><h3>Final Vote Count</h3><div class="single-finale-tally">${tally}</div></section><section class="single-finale-section"><h3>Complete Placements</h3><div class="single-finale-grid">${wall}</div></section><p>Press <strong>Proceed</strong> to open the complete Results page.</p></div>`,{week:s.currentWeek,skipHistory:false,skipLiveView:false});
-                save(); return;
-            }
-            if(index>=5||s.completed){showResults();return;}
-            ORIGINAL_NEXT(); return;
+            if (index >= 4) { showResults(); return; }
         }
-        ORIGINAL_NEXT();
+        if (ORIGINAL_NEXT) ORIGINAL_NEXT();
     }
 
-    addStyles();
     window.runNextEvent = nextEvent;
-    window.showResults = showResults;
-    console.log("Single Finale Controller loaded — Final 3, jury, results, and placements stabilized.");
 })();
