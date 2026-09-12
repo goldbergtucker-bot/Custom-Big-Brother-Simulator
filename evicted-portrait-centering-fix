@@ -122,5 +122,6 @@
 
     console.log(
         "EVICTED PORTRAIT CENTERING FIX v2 loaded — targeted to #event-content > .sim-portrait."
+
     );
 })();
