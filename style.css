@@ -3097,3 +3097,235 @@ select {
     margin-left: auto !important;
     margin-right: auto !important;
 }
+
+/* =========================================================
+   FINAL PORTRAIT CENTERING FIX — 2026-09-11
+   ========================================================= */
+
+/* ---------------------------------------------------------
+   NORMAL EVICTION PORTRAIT
+   Prevent the broad event-content > div rule from stretching
+   a lone eviction portrait to the full width.
+   --------------------------------------------------------- */
+
+.sim-main-panel #event-content > .sim-portrait {
+    width: 120px !important;
+    min-width: 120px !important;
+    max-width: 120px !important;
+
+    flex: 0 0 120px !important;
+
+    display: block !important;
+
+    align-self: center !important;
+    justify-self: center !important;
+
+    margin: 22px auto !important;
+
+    text-align: center !important;
+}
+
+.sim-main-panel #event-content > .sim-portrait img,
+.sim-main-panel #event-content > .sim-portrait .sim-portrait-placeholder {
+    width: 120px !important;
+    height: 145px !important;
+
+    display: block !important;
+
+    margin: 0 auto 7px !important;
+}
+
+
+/* ---------------------------------------------------------
+   FINAL RESULTS / COMPLETE PLACEMENTS
+   --------------------------------------------------------- */
+
+.sim-main-panel #event-content .single-finale-grid,
+#final-placements .single-finale-grid {
+    width: 100% !important;
+    max-width: 1000px !important;
+
+    margin: 20px auto !important;
+    padding: 0 !important;
+
+    display: grid !important;
+
+    grid-template-columns:
+        repeat(4, minmax(120px, 140px)) !important;
+
+    justify-content: center !important;
+    justify-items: center !important;
+    align-items: start !important;
+
+    gap: 28px 35px !important;
+
+    box-sizing: border-box !important;
+}
+
+
+/* Every placement card gets a fixed centered column. */
+
+.sim-main-panel #event-content .single-finale-grid > .single-finale-player-card,
+#final-placements .single-finale-grid > .single-finale-player-card {
+    width: 140px !important;
+    min-width: 140px !important;
+    max-width: 140px !important;
+
+    margin: 0 auto !important;
+
+    display: flex !important;
+    flex-direction: column !important;
+
+    align-items: center !important;
+    justify-content: flex-start !important;
+
+    text-align: center !important;
+
+    box-sizing: border-box !important;
+}
+
+
+/* Center every portrait inside every placement card. */
+
+.sim-main-panel #event-content .single-finale-grid .sim-portrait,
+#final-placements .single-finale-grid .sim-portrait {
+    width: 120px !important;
+    min-width: 120px !important;
+    max-width: 120px !important;
+
+    margin: 0 auto 9px !important;
+
+    align-self: center !important;
+
+    text-align: center !important;
+}
+
+
+/* Force the actual image itself to remain centered. */
+
+.sim-main-panel #event-content .single-finale-grid .sim-portrait img,
+.sim-main-panel #event-content .single-finale-grid .sim-portrait .sim-portrait-placeholder,
+#final-placements .single-finale-grid .sim-portrait img,
+#final-placements .single-finale-grid .sim-portrait .sim-portrait-placeholder {
+    width: 120px !important;
+    height: 145px !important;
+
+    display: block !important;
+
+    margin: 0 auto 7px !important;
+}
+
+
+/* ---------------------------------------------------------
+   FINAL WINNER / RUNNER-UP PORTRAITS
+   --------------------------------------------------------- */
+
+.single-finale-champions {
+    width: 100% !important;
+
+    display: flex !important;
+    flex-wrap: wrap !important;
+
+    justify-content: center !important;
+    align-items: flex-start !important;
+
+    gap: 45px !important;
+
+    margin: 20px auto 30px !important;
+}
+
+.single-finale-champion {
+    width: 160px !important;
+    min-width: 160px !important;
+
+    display: flex !important;
+    flex-direction: column !important;
+
+    align-items: center !important;
+    justify-content: flex-start !important;
+
+    text-align: center !important;
+
+    margin: 0 auto !important;
+}
+
+.single-finale-champion .sim-portrait {
+    width: 120px !important;
+    min-width: 120px !important;
+
+    margin: 0 auto 14px !important;
+
+    align-self: center !important;
+}
+
+.single-finale-champion .sim-portrait img,
+.single-finale-champion .sim-portrait .sim-portrait-placeholder {
+    width: 120px !important;
+    height: 145px !important;
+
+    margin: 0 auto 7px !important;
+}
+
+
+/* ---------------------------------------------------------
+   FINAL EVICTION SCREEN
+   --------------------------------------------------------- */
+
+.single-finale-eviction {
+    width: 100% !important;
+
+    display: flex !important;
+    flex-direction: column !important;
+
+    align-items: center !important;
+    justify-content: flex-start !important;
+
+    text-align: center !important;
+}
+
+.single-finale-eviction > .sim-portrait {
+    width: 120px !important;
+    min-width: 120px !important;
+    max-width: 120px !important;
+
+    margin: 22px auto 16px !important;
+
+    align-self: center !important;
+}
+
+.single-finale-eviction > .sim-portrait img,
+.single-finale-eviction > .sim-portrait .sim-portrait-placeholder {
+    width: 120px !important;
+    height: 145px !important;
+
+    margin: 0 auto 7px !important;
+}
+
+
+/* ---------------------------------------------------------
+   RESPONSIVE FINAL PLACEMENT WALL
+   --------------------------------------------------------- */
+
+@media (max-width: 850px) {
+    .sim-main-panel #event-content .single-finale-grid,
+    #final-placements .single-finale-grid {
+        grid-template-columns:
+            repeat(3, minmax(120px, 140px)) !important;
+    }
+}
+
+@media (max-width: 650px) {
+    .sim-main-panel #event-content .single-finale-grid,
+    #final-placements .single-finale-grid {
+        grid-template-columns:
+            repeat(2, minmax(120px, 140px)) !important;
+    }
+}
+
+@media (max-width: 420px) {
+    .sim-main-panel #event-content .single-finale-grid,
+    #final-placements .single-finale-grid {
+        grid-template-columns:
+            120px !important;
+    }
+}
