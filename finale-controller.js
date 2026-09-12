@@ -44,7 +44,10 @@
         return window.escapeHTML ? window.escapeHTML(String(value ?? "")) : String(value ?? "");
     }
     function portrait(p, size) {
-        return p && window.simulationPortrait ? window.simulationPortrait(p, size || "medium") : "";
+        // showName:false — every call site here also prints the name via nameOf()
+        // right next to the portrait, so the portrait's own caption is suppressed
+        // to avoid showing the same name twice.
+        return p && window.simulationPortrait ? window.simulationPortrait(p, size || "medium", { showName: false }) : "";
     }
     function portraits(ids, size) {
         return window.simulationPortraits
